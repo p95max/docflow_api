@@ -19,7 +19,7 @@ services:
       POSTGRES_USER: docsflow
       POSTGRES_PASSWORD: docsflow
     ports:
-      - "5432:5432"
+      - "5435:5435"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

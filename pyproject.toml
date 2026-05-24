@@ -3,18 +3,25 @@ name = "docflow-api"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "maxx",email = "m.petrykin@gmx.de"}
+    {name = "maxx", email = "m.petrykin@gmx.de"}
 ]
 readme = "README.md"
-requires-python = "^3.14"
+requires-python = ">=3.12,<4.0"
 dependencies = [
-    "fastapi (>=0.136.3,<0.137.0)",
-    "uvicorn (>=0.47.0,<0.48.0)",
-    "sqlalchemy (>=2.0.49,<3.0.0)",
-    "bcrypt (>=5.0.0,<6.0.0)",
-    "pyjwt (>=2.13.0,<3.0.0)"
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "sqlalchemy>=2.0,<3.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "alembic>=1.13,<2.0",
+    "pydantic>=2.8,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "bcrypt>=4.2,<6.0",
+    "PyJWT>=2.9,<3.0",
+    "python-multipart>=0.0.9,<1.0",
+    "email-validator>=2.2,<3.0",
+    "pytest>=8.0,<9.0",
+    "httpx>=0.27,<1.0"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
