@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker / local volumes
+postgres_data/
+docker-data/
+volumes/
+
+# Runtime files
+logs/
+*.log
+tmp/
+temp/
+
+# Uploaded files / local storage
+media/
+uploads/
+storage/
+
+# SQLite fallback
+*.sqlite3
+*.db
+
+# Alembic
+# Keep migration files tracked.
+# Do NOT ignore alembic/versions/

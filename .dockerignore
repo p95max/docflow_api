@@ -1,0 +1,68 @@
+# Git
+.git
+.gitignore
+
+# Docker files not needed inside image
+docker-compose.yml
+.dockerignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Local runtime data
+logs/
+*.log
+tmp/
+temp/
+media/
+uploads/
+storage/
+
+# Local DB files
+*.sqlite3
+*.db
+
+# Documentation / local notes
+README.local.md
+notes/
