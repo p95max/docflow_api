@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0001_create_users_and_documents"
 down_revision: str | None = None
@@ -17,18 +18,20 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    document_status = sa.Enum(
+    document_status = postgresql.ENUM(
         "uploaded",
         "processing",
         "completed",
         "failed",
         name="document_status",
+        create_type=False,
     )
 
-    processing_mode = sa.Enum(
+    processing_mode = postgresql.ENUM(
         "standard",
         "confidential",
         name="processing_mode",
+        create_type=False,
     )
 
     document_status.create(op.get_bind(), checkfirst=True)
@@ -125,5 +128,21 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_table("users")
 
-    sa.Enum(name="processing_mode").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="document_status").drop(op.get_bind(), checkfirst=True)
+    processing_mode = postgresql.ENUM(
+        "standard",
+        "confidential",
+        name="processing_mode",
+        create_type=False,
+    )
+
+    document_status = postgresql.ENUM(
+        "uploaded",
+        "processing",
+        "completed",
+        "failed",
+        name="document_status",
+        create_type=False,
+    )
+
+    processing_mode.drop(op.get_bind(), checkfirst=True)
+    document_status.drop(op.get_bind(), checkfirst=True)
