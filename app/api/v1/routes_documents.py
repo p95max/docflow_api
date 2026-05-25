@@ -1,11 +1,53 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 
 from app.api.v1.dependencies import CurrentUser, DbSession
-from app.models.document import Document
+from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.schemas.document import DocumentRead
+from app.services.uploads import enforce_upload_rate_limit, validate_upload_file
 
 router = APIRouter()
+
+
+def check_upload_rate_limit(current_user: CurrentUser) -> None:
+    enforce_upload_rate_limit(current_user)
+
+
+@router.post(
+    "/upload",
+    response_model=DocumentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document(
+    db: DbSession,
+    current_user: CurrentUser,
+    file: Annotated[UploadFile, File(description="PDF, JPG or PNG document")],
+    confidential: Annotated[
+        bool,
+        Form(description="Use confidential local-only processing mode"),
+    ] = False,
+    _: Annotated[None, Depends(check_upload_rate_limit)] = None,
+) -> DocumentRead:
+    upload = await validate_upload_file(file)
+
+    document = Document(
+        owner_id=current_user.id,
+        original_filename=upload.filename,
+        status=DocumentStatus.uploaded,
+        processing_mode=(
+            ProcessingMode.confidential
+            if confidential
+            else ProcessingMode.standard
+        ),
+    )
+
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+
+    return document
 
 
 @router.get("", response_model=list[DocumentRead])

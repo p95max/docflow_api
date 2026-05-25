@@ -1,3 +1,5 @@
+import json
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +12,14 @@ class Settings(BaseSettings):
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
 
+    upload_max_file_size_mb: int = 10
+    upload_rate_limit_requests: int = 10
+    upload_rate_limit_window_seconds: int = 60
+
+    @property
+    def upload_max_file_size_bytes(self) -> int:
+        return self.upload_max_file_size_mb * 1024 * 1024
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -18,9 +28,18 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+        if isinstance(value, list):
+            return value
+
+        value = value.strip()
+
+        if value.startswith("["):
+            parsed = json.loads(value)
+            if not isinstance(parsed, list):
+                raise ValueError("CORS_ORIGINS must be a list or comma-separated string")
+            return [str(origin).strip() for origin in parsed if str(origin).strip()]
+
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
 
 
 settings = Settings()
