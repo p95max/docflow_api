@@ -75,7 +75,7 @@ async def read_and_validate_upload_file(upload_file: UploadFile) -> ValidatedUpl
 
         if len(data) > settings.upload_max_file_size_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=(
                     "Uploaded file is too large. "
                     f"Maximum allowed size is {settings.upload_max_file_size_mb} MB."
