@@ -1,3 +1,4 @@
+import hashlib
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -23,7 +24,10 @@ _upload_rate_limit_state: dict[int, deque[datetime]] = defaultdict(deque)
 class ValidatedUpload:
     filename: str
     content_type: str
+    extension: str
     size_bytes: int
+    checksum_sha256: str
+    content: bytes
 
 
 def enforce_upload_rate_limit(current_user: User) -> None:
@@ -44,8 +48,8 @@ def enforce_upload_rate_limit(current_user: User) -> None:
     bucket.append(now)
 
 
-async def validate_upload_file(upload_file: UploadFile) -> ValidatedUpload:
-    """Validate upload filename, size, MIME type and file signature."""
+async def read_and_validate_upload_file(upload_file: UploadFile) -> ValidatedUpload:
+    """Read an uploaded file safely and validate size, MIME type and file signature."""
     filename = Path(upload_file.filename or "").name
 
     if not filename:
@@ -62,17 +66,14 @@ async def validate_upload_file(upload_file: UploadFile) -> ValidatedUpload:
             detail="Unsupported file type. Only PDF, JPG and PNG files are allowed.",
         )
 
-    size_bytes = 0
-    header = bytearray()
+    checksum = hashlib.sha256()
+    data = bytearray()
 
     while chunk := await upload_file.read(UPLOAD_CHUNK_SIZE):
-        size_bytes += len(chunk)
+        data.extend(chunk)
+        checksum.update(chunk)
 
-        if len(header) < 16:
-            remaining_header_bytes = 16 - len(header)
-            header.extend(chunk[:remaining_header_bytes])
-
-        if size_bytes > settings.upload_max_file_size_bytes:
+        if len(data) > settings.upload_max_file_size_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=(
@@ -81,21 +82,24 @@ async def validate_upload_file(upload_file: UploadFile) -> ValidatedUpload:
                 ),
             )
 
-    if size_bytes == 0:
+    if not data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file is empty.",
         )
 
     _validate_file_signature(
-        content=bytes(header),
+        content=bytes(data[:16]),
         content_type=content_type,
     )
 
     return ValidatedUpload(
         filename=filename,
         content_type=content_type,
-        size_bytes=size_bytes,
+        extension=ALLOWED_UPLOAD_MIME_TYPES[content_type],
+        size_bytes=len(data),
+        checksum_sha256=checksum.hexdigest(),
+        content=bytes(data),
     )
 
 

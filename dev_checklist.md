@@ -35,7 +35,7 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 2. File storage
 
-- [ ] Save files to MinIO or local storage
+- [ ] Save files to local storage
 - [ ] SHA-256 checksum
 - [ ] Duplicate detection
 

@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     upload_rate_limit_requests: int = 10
     upload_rate_limit_window_seconds: int = 60
 
+    local_storage_path: str = "storage"
+
     @property
     def upload_max_file_size_bytes(self) -> int:
         return self.upload_max_file_size_mb * 1024 * 1024

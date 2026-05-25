@@ -10,6 +10,9 @@ class DocumentRead(BaseModel):
     original_filename: str
     status: DocumentStatus
     processing_mode: ProcessingMode
+    content_type: str | None
+    file_size_bytes: int | None
+    checksum_sha256: str | None
     created_at: datetime
     updated_at: datetime
 
