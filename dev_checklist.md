@@ -35,18 +35,18 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 2. File storage
 
-- [ ] Save files to local storage
-- [ ] SHA-256 checksum
-- [ ] Duplicate detection
+- [x] Save files to local storage
+- [x] SHA-256 checksum
+- [x] Duplicate detection
 
 ---
 
 ### 3. Document record
 
-- [ ] Create `Document` record in DB
-- [ ] Document statuses: `uploaded` / `processing` / `completed` / `failed`
-- [ ] `processing_mode` field on `Document`
-- [ ] Processing modes:
+- [x] Create `Document` record in DB
+- [x] Document statuses: `uploaded` / `processing` / `completed` / `failed`
+- [x] `processing_mode` field on `Document`
+- [x] Processing modes:
   - `standard`
   - `confidential`
 

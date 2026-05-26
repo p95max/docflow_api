@@ -16,11 +16,24 @@ os.environ["UPLOAD_RATE_LIMIT_REQUESTS"] = "100"
 os.environ["UPLOAD_RATE_LIMIT_WINDOW_SECONDS"] = "60"
 os.environ["LOCAL_STORAGE_PATH"] = "storage-test"
 
+os.environ["CELERY_BROKER_URL"] = "memory://"
+os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
+os.environ["DOCUMENT_PROCESSING_SOFT_TIME_LIMIT_SECONDS"] = "60"
+os.environ["DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS"] = "90"
+os.environ["DOCUMENT_PROCESSING_MAX_RETRIES"] = "3"
+os.environ["DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS"] = "0"
+
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+
+# Import all SQLAlchemy models before Base.metadata.create_all().
+from app.models.document import Document  # noqa: F401, E402
+from app.models.processing_job import ProcessingJob  # noqa: F401, E402
+from app.models.user import User  # noqa: F401, E402
+
 from app.main import app  # noqa: E402
-from app.models import Document, User  # noqa: F401, E402
 from app.services.security import create_access_token  # noqa: E402
 from app.services.uploads import _upload_rate_limit_state  # noqa: E402
 from app.services.users import create_user  # noqa: E402

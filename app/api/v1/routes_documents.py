@@ -6,7 +6,14 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.dependencies import CurrentUser, DbSession
 from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.processing_job import ProcessingJobStatus
 from app.schemas.document import DocumentRead
+from app.schemas.processing_job import ProcessingJobRead
+from app.services.processing_jobs import (
+    create_processing_job,
+    enqueue_processing_job,
+    list_processing_jobs_for_document,
+)
 from app.services.storage import (
     build_document_storage_key,
     delete_document_file,
@@ -77,14 +84,22 @@ async def upload_document(
             document=document,
             extension=upload.extension,
         )
+
         save_document_file(
             content=upload.content,
             storage_key=storage_key,
         )
 
         document.storage_key = storage_key
+
+        processing_job = create_processing_job(
+            db=db,
+            document=document,
+        )
+
         db.commit()
         db.refresh(document)
+        db.refresh(processing_job)
 
     except IntegrityError:
         db.rollback()
@@ -112,6 +127,13 @@ async def upload_document(
         delete_document_file(storage_key)
         raise
 
+    enqueue_processing_job(
+        db=db,
+        job=processing_job,
+    )
+
+    db.refresh(document)
+
     return document
 
 
@@ -135,6 +157,86 @@ def get_my_document(
     db: DbSession,
     current_user: CurrentUser,
 ) -> DocumentRead:
+    return _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+
+
+@router.get("/{document_id}/jobs", response_model=list[ProcessingJobRead])
+def list_document_jobs(
+    document_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> list[ProcessingJobRead]:
+    document = _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+
+    return list_processing_jobs_for_document(
+        db=db,
+        document_id=document.id,
+    )
+
+
+@router.post(
+    "/{document_id}/reprocess",
+    response_model=ProcessingJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def reprocess_document(
+    document_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProcessingJobRead:
+    document = _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+
+    if document.status != DocumentStatus.failed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only failed documents can be reprocessed.",
+        )
+
+    failed_jobs = [
+        job
+        for job in list_processing_jobs_for_document(db=db, document_id=document.id)
+        if job.status == ProcessingJobStatus.failed
+    ]
+
+    if not failed_jobs:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document has no failed processing jobs.",
+        )
+
+    document.status = DocumentStatus.uploaded
+
+    processing_job = create_processing_job(
+        db=db,
+        document=document,
+    )
+
+    db.commit()
+    db.refresh(processing_job)
+
+    return enqueue_processing_job(
+        db=db,
+        job=processing_job,
+    )
+
+
+def _get_owned_document(
+    db: DbSession,
+    document_id: int,
+    current_user: CurrentUser,
+) -> Document:
     document = db.get(Document, document_id)
 
     if document is None:
@@ -161,4 +263,5 @@ def _get_duplicate_document(
         Document.owner_id == owner_id,
         Document.checksum_sha256 == checksum_sha256,
     )
+
     return db.scalar(stmt)

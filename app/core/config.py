@@ -18,6 +18,15 @@ class Settings(BaseSettings):
 
     local_storage_path: str = "storage"
 
+    celery_broker_url: str = "redis://redis:6379/0"
+    celery_result_backend: str = "redis://redis:6379/1"
+    celery_task_always_eager: bool = False
+
+    document_processing_soft_time_limit_seconds: int = 60
+    document_processing_hard_time_limit_seconds: int = 90
+    document_processing_max_retries: int = 3
+    document_processing_retry_delay_seconds: int = 10
+
     @property
     def upload_max_file_size_bytes(self) -> int:
         return self.upload_max_file_size_mb * 1024 * 1024

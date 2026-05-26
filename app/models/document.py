@@ -80,3 +80,9 @@ class Document(Base):
     )
 
     owner = relationship("User", back_populates="documents")
+
+    processing_jobs = relationship(
+        "ProcessingJob",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )

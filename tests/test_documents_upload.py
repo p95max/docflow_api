@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.api.v1 import routes_documents
 from app.core.config import settings
+from app.models import ProcessingJob
 from app.models.document import Document
 from app.services.uploads import _upload_rate_limit_state
 
@@ -16,6 +18,25 @@ PDF_BYTES_SECOND = b"%PDF-1.4\n2 0 obj\n<<>>\nendobj\n%%EOF\n"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 JPG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 
+@pytest.fixture(autouse=True)
+def disable_processing_enqueue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_enqueue_processing_job(
+        db: Session,
+        job: ProcessingJob,
+    ) -> ProcessingJob:
+        job.celery_task_id = "fake-upload-test-task-id"
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        return job
+
+    monkeypatch.setattr(
+        routes_documents,
+        "enqueue_processing_job",
+        fake_enqueue_processing_job,
+    )
 
 @pytest.mark.parametrize(
     ("filename", "content", "content_type", "expected_extension"),
