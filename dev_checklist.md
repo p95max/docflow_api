@@ -66,10 +66,10 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 5. Local text extraction
 
-- [ ] Extract text from file
-- [ ] Store `raw_text`
-- [ ] Confidential pipeline: local text extraction only
-- [ ] Block external API calls when `processing_mode = confidential`
+- [x] Extract text from file
+- [x] Store `raw_text`
+- [x] Confidential pipeline: local text extraction only
+- [x] Block external API calls when `processing_mode = confidential`
 
 ---
 
