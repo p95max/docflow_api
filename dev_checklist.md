@@ -54,13 +54,13 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 4. Processing job
 
-- [ ] `ProcessingJob` for each processing operation
-- [ ] Celery task for asynchronous processing
-- [ ] Celery soft/hard time limits
-- [ ] Max retries
-- [ ] Failed status
-- [ ] `error_message`
-- [ ] Reprocess trigger on failure
+- [x] `ProcessingJob` for each processing operation
+- [x] Celery task for asynchronous processing
+- [x] Celery soft/hard time limits
+- [x] Max retries
+- [x] Failed status
+- [x] `error_message`
+- [x] Reprocess trigger on failure
 
 ---
 

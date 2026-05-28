@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     document_processing_max_retries: int = 3
     document_processing_retry_delay_seconds: int = 10
 
+    local_ocr_languages: str = "eng+deu"
+
     @property
     def upload_max_file_size_bytes(self) -> int:
         return self.upload_max_file_size_mb * 1024 * 1024

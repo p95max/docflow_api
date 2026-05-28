@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.document import Document, DocumentStatus
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.worker import celery_app
+from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.services.text_extraction import extract_text_from_document
 
 
 @celery_app.task(
@@ -44,10 +45,10 @@ def process_document_task(self, job_id: int) -> None:
                 attempts=self.request.retries + 1,
             )
 
-            extracted_text = _extract_text_placeholder(document=document)
+            extracted_text = extract_text_from_document(document=document)
 
             document.raw_text = extracted_text
-            document.status = DocumentStatus.completed
+            document.status = _get_success_status(document=document)
 
             job.status = ProcessingJobStatus.completed
             job.error_message = None
@@ -155,3 +156,11 @@ def _extract_text_placeholder(document: Document) -> str:
         f"File size bytes: {document.file_size_bytes}\n"
         f"Storage key: {document.storage_key}\n"
     )
+
+def _get_success_status(document: Document) -> DocumentStatus:
+    if document.processing_mode == ProcessingMode.confidential:
+        return DocumentStatus.completed
+
+    # MVP 1 step 6 will continue standard-mode documents with AI extraction.
+    # At step 5 there are intentionally no external API calls here.
+    return DocumentStatus.completed

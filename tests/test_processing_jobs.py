@@ -29,7 +29,45 @@ from app.services.storage import save_document_file
 from app.tasks.documents import process_document_task
 
 
-PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
+PDF_BYTES = b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 72 >>
+stream
+BT
+/F1 24 Tf
+72 720 Td
+(Invoice number 12345) Tj
+0 -30 Td
+(Amount 99.95 EUR) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+433
+%%EOF
+"""
 
 
 class SessionLocalOverride:
@@ -155,8 +193,8 @@ def test_process_document_task_completes_document_and_job(
     assert result.successful()
     assert document.status == DocumentStatus.completed
     assert document.raw_text is not None
-    assert "Document processing completed." in document.raw_text
-    assert document.storage_key in document.raw_text
+    assert "Invoice number 12345" in document.raw_text
+    assert "Amount 99.95 EUR" in document.raw_text
 
     assert job.status == ProcessingJobStatus.completed
     assert job.attempts == 1
@@ -413,6 +451,7 @@ def _create_document_with_file(
     user: User,
     content: bytes,
     status: DocumentStatus = DocumentStatus.uploaded,
+    processing_mode: ProcessingMode = ProcessingMode.standard,
 ) -> Document:
     checksum = hashlib.sha256(content + str(status.value).encode()).hexdigest()
 
@@ -420,7 +459,7 @@ def _create_document_with_file(
         owner_id=user.id,
         original_filename="test-document.pdf",
         status=status,
-        processing_mode=ProcessingMode.standard,
+        processing_mode=processing_mode,
         content_type="application/pdf",
         file_size_bytes=len(content),
         checksum_sha256=checksum,
@@ -440,3 +479,44 @@ def _create_document_with_file(
     db.refresh(document)
 
     return document
+
+
+def test_process_document_task_completes_confidential_document_locally(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "local_storage_path", str(tmp_path / "storage"))
+    _patch_task_session(
+        monkeypatch=monkeypatch,
+        db_session=db_session,
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.confidential,
+    )
+    job = create_processing_job(
+        db=db_session,
+        document=document,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    result = process_document_task.apply(
+        args=(job.id,),
+        throw=True,
+    )
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+
+    assert result.successful()
+    assert document.processing_mode == ProcessingMode.confidential
+    assert document.status == DocumentStatus.completed
+    assert document.raw_text is not None
+    assert "Invoice number 12345" in document.raw_text
+    assert job.status == ProcessingJobStatus.completed
