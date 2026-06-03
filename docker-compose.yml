@@ -1,7 +1,7 @@
 services:
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh scripts/start-api.sh
     env_file:
       - .env
     volumes:

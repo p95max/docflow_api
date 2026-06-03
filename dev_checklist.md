@@ -75,10 +75,10 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 6. AI processing for standard mode
 
-- [ ] Classify document type
-- [ ] AI extraction to JSON
-- [ ] Pydantic validation of AI response
-- [ ] OpenAI usage logging
+- [x] Classify document type
+- [x] AI extraction to JSON
+- [x] Pydantic validation of AI response
+- [x] OpenAI usage logging
 
 ---
 
