@@ -382,14 +382,136 @@ Main settings are configured through `.env`.
 
 ---
 
+## AI Extraction for Standard Documents
+
+DocsFlow supports AI-based structured extraction for documents uploaded in `standard` mode.
+
+Processing flow for standard documents:
+
+```text
+upload
+→ local text extraction
+→ AI document classification
+→ AI structured JSON extraction
+→ Pydantic validation
+→ save extracted JSON
+→ save OpenAI usage log
+→ mark document as completed
+```
+
+> AI processing is executed only after local text extraction has completed successfully.
+
+### Supported AI Processing Scope
+
+- Document type classification
+- Structured data extraction to JSON
+- Pydantic validation of the AI response
+- OpenAI token usage logging
+
+**Storage fields:**
+
+| Field | Table |
+|---|---|
+| Extracted JSON | `documents.ai_extracted_data` |
+| Document type | `documents.document_type` |
+| Model used | `documents.ai_extraction_model` |
+| Completion timestamp | `documents.ai_extraction_completed_at` |
+| Token usage | `openai_usage_logs` |
+
+### Processing Modes
+
+AI extraction is only available for documents uploaded with `confidential=false`.
+
+Documents uploaded with `confidential=true` are processed locally only and never sent to OpenAI. This is an intentional security boundary.
+
+### Required Environment Variables
+
+```bash
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_REQUEST_TIMEOUT_SECONDS=45
+OPENAI_MAX_INPUT_CHARS=12000
+```
+
+> If `OPENAI_API_KEY` is missing, standard document processing will fail during the AI extraction step. Confidential documents do not require an OpenAI API key.
+
+### Example: Upload a Standard Document
+
+```bash
+curl -X POST http://localhost:8000/api/v1/documents/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/document.pdf;type=application/pdf" \
+  -F "confidential=false"
+```
+
+After processing, the document response includes AI extraction fields:
+
+```json
+{
+  "id": 1,
+  "status": "completed",
+  "processing_mode": "standard",
+  "document_type": "invoice",
+  "ai_extracted_data": {
+    "document_type": "invoice",
+    "summary": "Invoice for services.",
+    "sender": "Example Company",
+    "recipient": "Customer Name",
+    "document_date": "2026-01-15",
+    "due_date": "2026-02-15",
+    "total_amount": 950.0,
+    "currency": "EUR",
+    "invoice_number": "INV-001",
+    "reference_number": null,
+    "requires_action": true,
+    "action_deadline": "2026-02-15",
+    "confidence_score": 0.95,
+    "notes": null
+  },
+  "ai_extraction_model": "gpt-4o-mini",
+  "ai_extraction_completed_at": "2026-06-03T17:47:42.746233Z"
+}
+```
+
+### Check OpenAI Usage Logs
+
+```bash
+docker compose exec db psql -U docsflow -d docsflow \
+  -P pager=off \
+  -c "SELECT document_id, operation, model, input_tokens, output_tokens, total_tokens FROM openai_usage_logs ORDER BY id DESC LIMIT 5;"
+```
+
+Example result:
+
+```
+ document_id |       operation        |    model    | input_tokens | output_tokens | total_tokens
+-------------+------------------------+-------------+--------------+---------------+--------------
+           1 | document_ai_extraction | gpt-4o-mini |          844 |           100 |          944
+```
+
+### Check Extracted AI Data
+
+```bash
+docker compose exec db psql -U docsflow -d docsflow \
+  -P pager=off \
+  -c "SELECT id, document_type, ai_extracted_data FROM documents ORDER BY id DESC LIMIT 1;"
+```
+
+---
+
 ## Current Limitations
 
 - `raw_text` is stored internally but not exposed through the public API
 - Scanned PDF OCR fallback is not implemented yet
 - Uploaded files are stored on the local filesystem
 - Upload rate limiting is in-memory and not shared between multiple API instances
-- Structured AI extraction is not implemented yet
+- AI extraction is available only for `standard` mode — `confidential` documents are never sent to OpenAI
+- AI extraction depends on successful local text extraction
+- Scanned PDFs without a text layer require OCR fallback before AI extraction can work well
+- Extracted JSON schema is generic and will be refined in later MVP steps
 - Semantic search and document Q&A are planned for later MVP stages
+- standard-mode AI extraction requires `OPENAI_API_KEY`
+- scanned PDF files without a text layer may produce empty `raw_text` until OCR fallback is implemented
 
 ## Contacts
 
