@@ -1,7 +1,8 @@
 import enum
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -81,8 +82,32 @@ class Document(Base):
 
     owner = relationship("User", back_populates="documents")
 
+
+    document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    ai_extracted_data: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    ai_extraction_model: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    ai_extraction_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     processing_jobs = relationship(
         "ProcessingJob",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    openai_usage_logs = relationship(
+        "OpenAIUsageLog",
         back_populates="document",
         cascade="all, delete-orphan",
     )

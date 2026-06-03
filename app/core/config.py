@@ -29,6 +29,11 @@ class Settings(BaseSettings):
 
     local_ocr_languages: str = "eng+deu"
 
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    openai_request_timeout_seconds: int = 45
+    openai_max_input_chars: int = 12000
+
     @property
     def upload_max_file_size_bytes(self) -> int:
         return self.upload_max_file_size_mb * 1024 * 1024

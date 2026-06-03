@@ -1,15 +1,16 @@
 from datetime import UTC, datetime
-from pathlib import Path
 
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.processing_job import ProcessingJob, ProcessingJobStatus
-from app.worker import celery_app
 from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.openai_usage_log import OpenAIUsageLog
+from app.models.processing_job import ProcessingJob, ProcessingJobStatus
+from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
 from app.services.text_extraction import extract_text_from_document
+from app.worker import celery_app
 
 
 @celery_app.task(
@@ -48,7 +49,19 @@ def process_document_task(self, job_id: int) -> None:
             extracted_text = extract_text_from_document(document=document)
 
             document.raw_text = extracted_text
-            document.status = _get_success_status(document=document)
+
+            if document.processing_mode == ProcessingMode.standard:
+                ai_result = run_standard_ai_processing(
+                    raw_text=extracted_text,
+                    original_filename=document.original_filename,
+                )
+                _apply_standard_ai_processing_result(
+                    db=db,
+                    document=document,
+                    ai_result=ai_result,
+                )
+
+            document.status = DocumentStatus.completed
 
             job.status = ProcessingJobStatus.completed
             job.error_message = None
@@ -161,6 +174,28 @@ def _get_success_status(document: Document) -> DocumentStatus:
     if document.processing_mode == ProcessingMode.confidential:
         return DocumentStatus.completed
 
-    # MVP 1 step 6 will continue standard-mode documents with AI extraction.
-    # At step 5 there are intentionally no external API calls here.
     return DocumentStatus.completed
+
+
+def _apply_standard_ai_processing_result(
+    *,
+    db: Session,
+    document: Document,
+    ai_result: StandardAIProcessingResult,
+) -> None:
+    document.document_type = ai_result.extracted_data.document_type
+    document.ai_extracted_data = ai_result.extracted_data.model_dump(mode="json")
+    document.ai_extraction_model = ai_result.model
+    document.ai_extraction_completed_at = datetime.now(UTC)
+
+    db.add(
+        OpenAIUsageLog(
+            document_id=document.id,
+            operation="document_ai_extraction",
+            model=ai_result.model,
+            response_id=ai_result.response_id,
+            input_tokens=ai_result.usage.input_tokens,
+            output_tokens=ai_result.usage.output_tokens,
+            total_tokens=ai_result.usage.total_tokens,
+        )
+    )

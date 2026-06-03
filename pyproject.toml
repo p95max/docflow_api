@@ -25,7 +25,8 @@ dependencies = [
     "celery-types (>=0.26.0,<0.27.0)",
     "pymupdf (>=1.24,<2.0)",
     "pytesseract (>=0.3,<1.0)",
-    "pillow (>=10.0,<13.0)"
+    "pillow (>=10.0,<13.0)",
+    "openai (>=2.0,<3.0)"
 ]
 
 [build-system]

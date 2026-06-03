@@ -24,9 +24,15 @@ os.environ["DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS"] = "90"
 os.environ["DOCUMENT_PROCESSING_MAX_RETRIES"] = "3"
 os.environ["DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS"] = "0"
 
+os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
+os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
+os.environ["OPENAI_REQUEST_TIMEOUT_SECONDS"] = "45"
+os.environ["OPENAI_MAX_INPUT_CHARS"] = "12000"
+
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().
 from app.models.document import Document  # noqa: F401, E402

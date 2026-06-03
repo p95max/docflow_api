@@ -27,6 +27,9 @@ from app.services.processing_jobs import (
 )
 from app.services.storage import save_document_file
 from app.tasks.documents import process_document_task
+from app.models.openai_usage_log import OpenAIUsageLog
+from app.schemas.ai_processing import DocumentAIExtraction
+from app.services.ai_processing import OpenAIUsage, StandardAIProcessingResult
 
 
 PDF_BYTES = b"""%PDF-1.4
@@ -174,6 +177,7 @@ def test_process_document_task_completes_document_and_job(
         db=db_session,
         user=test_user,
         content=PDF_BYTES,
+        processing_mode=ProcessingMode.confidential,
     )
     job = create_processing_job(
         db=db_session,
@@ -520,3 +524,238 @@ def test_process_document_task_completes_confidential_document_locally(
     assert document.raw_text is not None
     assert "Invoice number 12345" in document.raw_text
     assert job.status == ProcessingJobStatus.completed
+
+
+def _fake_ai_processing_result() -> StandardAIProcessingResult:
+    return StandardAIProcessingResult(
+        model="gpt-4o-mini",
+        response_id="resp_test_123",
+        extracted_data=DocumentAIExtraction(
+            document_type="invoice",
+            summary="Invoice for software services.",
+            sender="YesLogic Pty. Ltd.",
+            recipient="Customer Name",
+            document_date="2016-11-26",
+            due_date=None,
+            total_amount=950.0,
+            currency="USD",
+            invoice_number="161126",
+            reference_number=None,
+            requires_action=True,
+            action_deadline=None,
+            confidence_score=0.95,
+            notes=None,
+        ),
+        usage=OpenAIUsage(
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+        ),
+    )
+
+
+def test_process_document_task_runs_ai_processing_for_standard_document(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "local_storage_path", str(tmp_path / "storage"))
+    _patch_task_session(
+        monkeypatch=monkeypatch,
+        db_session=db_session,
+    )
+
+    def fake_extract_text_from_document(document: Document) -> str:
+        return "Invoice number 161126. Total USD 950.00."
+
+    def fake_run_standard_ai_processing(
+        *,
+        raw_text: str,
+        original_filename: str,
+    ) -> StandardAIProcessingResult:
+        assert "Invoice number 161126" in raw_text
+        assert original_filename == "test-document.pdf"
+        return _fake_ai_processing_result()
+
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        fake_extract_text_from_document,
+    )
+    monkeypatch.setattr(
+        document_tasks,
+        "run_standard_ai_processing",
+        fake_run_standard_ai_processing,
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.standard,
+    )
+    job = create_processing_job(
+        db=db_session,
+        document=document,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    result = process_document_task.apply(
+        args=(job.id,),
+        throw=True,
+    )
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+
+    usage_logs = list(
+        db_session.scalars(
+            select(OpenAIUsageLog).where(OpenAIUsageLog.document_id == document.id)
+        ).all()
+    )
+
+    assert result.successful()
+    assert document.status == DocumentStatus.completed
+    assert document.raw_text == "Invoice number 161126. Total USD 950.00."
+    assert document.document_type == "invoice"
+    assert document.ai_extracted_data is not None
+    assert document.ai_extracted_data["sender"] == "YesLogic Pty. Ltd."
+    assert document.ai_extracted_data["total_amount"] == 950.0
+    assert document.ai_extraction_model == "gpt-4o-mini"
+    assert document.ai_extraction_completed_at is not None
+
+    assert job.status == ProcessingJobStatus.completed
+    assert len(usage_logs) == 1
+    assert usage_logs[0].model == "gpt-4o-mini"
+    assert usage_logs[0].response_id == "resp_test_123"
+    assert usage_logs[0].input_tokens == 100
+    assert usage_logs[0].output_tokens == 50
+    assert usage_logs[0].total_tokens == 150
+
+
+def test_process_document_task_skips_ai_processing_for_confidential_document(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "local_storage_path", str(tmp_path / "storage"))
+    _patch_task_session(
+        monkeypatch=monkeypatch,
+        db_session=db_session,
+    )
+
+    def fake_extract_text_from_document(document: Document) -> str:
+        return "Confidential local text."
+
+    def fake_run_standard_ai_processing(*args, **kwargs) -> StandardAIProcessingResult:
+        raise AssertionError("AI processing must not run for confidential documents.")
+
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        fake_extract_text_from_document,
+    )
+    monkeypatch.setattr(
+        document_tasks,
+        "run_standard_ai_processing",
+        fake_run_standard_ai_processing,
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.confidential,
+    )
+    job = create_processing_job(
+        db=db_session,
+        document=document,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    result = process_document_task.apply(
+        args=(job.id,),
+        throw=True,
+    )
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+
+    usage_logs = list(
+        db_session.scalars(
+            select(OpenAIUsageLog).where(OpenAIUsageLog.document_id == document.id)
+        ).all()
+    )
+
+    assert result.successful()
+    assert document.status == DocumentStatus.completed
+    assert document.raw_text == "Confidential local text."
+    assert document.document_type is None
+    assert document.ai_extracted_data is None
+    assert document.ai_extraction_model is None
+    assert document.ai_extraction_completed_at is None
+    assert job.status == ProcessingJobStatus.completed
+    assert usage_logs == []
+
+
+def test_process_document_task_marks_standard_document_failed_when_ai_processing_fails(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "local_storage_path", str(tmp_path / "storage"))
+    _patch_task_session(
+        monkeypatch=monkeypatch,
+        db_session=db_session,
+    )
+
+    def fake_extract_text_from_document(document: Document) -> str:
+        return "Invoice text."
+
+    def fake_run_standard_ai_processing(*args, **kwargs) -> StandardAIProcessingResult:
+        raise RuntimeError("OpenAI processing failed.")
+
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        fake_extract_text_from_document,
+    )
+    monkeypatch.setattr(
+        document_tasks,
+        "run_standard_ai_processing",
+        fake_run_standard_ai_processing,
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.standard,
+    )
+    job = create_processing_job(
+        db=db_session,
+        document=document,
+    )
+    job.max_retries = 0
+
+    db_session.commit()
+    db_session.refresh(job)
+
+    result = process_document_task.apply(
+        args=(job.id,),
+        throw=False,
+    )
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+
+    assert result.failed()
+    assert document.status == DocumentStatus.failed
+    assert job.status == ProcessingJobStatus.failed
+    assert job.error_message is not None
+    assert "OpenAI processing failed" in job.error_message
