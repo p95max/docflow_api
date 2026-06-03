@@ -152,15 +152,57 @@ curl http://localhost:8000/health
 
 ## Database Migrations
 
-```bash
-# Run migrations
-docker compose exec api alembic upgrade head
+### Automatic Migrations on Startup
 
+The API container runs database migrations automatically on startup.
+
+On every API start, the entrypoint script executes:
+
+```bash
+alembic upgrade head
+```
+
+If the database is empty, all migrations are applied before the FastAPI server starts. If the database is already up to date, Alembic exits without changes.
+
+The migration startup script is located at:
+
+```
+scripts/start-api.sh
+```
+
+The API service uses this script as its startup command:
+
+```yaml
+command: sh scripts/start-api.sh
+```
+
+> Only the API container runs migrations. The Celery worker does not run migrations to avoid concurrent migration execution.
+
+### Manual Commands
+
+```bash
 # Check current migration
 docker compose exec api alembic current
 
 # Inspect tables
 docker compose exec db psql -U docsflow -d docsflow -c "\dt"
+```
+
+For a clean local start:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+After startup, expected tables:
+
+```
+users
+documents
+processing_jobs
+openai_usage_logs
+alembic_version
 ```
 
 ---
@@ -348,8 +390,6 @@ Main settings are configured through `.env`.
 - Upload rate limiting is in-memory and not shared between multiple API instances
 - Structured AI extraction is not implemented yet
 - Semantic search and document Q&A are planned for later MVP stages
-
----
 
 ## Contacts
 
