@@ -23,6 +23,7 @@ os.environ["DOCUMENT_PROCESSING_SOFT_TIME_LIMIT_SECONDS"] = "60"
 os.environ["DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS"] = "90"
 os.environ["DOCUMENT_PROCESSING_MAX_RETRIES"] = "3"
 os.environ["DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS"] = "0"
+os.environ["DOCUMENT_PREVIEW_TOKEN_EXPIRE_MINUTES"] = "10"
 
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["OPENAI_MODEL"] = "gpt-4o-mini"

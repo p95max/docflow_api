@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     document_processing_hard_time_limit_seconds: int = 90
     document_processing_max_retries: int = 3
     document_processing_retry_delay_seconds: int = 10
+    document_preview_token_expire_minutes: int = 10
 
     local_ocr_languages: str = "eng+deu"
 
