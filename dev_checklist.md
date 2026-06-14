@@ -93,11 +93,11 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 8. Document result view
 
-- [ ] Display document with extraction results
-- [ ] File preview via storage URL / presigned URL
-- [ ] Show manual correction controls
-- [ ] Show error details if processing failed
-- [ ] Trigger manual reprocess
+- [x] Display document with extraction results
+- [x] File preview via storage URL / presigned URL
+- [x] Show manual correction controls
+- [x] Show error details if processing failed
+- [x] Trigger manual reprocess
 
 ---
 
