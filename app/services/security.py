@@ -5,7 +5,9 @@ import jwt
 
 from app.core.config import settings
 
+
 JWT_ALGORITHM = "HS256"
+DOCUMENT_PREVIEW_TOKEN_PURPOSE = "document_preview"
 
 
 def hash_password(password: str) -> str:
@@ -49,3 +51,43 @@ def decode_access_token(token: str) -> dict:
         settings.app_secret_key,
         algorithms=[JWT_ALGORITHM],
     )
+
+
+def create_document_preview_token(
+    *,
+    document_id: int,
+    owner_id: int,
+) -> tuple[str, datetime]:
+    """Create a short-lived token granting access to one document file."""
+    expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.document_preview_token_expire_minutes,
+    )
+
+    payload = {
+        "sub": str(owner_id),
+        "document_id": document_id,
+        "purpose": DOCUMENT_PREVIEW_TOKEN_PURPOSE,
+        "exp": expires_at,
+    }
+
+    token = jwt.encode(
+        payload,
+        settings.app_secret_key,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    return token, expires_at
+
+
+def decode_document_preview_token(token: str) -> dict:
+    """Decode and validate a document preview token."""
+    payload = jwt.decode(
+        token,
+        settings.app_secret_key,
+        algorithms=[JWT_ALGORITHM],
+    )
+
+    if payload.get("purpose") != DOCUMENT_PREVIEW_TOKEN_PURPOSE:
+        raise jwt.InvalidTokenError("Invalid preview token purpose.")
+
+    return payload

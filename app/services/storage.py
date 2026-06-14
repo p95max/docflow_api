@@ -11,7 +11,7 @@ def build_document_storage_key(document: Document, extension: str) -> str:
 
 def save_document_file(content: bytes, storage_key: str) -> Path:
     """Save file content to local storage and return the absolute file path."""
-    target_path = _get_safe_storage_path(storage_key)
+    target_path = get_document_file_path(storage_key)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_bytes(content)
     return target_path
@@ -22,15 +22,18 @@ def delete_document_file(storage_key: str | None) -> None:
     if not storage_key:
         return
 
-    file_path = _get_safe_storage_path(storage_key)
+    file_path = get_document_file_path(storage_key)
     file_path.unlink(missing_ok=True)
 
 
-def _get_safe_storage_path(storage_key: str) -> Path:
+def get_document_file_path(storage_key: str) -> Path:
+    """Resolve a storage key without allowing path traversal."""
     storage_root = Path(settings.local_storage_path).resolve()
     target_path = (storage_root / storage_key).resolve()
 
     if not target_path.is_relative_to(storage_root):
-        raise ValueError("Storage key resolves outside of the configured storage root")
+        raise ValueError(
+            "Storage key resolves outside of the configured storage root"
+        )
 
     return target_path
