@@ -84,10 +84,10 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 ### 7. Save extraction result
 
-- [ ] Store extracted data in PostgreSQL
-- [ ] Store summary / amount / deadline / sender / confidence score
-- [ ] Mark document status as `completed`
-- [ ] Mark document status as `failed` on any error
+- [x] Store extracted data in PostgreSQL
+- [x] Store summary / amount / deadline / sender / confidence score
+- [x] Mark document status as `completed`
+- [x] Mark document status as `failed` on any error
 
 ---
 
