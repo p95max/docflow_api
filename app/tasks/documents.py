@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.orm import Session
@@ -102,7 +103,9 @@ def _mark_job_running(
     job.attempts = attempts
     job.started_at = job.started_at or now
     job.finished_at = None
+    job.error_message = None
 
+    _reset_document_processing_result(document)
     document.status = DocumentStatus.processing
 
     db.commit()
@@ -129,11 +132,33 @@ def _handle_processing_failure(
     error_message: str,
 ) -> None:
     safe_error_message = error_message[:2000]
+    should_retry = task.request.retries < job.max_retries
 
-    if task.request.retries < job.max_retries:
-        job.status = ProcessingJobStatus.pending
-        job.error_message = safe_error_message
-        document.status = DocumentStatus.uploaded
+    job_id = job.id
+    document_id = document.id
+
+    db.rollback()
+
+    current_job = db.get(ProcessingJob, job_id)
+    current_document = db.get(Document, document_id)
+
+    if current_job is None:
+        raise exc
+
+    if current_document is None:
+        _mark_job_failed(
+            db=db,
+            job=current_job,
+            error_message="Document does not exist.",
+        )
+        raise exc
+
+    if should_retry:
+        current_job.status = ProcessingJobStatus.pending
+        current_job.error_message = safe_error_message
+        current_job.finished_at = None
+
+        current_document.status = DocumentStatus.uploaded
 
         db.commit()
 
@@ -142,39 +167,15 @@ def _handle_processing_failure(
             countdown=settings.document_processing_retry_delay_seconds,
         )
 
-    job.status = ProcessingJobStatus.failed
-    job.error_message = safe_error_message
-    job.finished_at = datetime.now(UTC)
+    current_job.status = ProcessingJobStatus.failed
+    current_job.error_message = safe_error_message
+    current_job.finished_at = datetime.now(UTC)
 
-    document.status = DocumentStatus.failed
+    current_document.status = DocumentStatus.failed
 
     db.commit()
 
     raise exc
-
-
-def _extract_text_placeholder(document: Document) -> str:
-    if not document.storage_key:
-        raise ValueError("Document has no storage key.")
-
-    file_path = Path(settings.local_storage_path) / document.storage_key
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"Stored file does not exist: {document.storage_key}")
-
-    return (
-        "Document processing completed.\n"
-        f"Original filename: {document.original_filename}\n"
-        f"Content type: {document.content_type}\n"
-        f"File size bytes: {document.file_size_bytes}\n"
-        f"Storage key: {document.storage_key}\n"
-    )
-
-def _get_success_status(document: Document) -> DocumentStatus:
-    if document.processing_mode == ProcessingMode.confidential:
-        return DocumentStatus.completed
-
-    return DocumentStatus.completed
 
 
 def _apply_standard_ai_processing_result(
@@ -183,10 +184,22 @@ def _apply_standard_ai_processing_result(
     document: Document,
     ai_result: StandardAIProcessingResult,
 ) -> None:
-    document.document_type = ai_result.extracted_data.document_type
-    document.ai_extracted_data = ai_result.extracted_data.model_dump(mode="json")
+    extracted_data = ai_result.extracted_data
+
+    document.document_type = extracted_data.document_type
+    document.ai_extracted_data = extracted_data.model_dump(mode="json")
     document.ai_extraction_model = ai_result.model
     document.ai_extraction_completed_at = datetime.now(UTC)
+
+    document.summary = extracted_data.summary
+    document.amount = _convert_amount(extracted_data.total_amount)
+    document.currency = _normalize_currency(extracted_data.currency)
+    document.deadline = _extract_deadline(
+        action_deadline=extracted_data.action_deadline,
+        due_date=extracted_data.due_date,
+    )
+    document.sender = extracted_data.sender
+    document.confidence_score = extracted_data.confidence_score
 
     db.add(
         OpenAIUsageLog(
@@ -199,3 +212,59 @@ def _apply_standard_ai_processing_result(
             total_tokens=ai_result.usage.total_tokens,
         )
     )
+
+
+def _reset_document_processing_result(document: Document) -> None:
+    """Remove stale results before a new processing attempt."""
+    document.raw_text = None
+
+    document.document_type = None
+    document.ai_extracted_data = None
+    document.ai_extraction_model = None
+    document.ai_extraction_completed_at = None
+
+    document.summary = None
+    document.amount = None
+    document.currency = None
+    document.deadline = None
+    document.sender = None
+    document.confidence_score = None
+
+
+def _convert_amount(value: float | None) -> Decimal | None:
+    if value is None:
+        return None
+
+    return Decimal(str(value))
+
+
+def _normalize_currency(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized_value = value.strip().upper()
+
+    if len(normalized_value) != 3 or not normalized_value.isalpha():
+        raise ValueError(
+            f"AI returned invalid ISO currency code: {value}"
+        )
+
+    return normalized_value
+
+
+def _extract_deadline(
+    *,
+    action_deadline: str | None,
+    due_date: str | None,
+) -> date | None:
+    value = action_deadline or due_date
+
+    if value is None:
+        return None
+
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError as exc:
+        raise ValueError(
+            f"AI returned invalid ISO deadline: {value}"
+        ) from exc

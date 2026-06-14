@@ -1,12 +1,30 @@
 import enum
-from datetime import datetime
+
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+from datetime import date, datetime
+from decimal import Decimal
+
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 
 class DocumentStatus(str, enum.Enum):
     uploaded = "uploaded"
@@ -29,6 +47,13 @@ class Document(Base):
             "checksum_sha256",
             unique=True,
             postgresql_where=text("checksum_sha256 IS NOT NULL"),
+        ),
+        CheckConstraint(
+            (
+                "confidence_score IS NULL "
+                "OR (confidence_score >= 0 AND confidence_score <= 1)"
+            ),
+            name="ck_documents_confidence_score_range",
         ),
     )
 
@@ -87,6 +112,38 @@ class Document(Base):
 
     ai_extracted_data: Mapped[dict[str, Any] | None] = mapped_column(
         JSON,
+        nullable=True,
+    )
+
+    summary: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=14, scale=2),
+        index=True,
+        nullable=True,
+    )
+
+    currency: Mapped[str | None] = mapped_column(
+        String(3),
+        nullable=True,
+    )
+
+    deadline: Mapped[date | None] = mapped_column(
+        Date,
+        index=True,
+        nullable=True,
+    )
+
+    sender: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    confidence_score: Mapped[float | None] = mapped_column(
+        Float,
         nullable=True,
     )
 

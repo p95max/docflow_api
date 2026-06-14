@@ -1,7 +1,8 @@
 import hashlib
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi import status
@@ -536,7 +537,7 @@ def _fake_ai_processing_result() -> StandardAIProcessingResult:
             sender="YesLogic Pty. Ltd.",
             recipient="Customer Name",
             document_date="2016-11-26",
-            due_date=None,
+            due_date="2016-12-26",
             total_amount=950.0,
             currency="USD",
             invoice_number="161126",
@@ -625,6 +626,13 @@ def test_process_document_task_runs_ai_processing_for_standard_document(
     assert document.ai_extracted_data["total_amount"] == 950.0
     assert document.ai_extraction_model == "gpt-4o-mini"
     assert document.ai_extraction_completed_at is not None
+
+    assert document.summary == "Invoice for software services."
+    assert document.amount == Decimal("950.00")
+    assert document.currency == "USD"
+    assert document.deadline == date(2016, 12, 26)
+    assert document.sender == "YesLogic Pty. Ltd."
+    assert document.confidence_score == pytest.approx(0.95)
 
     assert job.status == ProcessingJobStatus.completed
     assert len(usage_logs) == 1
@@ -759,3 +767,110 @@ def test_process_document_task_marks_standard_document_failed_when_ai_processing
     assert job.status == ProcessingJobStatus.failed
     assert job.error_message is not None
     assert "OpenAI processing failed" in job.error_message
+
+
+def test_process_document_task_rolls_back_partial_extraction_result_on_error(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "local_storage_path",
+        str(tmp_path / "storage"),
+    )
+    _patch_task_session(
+        monkeypatch=monkeypatch,
+        db_session=db_session,
+    )
+
+    def fake_extract_text_from_document(document: Document) -> str:
+        return "Invoice number 161126. Total USD 950.00."
+
+    def fake_run_standard_ai_processing(
+        *,
+        raw_text: str,
+        original_filename: str,
+    ) -> StandardAIProcessingResult:
+        return _fake_ai_processing_result()
+
+    original_apply_result = (
+        document_tasks._apply_standard_ai_processing_result
+    )
+
+    def failing_apply_result(
+        *,
+        db: Session,
+        document: Document,
+        ai_result: StandardAIProcessingResult,
+    ) -> None:
+        original_apply_result(
+            db=db,
+            document=document,
+            ai_result=ai_result,
+        )
+        raise RuntimeError("Extraction result persistence failed.")
+
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        fake_extract_text_from_document,
+    )
+    monkeypatch.setattr(
+        document_tasks,
+        "run_standard_ai_processing",
+        fake_run_standard_ai_processing,
+    )
+    monkeypatch.setattr(
+        document_tasks,
+        "_apply_standard_ai_processing_result",
+        failing_apply_result,
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.standard,
+    )
+    job = create_processing_job(
+        db=db_session,
+        document=document,
+    )
+    job.max_retries = 0
+
+    db_session.commit()
+    db_session.refresh(job)
+
+    result = process_document_task.apply(
+        args=(job.id,),
+        throw=False,
+    )
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+
+    usage_logs = list(
+        db_session.scalars(
+            select(OpenAIUsageLog).where(
+                OpenAIUsageLog.document_id == document.id
+            )
+        ).all()
+    )
+
+    assert result.failed()
+    assert document.status == DocumentStatus.failed
+    assert job.status == ProcessingJobStatus.failed
+
+    assert document.raw_text is None
+    assert document.document_type is None
+    assert document.ai_extracted_data is None
+    assert document.summary is None
+    assert document.amount is None
+    assert document.currency is None
+    assert document.deadline is None
+    assert document.sender is None
+    assert document.confidence_score is None
+
+    assert usage_logs == []

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -19,6 +19,13 @@ class DocumentRead(BaseModel):
     ai_extracted_data: dict[str, Any] | None
     ai_extraction_model: str | None
     ai_extraction_completed_at: datetime | None
+
+    summary: str | None
+    amount: float | None
+    currency: str | None
+    deadline: date | None
+    sender: str | None
+    confidence_score: float | None
 
     created_at: datetime
     updated_at: datetime
