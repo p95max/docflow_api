@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
 
+    test_user_email: str = "m@m.com"
+    test_user_password: str = "12345678"
+
     upload_max_file_size_mb: int = 10
     upload_rate_limit_requests: int = 10
     upload_rate_limit_window_seconds: int = 60
