@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,8 +8,8 @@
     <link href="/assets/css/app.css" rel="stylesheet">
     {% block head %}{% endblock %}
   </head>
-  <body class="bg-body-tertiary">
-    <nav class="navbar navbar-dark bg-primary shadow-sm">
+  <body class="bg-body">
+    <nav class="navbar navbar-dark docsflow-navbar shadow-sm">
       <div class="container d-flex flex-wrap gap-3">
         <a class="navbar-brand fw-semibold me-auto" href="{% if current_user %}/documents{% else %}/login{% endif %}">DocsFlow</a>
         <div class="d-flex align-items-center gap-2">

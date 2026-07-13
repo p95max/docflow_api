@@ -14,6 +14,7 @@ def test_login_page_is_server_rendered_without_javascript(
     assert response.status_code == 200
     assert "DocsFlow" in response.text
     assert "bootstrap" in response.text.lower()
+    assert 'data-bs-theme="dark"' in response.text
     assert '<form method="post" action="/login">' in response.text
     assert 'value="m@m.com"' in response.text
     assert 'value="12345678"' in response.text
@@ -65,6 +66,7 @@ def test_frontend_css_is_served_and_javascript_bundle_is_removed(
 
     assert css_response.status_code == 200
     assert ".preview-frame" in css_response.text
+    assert ':root[data-bs-theme="dark"]' in css_response.text
     assert javascript_response.status_code == 404
 
 
