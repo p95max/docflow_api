@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
 
+    init_test_user: bool = False
     test_user_email: str = "m@m.com"
     test_user_password: str = "12345678"
 
