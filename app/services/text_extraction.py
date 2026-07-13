@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import fitz
 import pytesseract
 from PIL import Image, UnidentifiedImageError
-from pytesseract import TesseractError
+from pytesseract import TesseractError, TesseractNotFoundError
 
 from app.core.config import settings
 
@@ -17,6 +17,10 @@ SUPPORTED_TEXT_EXTRACTION_MIME_TYPES = {
     "image/jpeg",
     "image/png",
 }
+
+
+class LocalOCRError(RuntimeError):
+    """Raised when the local Tesseract OCR engine cannot process a document."""
 
 
 def extract_text_from_document(document: "Document") -> str:
@@ -52,14 +56,39 @@ def extract_text_from_file(file_path: Path, content_type: str) -> str:
 def _extract_text_from_pdf(file_path: Path) -> str:
     try:
         with fitz.open(file_path) as pdf_document:
-            pages_text = [
-                page.get_text("text").strip()
-                for page in pdf_document
-            ]
+            pages_text: list[str] = []
+
+            for page in pdf_document:
+                page_text = page.get_text("text").strip()
+
+                if not page_text:
+                    page_text = _extract_text_from_pdf_page_image(page)
+
+                pages_text.append(page_text)
+    except LocalOCRError:
+        raise
     except Exception as exc:
         raise ValueError(f"Could not extract text from PDF: {file_path.name}") from exc
 
     return _normalize_extracted_text("\n\n".join(pages_text))
+
+
+def _extract_text_from_pdf_page_image(page: fitz.Page) -> str:
+    pixmap = page.get_pixmap(
+        matrix=fitz.Matrix(2.5, 2.5),
+        colorspace=fitz.csRGB,
+        alpha=False,
+    )
+    image = Image.frombytes(
+        "RGB",
+        (pixmap.width, pixmap.height),
+        pixmap.samples,
+    )
+
+    try:
+        return _run_tesseract_ocr(image).strip()
+    finally:
+        image.close()
 
 
 def _extract_text_from_image(file_path: Path) -> str:
@@ -80,14 +109,18 @@ def _run_tesseract_ocr(image: Image.Image) -> str:
             image,
             lang=settings.local_ocr_languages,
         )
+    except TesseractNotFoundError as exc:
+        raise LocalOCRError("Tesseract OCR is not installed.") from exc
     except TesseractError as exc:
         if settings.local_ocr_languages == "eng":
-            raise RuntimeError("Local OCR failed.") from exc
+            raise LocalOCRError("Local OCR failed.") from exc
 
         try:
             return pytesseract.image_to_string(image, lang="eng")
+        except TesseractNotFoundError as fallback_exc:
+            raise LocalOCRError("Tesseract OCR is not installed.") from fallback_exc
         except TesseractError as fallback_exc:
-            raise RuntimeError("Local OCR failed.") from fallback_exc
+            raise LocalOCRError("Local OCR failed.") from fallback_exc
 
 
 def _normalize_extracted_text(text: str) -> str:
