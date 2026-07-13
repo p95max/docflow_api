@@ -87,6 +87,7 @@ def test_google_oauth_callback_persists_refresh_token(
 def test_google_oauth_callback_rejects_invalid_state(
     client: TestClient,
     test_user: User,
+    db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _login(client, test_user)
@@ -107,7 +108,7 @@ def test_google_oauth_callback_rejects_invalid_state(
     )
 
     assert response.status_code == 400
-    assert "OAuth" in response.text or "token" in response.text
+    assert get_google_drive_connection(db=db_session, user_id=test_user.id) is None
 
 
 def test_disconnect_removes_google_drive_connection(
