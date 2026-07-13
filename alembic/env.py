@@ -9,6 +9,7 @@ from app.models import (  # noqa: F401
     AuditLog,
     BackupJob,
     Document,
+    GoogleDriveConnection,
     OpenAIUsageLog,
     ProcessingJob,
     User,
