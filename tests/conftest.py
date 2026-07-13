@@ -24,6 +24,13 @@ os.environ["DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS"] = "90"
 os.environ["DOCUMENT_PROCESSING_MAX_RETRIES"] = "3"
 os.environ["DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS"] = "0"
 os.environ["DOCUMENT_PREVIEW_TOKEN_EXPIRE_MINUTES"] = "10"
+os.environ["BACKUP_SOFT_TIME_LIMIT_SECONDS"] = "120"
+os.environ["BACKUP_HARD_TIME_LIMIT_SECONDS"] = "180"
+os.environ["GOOGLE_DRIVE_CLIENT_ID"] = "test-client-id"
+os.environ["GOOGLE_DRIVE_CLIENT_SECRET"] = "test-client-secret"
+os.environ["GOOGLE_DRIVE_REFRESH_TOKEN"] = "test-refresh-token"
+os.environ["GOOGLE_DRIVE_FOLDER_NAME"] = "docsflow_backups"
+os.environ["GOOGLE_DRIVE_TIMEOUT_SECONDS"] = "60"
 
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
@@ -34,6 +41,7 @@ from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.audit_log import AuditLog  # noqa: F401, E402
+from app.models.backup_job import BackupJob  # noqa: F401, E402
 from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().
