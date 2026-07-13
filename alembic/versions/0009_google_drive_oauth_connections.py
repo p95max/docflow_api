@@ -41,7 +41,6 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id"),
     )
     op.create_index(
         op.f("ix_google_drive_connections_id"),
