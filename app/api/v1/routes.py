@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     routes_auth,
+    routes_backups,
     routes_document_deletion,
     routes_documents,
     routes_users,
@@ -31,4 +32,10 @@ router.include_router(
     routes_document_deletion.router,
     prefix="/documents",
     tags=["documents"],
+)
+
+router.include_router(
+    routes_backups.router,
+    prefix="/backups",
+    tags=["backups"],
 )

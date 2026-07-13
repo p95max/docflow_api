@@ -7,7 +7,7 @@ celery_app = Celery(
     "docsflow",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.documents"],
+    include=["app.tasks.documents", "app.tasks.backups"],
 )
 
 celery_app.conf.update(

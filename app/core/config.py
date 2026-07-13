@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
 
+    init_test_user: bool = False
+    test_user_email: str = "m@m.com"
+    test_user_password: str = "12345678"
+
     upload_max_file_size_mb: int = 10
     upload_rate_limit_requests: int = 10
     upload_rate_limit_window_seconds: int = 60
@@ -27,6 +31,15 @@ class Settings(BaseSettings):
     document_processing_max_retries: int = 3
     document_processing_retry_delay_seconds: int = 10
     document_preview_token_expire_minutes: int = 10
+
+    backup_soft_time_limit_seconds: int = 120
+    backup_hard_time_limit_seconds: int = 180
+
+    google_drive_client_id: str | None = None
+    google_drive_client_secret: str | None = None
+    google_drive_refresh_token: str | None = None
+    google_drive_folder_name: str = "docsflow_backups"
+    google_drive_timeout_seconds: int = 60
 
     local_ocr_languages: str = "eng+deu"
 
