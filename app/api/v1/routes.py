@@ -1,6 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.v1 import routes_auth, routes_documents, routes_users
+from app.api.v1 import (
+    routes_auth,
+    routes_document_deletion,
+    routes_documents,
+    routes_users,
+)
 
 router = APIRouter()
 
@@ -18,6 +23,12 @@ router.include_router(
 
 router.include_router(
     routes_documents.router,
+    prefix="/documents",
+    tags=["documents"],
+)
+
+router.include_router(
+    routes_document_deletion.router,
     prefix="/documents",
     tags=["documents"],
 )
