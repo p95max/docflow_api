@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Delete document · DocsFlow{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <section class="col-lg-7">
+    <a class="text-decoration-none" href="/documents/{{ document.id }}">← Back to document</a>
+    <div class="card border-danger shadow-sm mt-3">
+      <div class="card-body p-4">
+        <h1 class="h3 text-danger">Delete document?</h1>
+        <p>You are about to permanently delete <strong>{{ document.original_filename }}</strong>.</p>
+        <p class="text-secondary">The database record, processing history and locally stored file will be removed. This action cannot be undone.</p>
+        <div class="d-flex gap-2">
+          <form method="post" action="/documents/{{ document.id }}/delete">
+            <button class="btn btn-danger" type="submit">Delete permanently</button>
+          </form>
+          <a class="btn btn-outline-secondary" href="/documents/{{ document.id }}">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
