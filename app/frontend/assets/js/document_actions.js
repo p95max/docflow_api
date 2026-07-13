@@ -12,6 +12,23 @@
     window.alert(message);
   }
 
+  function isLocalDevelopmentHost() {
+    return ["localhost", "127.0.0.1", "0.0.0.0"].includes(window.location.hostname)
+      || window.location.hostname.endsWith(".app.github.dev");
+  }
+
+  function prefillTestLoginCredentials() {
+    if (window.location.pathname !== "/login" || !isLocalDevelopmentHost()) return;
+
+    const emailInput = appRoot.querySelector("#email");
+    const passwordInput = appRoot.querySelector("#password");
+
+    if (!emailInput || !passwordInput) return;
+
+    if (!emailInput.value) emailInput.value = "m@m.com";
+    if (!passwordInput.value) passwordInput.value = "12345678";
+  }
+
   function normalizeDocumentUrl(value) {
     if (!value) return value;
 
@@ -226,6 +243,7 @@
   }
 
   function enhanceDocumentPages() {
+    prefillTestLoginCredentials();
     normalizePreviewAndDownloadUrls();
     showConfidentialModeNotice();
     formatDocumentFileSizes();
