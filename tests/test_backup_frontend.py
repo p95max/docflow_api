@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 import app.web_backups as web_backups
 from app.models.backup_job import BackupJob
+from app.models.google_drive_connection import GoogleDriveConnection
 from app.models.user import User
 
 
@@ -26,6 +27,20 @@ def test_backup_page_redirects_anonymous_user(client: TestClient) -> None:
     assert response.headers["location"] == "/login"
 
 
+def test_backup_page_prompts_user_to_connect_google_drive(
+    client: TestClient,
+    test_user: User,
+) -> None:
+    _login(client, test_user)
+
+    response = client.get("/backups")
+
+    assert response.status_code == 200
+    assert "Google Drive backups" in response.text
+    assert "Connect Google Drive" in response.text
+    assert '<form method="post" action="/backups/run">' not in response.text
+
+
 def test_backup_page_renders_and_creates_job(
     client: TestClient,
     test_user: User,
@@ -33,6 +48,14 @@ def test_backup_page_renders_and_creates_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _login(client, test_user)
+    db_session.add(
+        GoogleDriveConnection(
+            user_id=test_user.id,
+            refresh_token="frontend-refresh-token",
+            scope="https://www.googleapis.com/auth/drive.file",
+        )
+    )
+    db_session.commit()
 
     def fake_enqueue_backup_job(*, db: Session, job: BackupJob) -> BackupJob:
         job.celery_task_id = "frontend-backup-task-id"
@@ -51,6 +74,7 @@ def test_backup_page_renders_and_creates_job(
     assert page_response.status_code == 200
     assert "Google Drive backups" in page_response.text
     assert '<form method="post" action="/backups/run">' in page_response.text
+    assert "Disconnect Google Drive" in page_response.text
 
     create_response = client.post("/backups/run", follow_redirects=False)
     assert create_response.status_code == 303
