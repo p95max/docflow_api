@@ -79,6 +79,21 @@
     header.insertAdjacentElement("afterend", notice);
   }
 
+  function formatDocumentFileSizes() {
+    appRoot.querySelectorAll("table tbody small.text-secondary").forEach((element) => {
+      const match = element.textContent.trim().match(/^(\d+)\s+bytes$/i);
+
+      if (!match) return;
+
+      const bytes = Number(match[1]);
+
+      if (!Number.isFinite(bytes)) return;
+
+      const megabytes = bytes / (1024 * 1024);
+      element.textContent = `${megabytes.toFixed(2)} MB`;
+    });
+  }
+
   async function deleteDocument(documentId, filename, button) {
     const confirmed = window.confirm(
       `Delete "${filename}" permanently? This action cannot be undone.`,
@@ -213,6 +228,7 @@
   function enhanceDocumentPages() {
     normalizePreviewAndDownloadUrls();
     showConfidentialModeNotice();
+    formatDocumentFileSizes();
     enhanceDocumentDetail();
     enhanceDocumentList();
   }
