@@ -118,9 +118,22 @@
 
     if (!title || !header) return;
 
-    header.append(
+    const actions = document.createElement("div");
+    actions.className = "d-flex gap-2";
+    actions.dataset.documentActions = "true";
+
+    const downloadLink = Array.from(header.children).find(
+      (element) => element.matches?.("a.btn[href]"),
+    );
+
+    if (downloadLink) {
+      actions.append(downloadLink);
+    }
+
+    actions.append(
       createDeleteButton(match[1], title.textContent.trim()),
     );
+    header.append(actions);
   }
 
   function enhanceDocumentList() {
