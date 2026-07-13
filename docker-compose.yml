@@ -4,6 +4,10 @@ services:
     command: sh scripts/start-api.sh
     env_file:
       - .env
+    environment:
+      GOOGLE_DRIVE_CLIENT_ID: ${GOOGLE_DRIVE_CLIENT_ID:-}
+      GOOGLE_DRIVE_CLIENT_SECRET: ${GOOGLE_DRIVE_CLIENT_SECRET:-}
+      GOOGLE_DRIVE_REDIRECT_URI: ${GOOGLE_DRIVE_REDIRECT_URI:-}
     volumes:
       - .:/app
     ports:
@@ -19,6 +23,10 @@ services:
     command: celery -A app.worker.celery_app worker --loglevel=info
     env_file:
       - .env
+    environment:
+      GOOGLE_DRIVE_CLIENT_ID: ${GOOGLE_DRIVE_CLIENT_ID:-}
+      GOOGLE_DRIVE_CLIENT_SECRET: ${GOOGLE_DRIVE_CLIENT_SECRET:-}
+      GOOGLE_DRIVE_REDIRECT_URI: ${GOOGLE_DRIVE_REDIRECT_URI:-}
     volumes:
       - .:/app
     depends_on:
