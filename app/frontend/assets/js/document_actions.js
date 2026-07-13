@@ -12,6 +12,23 @@
     window.alert(message);
   }
 
+  function isLocalDevelopmentHost() {
+    return ["localhost", "127.0.0.1", "0.0.0.0"].includes(window.location.hostname)
+      || window.location.hostname.endsWith(".app.github.dev");
+  }
+
+  function prefillTestLoginCredentials() {
+    if (window.location.pathname !== "/login" || !isLocalDevelopmentHost()) return;
+
+    const emailInput = appRoot.querySelector("#email");
+    const passwordInput = appRoot.querySelector("#password");
+
+    if (!emailInput || !passwordInput) return;
+
+    if (!emailInput.value) emailInput.value = "m@m.com";
+    if (!passwordInput.value) passwordInput.value = "12345678";
+  }
+
   function normalizeDocumentUrl(value) {
     if (!value) return value;
 
@@ -73,10 +90,25 @@
     notice.innerHTML = [
       "<strong>Confidential mode:</strong>",
       "This document was processed locally only.",
-      "Structured AI fields are intentionally not generated, and no document data was sent to OpenAI.",
+      "The document type was classified locally; structured AI fields were not generated, and no document data was sent to OpenAI.",
     ].join(" ");
 
     header.insertAdjacentElement("afterend", notice);
+  }
+
+  function formatDocumentFileSizes() {
+    appRoot.querySelectorAll("table tbody small.text-secondary").forEach((element) => {
+      const match = element.textContent.trim().match(/^(\d+)\s+bytes$/i);
+
+      if (!match) return;
+
+      const bytes = Number(match[1]);
+
+      if (!Number.isFinite(bytes)) return;
+
+      const megabytes = bytes / (1024 * 1024);
+      element.textContent = `${megabytes.toFixed(2)} MB`;
+    });
   }
 
   async function deleteDocument(documentId, filename, button) {
@@ -164,25 +196,57 @@
   }
 
   function enhanceDocumentList() {
-    appRoot.querySelectorAll('a[href^="/documents/"]').forEach((openLink) => {
-      const match = openLink.getAttribute("href")?.match(/^\/documents\/(\d+)$/);
-      const cell = openLink.parentElement;
-
-      if (!match || !cell || cell.querySelector("[data-document-delete]")) return;
-
-      const row = openLink.closest("tr");
-      const filename = row?.querySelector(".fw-semibold")?.textContent?.trim()
-        || `document ${match[1]}`;
-
-      cell.append(
-        createDeleteButton(match[1], filename, "btn-sm ms-2"),
+    appRoot.querySelectorAll("table tbody tr").forEach((row) => {
+      const detailLinks = Array.from(
+        row.querySelectorAll('a[href^="/documents/"]'),
       );
+      const detailLink = detailLinks.find((link) => (
+        documentDetailPattern.test(link.getAttribute("href") || "")
+      ));
+
+      if (!detailLink) return;
+
+      const match = detailLink.getAttribute("href").match(documentDetailPattern);
+
+      if (!match) return;
+
+      const filenameElement = row.querySelector(".fw-semibold");
+      const filename = filenameElement?.textContent?.trim() || `document ${match[1]}`;
+
+      if (filenameElement && !filenameElement.matches("a")) {
+        const filenameLink = document.createElement("a");
+        filenameLink.href = detailLink.getAttribute("href");
+        filenameLink.className = `${filenameElement.className} text-decoration-none`;
+        filenameLink.dataset.documentLink = "true";
+        filenameLink.textContent = filename;
+        filenameElement.replaceWith(filenameLink);
+      } else if (filenameElement) {
+        filenameElement.dataset.documentLink = "true";
+      }
+
+      if (!detailLink.dataset.documentLink) {
+        detailLink.remove();
+      }
+
+      const actionsCell = row.lastElementChild;
+
+      if (!actionsCell) return;
+
+      actionsCell.classList.add("text-end");
+
+      if (!actionsCell.querySelector("[data-document-delete]")) {
+        actionsCell.append(
+          createDeleteButton(match[1], filename, "btn-sm"),
+        );
+      }
     });
   }
 
   function enhanceDocumentPages() {
+    prefillTestLoginCredentials();
     normalizePreviewAndDownloadUrls();
     showConfidentialModeNotice();
+    formatDocumentFileSizes();
     enhanceDocumentDetail();
     enhanceDocumentList();
   }

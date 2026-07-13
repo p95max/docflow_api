@@ -15,6 +15,7 @@ from app.models.document import (
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
+from app.services.local_document_classification import classify_document_type
 from app.services.text_extraction import extract_text_from_document
 from app.worker import celery_app
 
@@ -56,7 +57,12 @@ def process_document_task(self, job_id: int) -> None:
 
             document.raw_text = extracted_text
 
-            if document.processing_mode == ProcessingMode.standard:
+            if document.processing_mode == ProcessingMode.confidential:
+                local_document_type = classify_document_type(extracted_text)
+
+                if local_document_type != "other":
+                    document.document_type = local_document_type
+            else:
                 ai_result = run_standard_ai_processing(
                     raw_text=extracted_text,
                     original_filename=document.original_filename,
