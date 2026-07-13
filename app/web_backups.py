@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.backup_job import BackupJob
 from app.services.backup_jobs import (
     create_backup_job,
     enqueue_backup_job,
