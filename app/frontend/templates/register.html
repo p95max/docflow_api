@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Register · DocsFlow{% endblock %}
+{% block content %}
+<section class="card shadow-sm auth-card">
+  <div class="card-body p-4">
+    <h1 class="h3 mb-2">Create your account</h1>
+    <p class="text-secondary mb-4">Start organizing your documents.</p>
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/register">
+      <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" id="email" name="email" type="email" required autocomplete="email" value="{{ email_value }}">
+      </div>
+      <div class="mb-4">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
+        <div class="form-text">At least 8 characters.</div>
+      </div>
+      <button class="btn btn-primary w-100" type="submit">Create account</button>
+    </form>
+    <p class="small text-center mt-3 mb-0">Already registered? <a href="/login">Log in</a></p>
+  </div>
+</section>
+{% endblock %}
