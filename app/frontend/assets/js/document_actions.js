@@ -52,6 +52,33 @@
     });
   }
 
+  function showConfidentialModeNotice() {
+    if (!documentDetailPattern.test(window.location.pathname)) return;
+    if (appRoot.querySelector("[data-confidential-mode-notice]")) return;
+
+    const confidentialBadge = Array.from(
+      appRoot.querySelectorAll("span.badge"),
+    ).find((badge) => badge.textContent.trim().toLowerCase() === "confidential");
+
+    if (!confidentialBadge) return;
+
+    const title = appRoot.querySelector("h1.h2");
+    const header = title?.parentElement?.parentElement;
+
+    if (!header) return;
+
+    const notice = document.createElement("div");
+    notice.className = "alert alert-info";
+    notice.dataset.confidentialModeNotice = "true";
+    notice.innerHTML = [
+      "<strong>Confidential mode:</strong>",
+      "This document was processed locally only.",
+      "Structured AI fields are intentionally not generated, and no document data was sent to OpenAI.",
+    ].join(" ");
+
+    header.insertAdjacentElement("afterend", notice);
+  }
+
   async function deleteDocument(documentId, filename, button) {
     const confirmed = window.confirm(
       `Delete "${filename}" permanently? This action cannot be undone.`,
@@ -155,6 +182,7 @@
 
   function enhanceDocumentPages() {
     normalizePreviewAndDownloadUrls();
+    showConfidentialModeNotice();
     enhanceDocumentDetail();
     enhanceDocumentList();
   }
