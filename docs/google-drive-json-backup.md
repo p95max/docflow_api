@@ -23,14 +23,14 @@ For the MVP, DocsFlow uses one technical Google account configured through envir
 
 After Alembic migrations complete, `scripts/start-api.sh` runs `scripts/init_test_user.py`.
 
-In `APP_ENV=local`, the script idempotently creates or updates this development account:
+When `APP_ENV=local` and `INIT_TEST_USER=true`, the script idempotently creates or updates this development account:
 
 ```text
 email: m@m.com
 password: 12345678
 ```
 
-The credentials can be overridden through `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`. The initializer is skipped outside the local environment.
+The credentials can be overridden through `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`. The initializer is skipped unless both local mode and the explicit init flag are enabled.
 
 ## Google configuration
 
