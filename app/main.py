@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.routes import router as api_router
 from app.core.config import settings
 from app.web import FRONTEND_DIR, router as web_router
+from app.web_backups import router as web_backups_router
 
 app = FastAPI(
     title="DocsFlow API",
@@ -35,3 +36,4 @@ app.mount(
     name="frontend_assets",
 )
 app.include_router(web_router)
+app.include_router(web_backups_router)
