@@ -19,6 +19,19 @@ POST /api/v1/backups/run
 
 For the MVP, DocsFlow uses one technical Google account configured through environment variables. Application users do not connect their own Google Drive accounts. Each backup payload remains isolated by `owner_id`.
 
+## Local startup user
+
+After Alembic migrations complete, `scripts/start-api.sh` runs `scripts/init_test_user.py`.
+
+In `APP_ENV=local`, the script idempotently creates or updates this development account:
+
+```text
+email: m@m.com
+password: 12345678
+```
+
+The credentials can be overridden through `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`. The initializer is skipped outside the local environment.
+
 ## Google configuration
 
 Enable the Google Drive API in the Google Cloud project and create OAuth credentials with offline access.
@@ -102,12 +115,14 @@ Google credentials remain environment-only and are never written to the backup p
 
 ## Validation
 
-Run the backup tests:
+Run the backup and startup tests:
 
 ```bash
 docker compose run --rm api pytest \
   tests/test_backups.py \
-  tests/test_backup_hardening.py
+  tests/test_backup_hardening.py \
+  tests/test_backup_frontend.py \
+  tests/test_init_test_user.py
 ```
 
 Run all tests:
