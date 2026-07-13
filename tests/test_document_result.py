@@ -5,9 +5,16 @@ from urllib.parse import urlsplit
 
 from fastapi import status
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.audit_log import AuditLog
+from app.models.document import (
+    Document,
+    DocumentStatus,
+    ExtractionStatus,
+    ProcessingMode,
+)
 from app.models.processing_job import (
     ProcessingJob,
     ProcessingJobStatus,
@@ -49,6 +56,8 @@ def test_get_document_result_returns_extraction_and_preview(
     assert payload["deadline"] == "2016-12-26"
     assert payload["sender"] == "YesLogic Pty. Ltd."
     assert payload["confidence_score"] == 0.95
+    assert payload["extraction_status"] == "draft"
+    assert payload["can_confirm"] is True
 
     assert payload["can_correct"] is True
     assert payload["can_reprocess"] is False
@@ -113,6 +122,7 @@ def test_manual_correction_updates_effective_fields(
     assert payload["sender"] == "Corrected Sender GmbH"
     assert payload["confidence_score"] == 0.8
     assert payload["manually_corrected_at"] is not None
+    assert payload["extraction_status"] == "corrected"
 
     db_session.refresh(document)
 
@@ -122,6 +132,7 @@ def test_manual_correction_updates_effective_fields(
     assert document.deadline == date(2017, 1, 15)
     assert document.sender == "Corrected Sender GmbH"
     assert document.confidence_score == 0.8
+    assert document.extraction_status == ExtractionStatus.corrected
 
     assert document.manual_corrections == {
         "summary": "Corrected invoice summary.",
@@ -134,6 +145,121 @@ def test_manual_correction_updates_effective_fields(
 
     # Original AI response remains available for audit.
     assert document.ai_extracted_data == original_ai_data
+
+
+def test_manual_correction_creates_audit_log_for_each_changed_field(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    response = client.patch(
+        f"/api/v1/documents/{document.id}/extraction",
+        headers=auth_headers,
+        json={
+            "amount": "1000.25",
+            "document_date": "2016-11-26",
+            "document_type": "receipt",
+            "sender": "Corrected Vendor Ltd.",
+        },
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["document_date"] == "2016-11-26"
+
+    audit_logs = list(
+        db_session.scalars(
+            select(AuditLog)
+            .where(AuditLog.document_id == document.id)
+            .order_by(AuditLog.id)
+        ).all()
+    )
+
+    assert [log.field_name for log in audit_logs] == [
+        "document_type",
+        "amount",
+        "document_date",
+        "sender",
+    ]
+    assert all(
+        log.action == "extraction_field_corrected"
+        for log in audit_logs
+    )
+    assert audit_logs[1].old_value == "950.00"
+    assert audit_logs[1].new_value == "1000.25"
+    assert audit_logs[2].old_value is None
+    assert audit_logs[2].new_value == "2016-11-26"
+    assert all(log.user_id == test_user.id for log in audit_logs)
+
+
+def test_confirm_extraction_updates_status_and_creates_audit_log(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    response = client.post(
+        f"/api/v1/documents/{document.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["extraction_status"] == "confirmed"
+    assert payload["extraction_confirmed_at"] is not None
+    assert payload["can_confirm"] is False
+
+    db_session.refresh(document)
+    assert document.extraction_status == ExtractionStatus.confirmed
+    assert document.extraction_confirmed_at is not None
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.document_id == document.id,
+            AuditLog.action == "extraction_confirmed",
+        )
+    )
+    assert audit_log is not None
+    assert audit_log.field_name == "extraction_status"
+    assert audit_log.old_value == "draft"
+    assert audit_log.new_value == "confirmed"
+
+
+def test_confirm_extraction_rejects_repeated_confirmation(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    first_response = client.post(
+        f"/api/v1/documents/{document.id}/confirm",
+        headers=auth_headers,
+    )
+    second_response = client.post(
+        f"/api/v1/documents/{document.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert first_response.status_code == status.HTTP_200_OK
+    assert second_response.status_code == status.HTTP_409_CONFLICT
+    assert second_response.json() == {
+        "detail": "Extraction is already confirmed.",
+    }
 
 
 def test_failed_document_result_exposes_error_and_reprocess_control(

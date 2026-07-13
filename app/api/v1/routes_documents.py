@@ -1,4 +1,6 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from enum import Enum
 from typing import Annotated
 from urllib.parse import quote
 
@@ -19,7 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.dependencies import CurrentUser, DbSession
-from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.audit_log import AuditLog
+from app.models.document import (
+    Document,
+    DocumentStatus,
+    ExtractionStatus,
+    ProcessingMode,
+)
 from app.models.processing_job import (
     ProcessingJob,
     ProcessingJobStatus,
@@ -219,8 +227,13 @@ def get_document_result(
 
 
 @router.patch(
+    "/{document_id}/extraction",
+    response_model=DocumentResultRead,
+)
+@router.patch(
     "/{document_id}/result",
     response_model=DocumentResultRead,
+    include_in_schema=False,
 )
 def correct_document_result(
     document_id: int,
@@ -261,22 +274,112 @@ def correct_document_result(
     if changes.get("currency") is not None:
         changes["currency"] = changes["currency"].upper()
 
-    for field_name, value in changes.items():
+    effective_changes = {
+        field_name: value
+        for field_name, value in changes.items()
+        if getattr(document, field_name) != value
+    }
+
+    if not effective_changes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Correction does not change any extraction fields.",
+        )
+
+    json_changes: dict[str, object | None] = {}
+
+    for field_name, value in effective_changes.items():
+        old_value = getattr(document, field_name)
         setattr(document, field_name, value)
 
-    json_changes = correction.model_dump(
-        exclude_unset=True,
-        mode="json",
-    )
+        serialized_value = _serialize_audit_value(value)
+        json_changes[field_name] = serialized_value
 
-    if json_changes.get("currency") is not None:
-        json_changes["currency"] = json_changes["currency"].upper()
+        db.add(
+            AuditLog(
+                document_id=document.id,
+                user_id=current_user.id,
+                action="extraction_field_corrected",
+                field_name=field_name,
+                old_value=_serialize_audit_value(old_value),
+                new_value=serialized_value,
+            )
+        )
 
     document.manual_corrections = {
         **(document.manual_corrections or {}),
         **json_changes,
     }
     document.manually_corrected_at = datetime.now(UTC)
+    document.extraction_status = ExtractionStatus.corrected
+    document.extraction_confirmed_at = None
+
+    db.commit()
+    db.refresh(document)
+
+    latest_job = _get_latest_processing_job(
+        db=db,
+        document_id=document.id,
+    )
+
+    return _build_document_result(
+        document=document,
+        latest_job=latest_job,
+        request=request,
+    )
+
+
+@router.post(
+    "/{document_id}/confirm",
+    response_model=DocumentResultRead,
+)
+def confirm_document_extraction(
+    document_id: int,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DocumentResultRead:
+    document = _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+
+    if document.status != DocumentStatus.completed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only completed documents can be confirmed.",
+        )
+
+    if (
+        document.processing_mode != ProcessingMode.standard
+        or document.ai_extracted_data is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document does not have an AI extraction result.",
+        )
+
+    if document.extraction_status == ExtractionStatus.confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Extraction is already confirmed.",
+        )
+
+    previous_status = document.extraction_status
+    document.extraction_status = ExtractionStatus.confirmed
+    document.extraction_confirmed_at = datetime.now(UTC)
+
+    db.add(
+        AuditLog(
+            document_id=document.id,
+            user_id=current_user.id,
+            action="extraction_confirmed",
+            field_name="extraction_status",
+            old_value=previous_status.value,
+            new_value=ExtractionStatus.confirmed.value,
+        )
+    )
 
     db.commit()
     db.refresh(document)
@@ -564,9 +667,28 @@ def _build_document_result(
             document.status == DocumentStatus.completed
             and document.processing_mode == ProcessingMode.standard
         ),
+        can_confirm=(
+            document.status == DocumentStatus.completed
+            and document.processing_mode == ProcessingMode.standard
+            and document.ai_extracted_data is not None
+            and document.extraction_status != ExtractionStatus.confirmed
+        ),
         can_reprocess=(
             document.status == DocumentStatus.failed
             and latest_job is not None
             and latest_job.status == ProcessingJobStatus.failed
         ),
     )
+
+
+def _serialize_audit_value(value: object | None) -> object | None:
+    if isinstance(value, Enum):
+        return value.value
+
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+
+    if isinstance(value, Decimal):
+        return str(value)
+
+    return value

@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.document import (
+    Document,
+    DocumentStatus,
+    ExtractionStatus,
+    ProcessingMode,
+)
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
@@ -194,12 +199,20 @@ def _apply_standard_ai_processing_result(
     document.summary = extracted_data.summary
     document.amount = _convert_amount(extracted_data.total_amount)
     document.currency = _normalize_currency(extracted_data.currency)
+    document.document_date = _parse_iso_date(
+        extracted_data.document_date,
+        field_name="document date",
+    )
     document.deadline = _extract_deadline(
         action_deadline=extracted_data.action_deadline,
         due_date=extracted_data.due_date,
     )
     document.sender = extracted_data.sender
     document.confidence_score = extracted_data.confidence_score
+    document.extraction_status = ExtractionStatus.draft
+    document.extraction_confirmed_at = None
+    document.manual_corrections = None
+    document.manually_corrected_at = None
 
     db.add(
         OpenAIUsageLog(
@@ -227,8 +240,14 @@ def _reset_document_processing_result(document: Document) -> None:
     document.amount = None
     document.currency = None
     document.deadline = None
+    document.document_date = None
     document.sender = None
     document.confidence_score = None
+
+    document.extraction_status = ExtractionStatus.draft
+    document.extraction_confirmed_at = None
+    document.manual_corrections = None
+    document.manually_corrected_at = None
 
 
 def _convert_amount(value: float | None) -> Decimal | None:
@@ -262,9 +281,20 @@ def _extract_deadline(
     if value is None:
         return None
 
+    return _parse_iso_date(value, field_name="deadline")
+
+
+def _parse_iso_date(
+    value: str | None,
+    *,
+    field_name: str,
+) -> date | None:
+    if value is None:
+        return None
+
     try:
         return date.fromisoformat(value.strip())
     except ValueError as exc:
         raise ValueError(
-            f"AI returned invalid ISO deadline: {value}"
+            f"AI returned invalid ISO {field_name}: {value}"
         ) from exc

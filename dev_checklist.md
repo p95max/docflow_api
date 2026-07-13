@@ -105,13 +105,13 @@ structured AI extraction, search and later semantic interaction with uploaded do
 
 After AI extraction, user can manually correct fields:
 
-- [ ] Correct amount
-- [ ] Correct date
-- [ ] Correct document type
-- [ ] Correct sender/vendor
-- [ ] Confirm extraction
-- [ ] `AuditLog` for all field changes
-- [ ] `extraction_status`: `draft` / `confirmed` / `corrected`
+- [x] Correct amount
+- [x] Correct date
+- [x] Correct document type
+- [x] Correct sender/vendor
+- [x] Confirm extraction
+- [x] `AuditLog` for all field changes
+- [x] `extraction_status`: `draft` / `confirmed` / `corrected`
 
 ---
 
@@ -285,7 +285,7 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 - [ ] Skip OpenAI calls in confidential mode
 - [ ] Validate AI JSON response with Pydantic
 - [ ] Save OpenAI usage log
-- [ ] Apply manual correction
+- [x] Apply manual correction
 - [ ] Create Google Drive backup
 - [ ] Exclude sensitive fields from backup
 - [ ] Search by document type

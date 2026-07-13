@@ -83,6 +83,20 @@ Extracted text is stored in `documents.raw_text`.
 
 > **Limitation:** scanned PDFs without a text layer are not OCR-processed yet. OCR fallback for scanned PDF pages should be implemented as a separate improvement.
 
+### Manual Extraction Review
+
+Completed standard documents have a review lifecycle:
+
+| Status | Meaning |
+|---|---|
+| `draft` | AI extraction is ready for review |
+| `corrected` | A user changed one or more extracted fields |
+| `confirmed` | A user confirmed the current extraction |
+
+Users can correct the amount, document date, document type, sender/vendor and
+other existing extraction fields. Every effective field change is stored as a
+separate immutable `AuditLog` row with the old and new value.
+
 ---
 
 ## Project Structure
@@ -102,6 +116,7 @@ app/
   models/
     user.py
     document.py
+    audit_log.py
     processing_job.py
   schemas/
   services/
@@ -202,6 +217,7 @@ users
 documents
 processing_jobs
 openai_usage_logs
+audit_logs
 alembic_version
 ```
 
@@ -293,6 +309,21 @@ curl http://localhost:8000/api/v1/documents/1/jobs \
 
 # Reprocess a failed document
 curl -X POST http://localhost:8000/api/v1/documents/1/reprocess \
+  -H "Authorization: Bearer $TOKEN"
+
+# Correct extracted fields
+curl -X PATCH http://localhost:8000/api/v1/documents/1/extraction \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 49.99,
+    "document_date": "2026-05-20",
+    "document_type": "invoice",
+    "sender": "Vodafone GmbH"
+  }'
+
+# Confirm the current extraction
+curl -X POST http://localhost:8000/api/v1/documents/1/confirm \
   -H "Authorization: Bearer $TOKEN"
 ```
 

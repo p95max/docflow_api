@@ -4,7 +4,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.document import DocumentStatus, ProcessingMode
+from app.models.document import (
+    DocumentStatus,
+    ExtractionStatus,
+    ProcessingMode,
+)
 from app.schemas.ai_processing import DocumentType
 from app.schemas.processing_job import ProcessingJobRead
 
@@ -27,8 +31,12 @@ class DocumentRead(BaseModel):
     amount: float | None
     currency: str | None
     deadline: date | None
+    document_date: date | None
     sender: str | None
     confidence_score: float | None
+
+    extraction_status: ExtractionStatus
+    extraction_confirmed_at: datetime | None
 
     created_at: datetime
     updated_at: datetime
@@ -60,6 +68,8 @@ class DocumentCorrection(BaseModel):
 
     deadline: date | None = None
 
+    document_date: date | None = None
+
     sender: str | None = Field(
         default=None,
         max_length=255,
@@ -85,4 +95,5 @@ class DocumentResultRead(DocumentRead):
     processing_error: str | None
 
     can_correct: bool
+    can_confirm: bool
     can_reprocess: bool

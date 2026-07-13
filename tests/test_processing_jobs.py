@@ -14,7 +14,12 @@ import app.api.v1.routes_documents as routes_documents
 import app.services.processing_jobs as processing_jobs_service
 import app.tasks.documents as document_tasks
 from app.core.config import settings
-from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.document import (
+    Document,
+    DocumentStatus,
+    ExtractionStatus,
+    ProcessingMode,
+)
 from app.models.processing_job import (
     ProcessingJob,
     ProcessingJobStatus,
@@ -631,8 +636,10 @@ def test_process_document_task_runs_ai_processing_for_standard_document(
     assert document.amount == Decimal("950.00")
     assert document.currency == "USD"
     assert document.deadline == date(2016, 12, 26)
+    assert document.document_date == date(2016, 11, 26)
     assert document.sender == "YesLogic Pty. Ltd."
     assert document.confidence_score == pytest.approx(0.95)
+    assert document.extraction_status == ExtractionStatus.draft
 
     assert job.status == ProcessingJobStatus.completed
     assert len(usage_logs) == 1

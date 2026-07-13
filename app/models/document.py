@@ -38,6 +38,12 @@ class ProcessingMode(str, enum.Enum):
     confidential = "confidential"
 
 
+class ExtractionStatus(str, enum.Enum):
+    draft = "draft"
+    confirmed = "confirmed"
+    corrected = "corrected"
+
+
 class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
@@ -137,6 +143,11 @@ class Document(Base):
         nullable=True,
     )
 
+    document_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
     sender: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
@@ -162,6 +173,18 @@ class Document(Base):
         nullable=True,
     )
 
+    extraction_status: Mapped[ExtractionStatus] = mapped_column(
+        Enum(ExtractionStatus, name="extraction_status"),
+        default=ExtractionStatus.draft,
+        server_default=ExtractionStatus.draft.value,
+        nullable=False,
+    )
+
+    extraction_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     ai_extraction_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -175,6 +198,12 @@ class Document(Base):
 
     openai_usage_logs = relationship(
         "OpenAIUsageLog",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    audit_logs = relationship(
+        "AuditLog",
         back_populates="document",
         cascade="all, delete-orphan",
     )

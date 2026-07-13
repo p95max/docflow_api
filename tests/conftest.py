@@ -33,6 +33,7 @@ os.environ["OPENAI_MAX_INPUT_CHARS"] = "12000"
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.models.audit_log import AuditLog  # noqa: F401, E402
 from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().
