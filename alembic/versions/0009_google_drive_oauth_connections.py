@@ -1,6 +1,6 @@
 """add per-user Google Drive OAuth connections
 
-Revision ID: 0009_google_drive_oauth_connections
+Revision ID: 0009_google_drive_oauth
 Revises: 0008_google_drive_json_backup
 Create Date: 2026-07-13
 """
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0009_google_drive_oauth_connections"
+revision: str = "0009_google_drive_oauth"
 down_revision: str | None = "0008_google_drive_json_backup"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
