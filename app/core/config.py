@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     document_processing_retry_delay_seconds: int = 10
     document_preview_token_expire_minutes: int = 10
 
+    backup_soft_time_limit_seconds: int = 120
+    backup_hard_time_limit_seconds: int = 180
+
+    google_drive_client_id: str | None = None
+    google_drive_client_secret: str | None = None
+    google_drive_refresh_token: str | None = None
+    google_drive_folder_name: str = "docsflow_backups"
+    google_drive_timeout_seconds: int = 60
+
     local_ocr_languages: str = "eng+deu"
 
     openai_api_key: str | None = None
