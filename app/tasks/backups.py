@@ -20,7 +20,7 @@ from app.worker import celery_app
 def run_backup_task(self, backup_job_id: int) -> None:
     with SessionLocal() as db:
         job = db.get(BackupJob, backup_job_id)
-        if job is None:
+        if job is None or job.status == BackupJobStatus.completed:
             return
 
         try:
