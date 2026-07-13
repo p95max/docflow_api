@@ -115,17 +115,20 @@ def exchange_google_drive_authorization_code(
             "Google Drive OAuth is not configured. Missing: " + ", ".join(missing)
         )
 
-    with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
-        response = client.post(
-            GOOGLE_TOKEN_URL,
-            data={
-                "client_id": settings.google_drive_client_id,
-                "client_secret": settings.google_drive_client_secret,
-                "code": code,
-                "grant_type": "authorization_code",
-                "redirect_uri": redirect_uri,
-            },
-        )
+    try:
+        with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
+            response = client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "client_id": settings.google_drive_client_id,
+                    "client_secret": settings.google_drive_client_secret,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": redirect_uri,
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise RuntimeError("Could not contact the Google OAuth service.") from exc
 
     try:
         payload = response.json()
