@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}{{ document.original_filename }} · DocsFlow{% endblock %}
+{% block head %}
+  {% if document.status.value in ("uploaded", "processing") %}
+    <meta http-equiv="refresh" content="3">
+  {% endif %}
+{% endblock %}
+{% block content %}
+<a class="text-decoration-none" href="/documents">← Documents</a>
+
+<div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-3 mb-4">
+  <div>
+    <h1 class="h2 mb-1">{{ document.original_filename }}</h1>
+    <div class="d-flex gap-2">
+      <span class="badge {{ document.status|status_badge_class }}">{{ document.status.value }}</span>
+      {% if document.processing_mode.value == "confidential" %}
+        <span class="badge text-bg-dark">confidential</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if download_url %}
+      <a class="btn btn-outline-primary" href="{{ download_url }}">Download</a>
+    {% endif %}
+    <a class="btn btn-outline-danger" href="/documents/{{ document.id }}/delete">Delete</a>
+  </div>
+</div>
+
+{% if request.query_params.get("saved") == "1" %}
+  <div class="alert alert-success">Changes saved.</div>
+{% endif %}
+{% if request.query_params.get("confirmed") == "1" %}
+  <div class="alert alert-success">Extraction confirmed.</div>
+{% endif %}
+{% if request.query_params.get("reprocessed") == "1" %}
+  <div class="alert alert-info">Document processing started again. This page refreshes automatically.</div>
+{% endif %}
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+{% if document.processing_error %}
+  <div class="alert alert-danger">{{ document.processing_error }}</div>
+{% endif %}
+{% if document.processing_mode.value == "confidential" %}
+  <div class="alert alert-info">
+    <strong>Confidential mode:</strong>
+    this document was processed locally. Its document type was classified locally; structured AI fields were not generated, and no document data was sent to OpenAI.
+  </div>
+{% endif %}
+{% if document.status.value in ("uploaded", "processing") %}
+  <div class="alert alert-secondary">Processing is in progress. The page refreshes every 3 seconds.</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    {% if preview_url %}
+      <iframe class="preview-frame" title="Document preview" src="{{ preview_url }}"></iframe>
+    {% else %}
+      <div class="alert alert-secondary">Preview is not available yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Extraction result</h2>
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-secondary">Document type</dt>
+          <dd class="col-sm-7">{{ document.document_type or "—" }}</dd>
+          <dt class="col-sm-5 text-secondary">Sender</dt>
+          <dd class="col-sm-7">{{ document.sender or "—" }}</dd>
+          <dt class="col-sm-5 text-secondary">Document date</dt>
+          <dd class="col-sm-7">{{ document.document_date or "—" }}</dd>
+          <dt class="col-sm-5 text-secondary">Deadline</dt>
+          <dd class="col-sm-7">{{ document.deadline or "—" }}</dd>
+          <dt class="col-sm-5 text-secondary">Amount</dt>
+          <dd class="col-sm-7">
+            {% if document.amount is not none %}
+              {{ document.amount }} {{ document.currency or "" }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          <dt class="col-sm-5 text-secondary">Extraction</dt>
+          <dd class="col-sm-7">
+            {% if document.processing_mode.value == "confidential" %}
+              local only
+            {% else %}
+              <span class="badge {{ document.extraction_status|status_badge_class }}">{{ document.extraction_status.value }}</span>
+            {% endif %}
+          </dd>
+        </dl>
+        {% if document.summary %}
+          <hr>
+          <p class="document-summary mb-0">{{ document.summary }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if document.can_reprocess %}
+      <form method="post" action="/documents/{{ document.id }}/reprocess" class="mt-3">
+        <button class="btn btn-warning" type="submit">Reprocess document</button>
+      </form>
+    {% endif %}
+
+    {% if document.can_correct %}
+      <div class="card shadow-sm mt-4">
+        <div class="card-body">
+          <h2 class="h5">Correct extraction</h2>
+          <form method="post" action="/documents/{{ document.id }}/correct">
+            <div class="mb-3">
+              <label class="form-label" for="document_type">Document type</label>
+              <select class="form-select" id="document_type" name="document_type">
+                {% for type in document_types %}
+                  <option value="{{ type }}" {% if document.document_type == type %}selected{% endif %}>{{ type }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="sender">Sender / vendor</label>
+              <input class="form-control" id="sender" name="sender" value="{{ document.sender or '' }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="summary">Summary</label>
+              <textarea class="form-control" id="summary" name="summary" rows="4">{{ document.summary or "" }}</textarea>
+            </div>
+            <div class="row">
+              <div class="col-md-7 mb-3">
+                <label class="form-label" for="amount">Amount</label>
+                <input class="form-control" id="amount" name="amount" type="number" min="0" step="0.01" value="{{ document.amount if document.amount is not none else '' }}">
+              </div>
+              <div class="col-md-5 mb-3">
+                <label class="form-label" for="currency">Currency</label>
+                <input class="form-control" id="currency" name="currency" minlength="3" maxlength="3" value="{{ document.currency or '' }}">
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="document_date">Document date</label>
+                <input class="form-control" id="document_date" name="document_date" type="date" value="{{ document.document_date or '' }}">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="deadline">Deadline</label>
+                <input class="form-control" id="deadline" name="deadline" type="date" value="{{ document.deadline or '' }}">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="confidence_score">Confidence score</label>
+              <input class="form-control" id="confidence_score" name="confidence_score" type="number" min="0" max="1" step="0.01" value="{{ document.confidence_score if document.confidence_score is not none else '' }}">
+            </div>
+            <button class="btn btn-primary" type="submit">Save changes</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if document.can_confirm %}
+      <form method="post" action="/documents/{{ document.id }}/confirm" class="mt-3">
+        <button class="btn btn-success" type="submit">Confirm extraction</button>
+      </form>
+    {% endif %}
+
+    {% if document.raw_text %}
+      <details class="card shadow-sm mt-4">
+        <summary class="card-header cursor-pointer">Extracted text</summary>
+        <pre class="card-body raw-text mb-0">{{ document.raw_text }}</pre>
+      </details>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
