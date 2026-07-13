@@ -1,131 +1,75 @@
 # Google Drive JSON Backup
 
-MVP 1.5 exports the authenticated user's DocsFlow data to a compressed JSON file and uploads it to Google Drive.
+MVP 1.5 exports the authenticated user's DocsFlow records and document metadata to a compressed JSON file and uploads it to that user's connected Google Drive account.
 
-## Architecture
+## Flow
 
-The API creates a `BackupJob` synchronously and delegates the export/upload work to Celery.
+1. The user opens **Backups** and clicks **Connect Google Drive**.
+2. DocsFlow redirects the browser to Google's OAuth consent page.
+3. Google returns an authorization code to `/backups/google/callback`.
+4. DocsFlow validates a signed state value and browser nonce, then exchanges the code server-side.
+5. The returned offline credential is stored for that DocsFlow user.
+6. A backup job uses the stored credential to obtain a short-lived access token and upload the archive.
+
+The user never copies an OAuth token into the application configuration.
+
+## Google Cloud setup
+
+Enable the Google Drive API and create an OAuth client of type **Web application**. Add the exact DocsFlow callback URI to the client's authorized redirect URIs.
+
+For local development, the callback is normally:
+
+`http://localhost:8000/backups/google/callback`
+
+For GitHub Codespaces, use the public forwarded-port origin followed by:
+
+`/backups/google/callback`
+
+The callback scheme, hostname, port, path, and trailing slash must match exactly.
+
+The application still needs its Google OAuth client identifier and client credential configured server-side. An explicit callback setting is recommended behind a proxy or in Codespaces. The legacy manually supplied Drive token setting is ignored by the new browser flow.
+
+DocsFlow requests only the `drive.file` permission. This allows it to create and manage files created by DocsFlow without general access to all files in the user's Drive.
+
+## Backup processing
 
 ```text
-POST /api/v1/backups/run
+Create backup
+  -> require connected Google Drive account
   -> create BackupJob(status=pending)
   -> enqueue Celery task
-  -> status=running
   -> export allow-listed database records
   -> JSON -> gzip -> SHA-256
-  -> upload to Google Drive
+  -> upload to /docsflow_backups
   -> status=completed or failed
 ```
 
-For the MVP, DocsFlow uses one technical Google account configured through environment variables. Application users do not connect their own Google Drive accounts. Each backup payload remains isolated by `owner_id`.
+Original PDF, JPG, and PNG files are not included.
 
-## Local startup user
+## Security
 
-After Alembic migrations complete, `scripts/start-api.sh` runs `scripts/init_test_user.py`.
+- OAuth callback state is signed and expires quickly.
+- The state is also bound to an HttpOnly browser nonce.
+- Each Drive connection is isolated by DocsFlow user ID.
+- Password hashes, OAuth credentials, API keys, and Celery task identifiers are excluded from backup archives.
+- Disconnecting Drive attempts to revoke the Google grant and removes the local connection.
 
-When `APP_ENV=local` and `INIT_TEST_USER=true`, the script idempotently creates or updates this development account:
-
-```text
-email: m@m.com
-password: 12345678
-```
-
-The credentials can be overridden through `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`. The initializer is skipped unless both local mode and the explicit init flag are enabled.
-
-## Google configuration
-
-Enable the Google Drive API in the Google Cloud project and create OAuth credentials with offline access.
-
-The refresh token must include this scope:
-
-```text
-https://www.googleapis.com/auth/drive.file
-```
-
-Configure the API and Celery worker with the same environment variables:
-
-```env
-GOOGLE_DRIVE_CLIENT_ID=
-GOOGLE_DRIVE_CLIENT_SECRET=
-GOOGLE_DRIVE_REFRESH_TOKEN=
-GOOGLE_DRIVE_FOLDER_NAME=docsflow_backups
-GOOGLE_DRIVE_TIMEOUT_SECONDS=60
-
-BACKUP_SOFT_TIME_LIMIT_SECONDS=120
-BACKUP_HARD_TIME_LIMIT_SECONDS=180
-```
-
-The folder is looked up or created in the root of the configured Google Drive account.
-
-## API
-
-Create a backup:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/backups/run \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-List backup history:
-
-```bash
-curl http://localhost:8000/api/v1/backups \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Get one backup job:
-
-```bash
-curl http://localhost:8000/api/v1/backups/1 \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-A successful job contains the Drive file metadata, compressed size, SHA-256 checksum and record counts.
-
-## Backup format
-
-The uploaded file name has this form:
-
-```text
-docsflow-backup-user-<owner_id>-<UTC timestamp>.json.gz
-```
-
-The JSON contains:
-
-- user profile fields required for restore;
-- document records and file metadata;
-- extracted text and structured extraction results;
-- processing jobs;
-- OpenAI usage records;
-- audit logs;
-- backup job metadata.
-
-The original uploaded PDF/JPG/PNG files are not included.
-
-## Security boundary
-
-Serialization uses explicit field allow-lists. The backup excludes:
-
-- password hashes;
-- Google OAuth client secret and refresh token;
-- API keys and OpenAI credentials;
-- Celery task identifiers.
-
-Google credentials remain environment-only and are never written to the backup payload or database.
+The stored offline credential is sensitive. Production databases should use encryption at rest and tightly restricted access.
 
 ## Validation
 
-Run the backup and startup tests:
+Run the focused suite:
 
 ```bash
 docker compose run --rm api pytest \
   tests/test_backups.py \
   tests/test_backup_hardening.py \
   tests/test_backup_frontend.py \
+  tests/test_google_drive_oauth.py \
   tests/test_init_test_user.py
 ```
 
-Run all tests:
+Run the full suite:
 
 ```bash
 docker compose run --rm api pytest

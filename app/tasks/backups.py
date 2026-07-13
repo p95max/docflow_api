@@ -8,6 +8,7 @@ from app.db.session import SessionLocal
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.services.backup_export import build_backup_archive
 from app.services.google_drive import upload_gzip_backup
+from app.services.google_drive_oauth import get_google_drive_connection
 from app.worker import celery_app
 
 
@@ -20,10 +21,22 @@ from app.worker import celery_app
 def run_backup_task(self, backup_job_id: int) -> None:
     with SessionLocal() as db:
         job = db.get(BackupJob, backup_job_id)
-        if job is None or job.status == BackupJobStatus.completed:
+        if job is None or job.status in {
+            BackupJobStatus.running,
+            BackupJobStatus.completed,
+        }:
             return
 
         try:
+            connection = get_google_drive_connection(
+                db=db,
+                user_id=job.owner_id,
+            )
+            if connection is None:
+                raise RuntimeError(
+                    "Google Drive is not connected. Connect it on the Backups page."
+                )
+
             job.status = BackupJobStatus.running
             job.started_at = job.started_at or datetime.now(UTC)
             job.finished_at = None
@@ -36,6 +49,7 @@ def run_backup_task(self, backup_job_id: int) -> None:
             drive_result = upload_gzip_backup(
                 filename=filename,
                 content=archive.content,
+                refresh_token=connection.refresh_token,
             )
 
             db.refresh(job)

@@ -21,4 +21,26 @@ jobs:
         run: cp .env.example .env
 
       - name: Run test suite
-        run: docker compose run --rm api pytest
+        id: pytest
+        continue-on-error: true
+        shell: bash
+        run: |
+          docker compose run --rm api pytest -q --tb=short > /tmp/docsflow-pytest.log 2>&1
+
+      - name: Upload pytest log
+        if: steps.pytest.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-log
+          path: /tmp/docsflow-pytest.log
+          retention-days: 3
+
+      - name: Report pytest result
+        if: steps.pytest.outcome == 'failure'
+        run: |
+          tail -n 80 /tmp/docsflow-pytest.log
+          exit 1
+
+      - name: Show pytest summary
+        if: steps.pytest.outcome == 'success'
+        run: cat /tmp/docsflow-pytest.log

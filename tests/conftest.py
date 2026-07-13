@@ -28,9 +28,10 @@ os.environ["BACKUP_SOFT_TIME_LIMIT_SECONDS"] = "120"
 os.environ["BACKUP_HARD_TIME_LIMIT_SECONDS"] = "180"
 os.environ["GOOGLE_DRIVE_CLIENT_ID"] = "test-client-id"
 os.environ["GOOGLE_DRIVE_CLIENT_SECRET"] = "test-client-secret"
-os.environ["GOOGLE_DRIVE_REFRESH_TOKEN"] = "test-refresh-token"
+os.environ["GOOGLE_DRIVE_REDIRECT_URI"] = "http://testserver/backups/google/callback"
 os.environ["GOOGLE_DRIVE_FOLDER_NAME"] = "docsflow_backups"
 os.environ["GOOGLE_DRIVE_TIMEOUT_SECONDS"] = "60"
+os.environ["GOOGLE_OAUTH_STATE_EXPIRE_MINUTES"] = "10"
 
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
@@ -42,6 +43,9 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.audit_log import AuditLog  # noqa: F401, E402
 from app.models.backup_job import BackupJob  # noqa: F401, E402
+from app.models.google_drive_connection import (  # noqa: F401, E402
+    GoogleDriveConnection,
+)
 from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().

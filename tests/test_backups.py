@@ -11,6 +11,7 @@ import app.api.v1.routes_backups as routes_backups
 import app.tasks.backups as backup_tasks
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.document import Document, DocumentStatus, ProcessingMode
+from app.models.google_drive_connection import GoogleDriveConnection
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
 from app.services.google_drive import DriveUploadResult
@@ -32,6 +33,18 @@ class SessionLocalOverride:
         traceback: TracebackType | None,
     ) -> bool:
         return False
+
+
+def _connect_drive(db: Session, user: User) -> GoogleDriveConnection:
+    connection = GoogleDriveConnection(
+        user_id=user.id,
+        refresh_token="stored-refresh-token",
+        scope="https://www.googleapis.com/auth/drive.file",
+    )
+    db.add(connection)
+    db.commit()
+    db.refresh(connection)
+    return connection
 
 
 def test_backup_archive_contains_records_and_excludes_password_hash(
@@ -62,17 +75,31 @@ def test_backup_archive_contains_records_and_excludes_password_hash(
     assert payload["records"]["documents"][0]["storage_key"] == "1/invoice.pdf"
     assert payload["records"]["documents"][0]["raw_text"] == "Invoice text"
     assert "password_hash" not in serialized
+    assert "refresh_token" not in serialized
     assert test_user.password_hash not in serialized
     assert archive.checksum_sha256
     assert archive.record_counts["documents"] == 1
+
+
+def test_run_backup_endpoint_requires_google_drive_connection(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.post("/api/v1/backups/run", headers=auth_headers)
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "Google Drive is not connected" in response.json()["detail"]
 
 
 def test_run_backup_endpoint_creates_pending_job(
     client: TestClient,
     auth_headers: dict[str, str],
     db_session: Session,
+    test_user: User,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _connect_drive(db_session, test_user)
+
     def fake_enqueue_backup_job(*, db: Session, job: BackupJob) -> BackupJob:
         job.celery_task_id = "fake-backup-task-id"
         db.commit()
@@ -130,6 +157,7 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
     test_user: User,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _connect_drive(db_session, test_user)
     job = BackupJob(owner_id=test_user.id)
     db_session.add(job)
     db_session.commit()
@@ -141,7 +169,13 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
         lambda: SessionLocalOverride(db_session),
     )
 
-    def fake_upload_gzip_backup(*, filename: str, content: bytes):
+    def fake_upload_gzip_backup(
+        *,
+        filename: str,
+        content: bytes,
+        refresh_token: str,
+    ) -> DriveUploadResult:
+        assert refresh_token == "stored-refresh-token"
         assert filename.endswith(".json.gz")
         payload = json.loads(gzip.decompress(content))
         assert payload["owner_id"] == test_user.id
@@ -174,7 +208,7 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
     assert job.finished_at is not None
 
 
-def test_run_backup_task_marks_job_failed(
+def test_run_backup_task_marks_job_failed_without_connection(
     db_session: Session,
     test_user: User,
     monkeypatch: pytest.MonkeyPatch,
@@ -190,7 +224,38 @@ def test_run_backup_task_marks_job_failed(
         lambda: SessionLocalOverride(db_session),
     )
 
-    def fail_upload(*, filename: str, content: bytes):
+    result = run_backup_task.apply(args=(job.id,), throw=False)
+
+    assert result.failed()
+    db_session.refresh(job)
+    assert job.status == BackupJobStatus.failed
+    assert "Google Drive is not connected" in (job.error_message or "")
+    assert job.finished_at is not None
+
+
+def test_run_backup_task_marks_job_failed_when_drive_upload_fails(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _connect_drive(db_session, test_user)
+    job = BackupJob(owner_id=test_user.id)
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    monkeypatch.setattr(
+        backup_tasks,
+        "SessionLocal",
+        lambda: SessionLocalOverride(db_session),
+    )
+
+    def fail_upload(
+        *,
+        filename: str,
+        content: bytes,
+        refresh_token: str,
+    ) -> None:
         raise RuntimeError("Drive unavailable")
 
     monkeypatch.setattr(backup_tasks, "upload_gzip_backup", fail_upload)

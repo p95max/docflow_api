@@ -20,7 +20,7 @@ done
 
 echo "Database migrations completed."
 echo "Initializing local test user..."
-python scripts/init_test_user.py
+python -m scripts.init_test_user
 
 echo "Starting API server..."
 

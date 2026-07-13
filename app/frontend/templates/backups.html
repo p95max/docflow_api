@@ -10,9 +10,20 @@
         Export your DocsFlow records and document metadata as compressed JSON.
       </p>
     </div>
-    <form method="post" action="/backups/run">
-      <button class="btn btn-primary" type="submit">Create backup</button>
-    </form>
+    <div class="d-flex flex-wrap gap-2">
+      {% if google_drive_connection %}
+        <form method="post" action="/backups/run">
+          <button class="btn btn-primary" type="submit">Create backup</button>
+        </form>
+        <form method="post" action="/backups/google/disconnect">
+          <button class="btn btn-outline-danger" type="submit">Disconnect Google Drive</button>
+        </form>
+      {% elif google_oauth_configured %}
+        <a class="btn btn-primary" href="/backups/google/connect">Connect Google Drive</a>
+      {% else %}
+        <button class="btn btn-primary" type="button" disabled>Connect Google Drive</button>
+      {% endif %}
+    </div>
   </div>
 
   {% if created %}
@@ -21,9 +32,50 @@
     </div>
   {% endif %}
 
+  {% if google_connected %}
+    <div class="alert alert-success" role="alert">
+      Google Drive connected successfully. Backups will now be uploaded to this Google account.
+    </div>
+  {% endif %}
+
+  {% if google_disconnected %}
+    <div class="alert alert-info" role="alert">
+      Google Drive disconnected.
+    </div>
+  {% endif %}
+
   {% if error %}
     <div class="alert alert-danger" role="alert">{{ error }}</div>
   {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+        <div>
+          <h2 class="h6">Google Drive connection</h2>
+          {% if google_drive_connection %}
+            <p class="text-success mb-0">
+              Connected. DocsFlow has permission to create and manage only files created by this application.
+            </p>
+          {% elif google_oauth_configured %}
+            <p class="text-secondary mb-0">
+              Not connected. Click <strong>Connect Google Drive</strong> and approve access in Google.
+            </p>
+          {% else %}
+            <p class="text-danger mb-0">
+              OAuth client configuration is missing:
+              <code>{{ google_oauth_missing_settings|join(", ") }}</code>.
+            </p>
+          {% endif %}
+        </div>
+        {% if google_drive_connection %}
+          <div class="small text-secondary text-md-end">
+            Connected {{ google_drive_connection.updated_at.strftime("%Y-%m-%d %H:%M:%S") }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 
   <div class="card shadow-sm mb-4">
     <div class="card-body">
@@ -84,7 +136,13 @@
   {% else %}
     <div class="empty-state text-center p-5">
       <h2 class="h5">No backups yet</h2>
-      <p class="text-secondary mb-0">Create the first Google Drive backup for this account.</p>
+      <p class="text-secondary mb-0">
+        {% if google_drive_connection %}
+          Create the first Google Drive backup for this account.
+        {% else %}
+          Connect Google Drive before creating the first backup.
+        {% endif %}
+      </p>
     </div>
   {% endif %}
 {% endblock %}

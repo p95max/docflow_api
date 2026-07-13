@@ -25,12 +25,16 @@ def upload_gzip_backup(
     *,
     filename: str,
     content: bytes,
+    refresh_token: str,
     folder_name: str | None = None,
 ) -> DriveUploadResult:
     folder_name = folder_name or settings.google_drive_folder_name
 
     with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
-        access_token = _get_access_token(client)
+        access_token = _get_access_token(
+            client=client,
+            refresh_token=refresh_token,
+        )
         folder_id = _get_or_create_folder(
             client=client,
             access_token=access_token,
@@ -56,31 +60,46 @@ def upload_gzip_backup(
     )
 
 
-def _get_access_token(client: httpx.Client) -> str:
+def _get_access_token(
+    *,
+    client: httpx.Client,
+    refresh_token: str,
+) -> str:
     required_settings = {
         "GOOGLE_DRIVE_CLIENT_ID": settings.google_drive_client_id,
         "GOOGLE_DRIVE_CLIENT_SECRET": settings.google_drive_client_secret,
-        "GOOGLE_DRIVE_REFRESH_TOKEN": settings.google_drive_refresh_token,
     }
     missing = [name for name, value in required_settings.items() if not value]
 
     if missing:
         raise RuntimeError(
-            "Google Drive backup is not configured. Missing: " + ", ".join(missing)
+            "Google Drive OAuth is not configured. Missing: " + ", ".join(missing)
         )
+    if not refresh_token:
+        raise RuntimeError("Google Drive is not connected for this user.")
 
     response = client.post(
         TOKEN_URL,
         data={
             "client_id": settings.google_drive_client_id,
             "client_secret": settings.google_drive_client_secret,
-            "refresh_token": settings.google_drive_refresh_token,
+            "refresh_token": refresh_token,
             "grant_type": "refresh_token",
         },
     )
-    response.raise_for_status()
 
-    access_token = response.json().get("access_token")
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    if response.is_error:
+        detail = payload.get("error_description") or payload.get("error")
+        raise RuntimeError(
+            f"Google OAuth refresh failed: {detail or response.status_code}"
+        )
+
+    access_token = payload.get("access_token")
     if not access_token:
         raise RuntimeError("Google OAuth token response does not contain access_token")
 

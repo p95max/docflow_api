@@ -37,9 +37,11 @@ class Settings(BaseSettings):
 
     google_drive_client_id: str | None = None
     google_drive_client_secret: str | None = None
-    google_drive_refresh_token: str | None = None
+    google_drive_redirect_uri: str | None = None
+    google_drive_refresh_token: str | None = None  # Deprecated; ignored by OAuth flow.
     google_drive_folder_name: str = "docsflow_backups"
     google_drive_timeout_seconds: int = 60
+    google_oauth_state_expire_minutes: int = 10
 
     local_ocr_languages: str = "eng+deu"
 
@@ -55,6 +57,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     @field_validator("cors_origins", mode="before")

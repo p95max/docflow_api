@@ -8,6 +8,7 @@ from app.services.backup_jobs import (
     get_backup_job,
     list_backup_jobs,
 )
+from app.services.google_drive_oauth import get_google_drive_connection
 
 router = APIRouter()
 
@@ -21,6 +22,12 @@ def run_backup(
     db: DbSession,
     current_user: CurrentUser,
 ) -> BackupJobRead:
+    if get_google_drive_connection(db=db, user_id=current_user.id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Google Drive is not connected. Connect it on the Backups page.",
+        )
+
     job = create_backup_job(db=db, owner_id=current_user.id)
     db.commit()
     db.refresh(job)
