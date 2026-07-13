@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
@@ -34,6 +35,7 @@ from app.models.processing_job import (
 )
 from app.schemas.document import (
     DocumentCorrection,
+    DocumentFileUrl,
     DocumentRead,
     DocumentResultRead,
 )
@@ -44,8 +46,11 @@ from app.services.processing_jobs import (
     list_processing_jobs_for_document,
 )
 from app.services.security import (
+    create_document_download_token,
     create_document_preview_token,
-    decode_document_preview_token,
+    decode_document_file_token,
+    DOCUMENT_DOWNLOAD_TOKEN_PURPOSE,
+    DOCUMENT_PREVIEW_TOKEN_PURPOSE,
 )
 from app.services.storage import (
     build_document_storage_key,
@@ -406,68 +411,71 @@ def preview_document_file(
     db: DbSession,
     token: Annotated[str, Query(min_length=1)],
 ) -> FileResponse:
-    try:
-        payload = decode_document_preview_token(token)
-
-        token_document_id = int(payload["document_id"])
-        token_owner_id = int(payload["sub"])
-
-    except (
-        jwt.InvalidTokenError,
-        KeyError,
-        TypeError,
-        ValueError,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired document preview token.",
-        ) from None
-
-    if token_document_id != document_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
-
-    document = db.get(Document, document_id)
-
-    if document is None or document.owner_id != token_owner_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
-
-    if not document.storage_key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document file not found",
-        )
-
-    file_path = get_document_file_path(document.storage_key)
-
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document file not found",
-        )
-
-    encoded_filename = quote(
-        document.original_filename,
-        safe="",
+    document, file_path = _get_file_for_signed_request(
+        db=db,
+        document_id=document_id,
+        token=token,
+        expected_purpose=DOCUMENT_PREVIEW_TOKEN_PURPOSE,
+        invalid_token_detail="Invalid or expired document preview token.",
     )
 
-    return FileResponse(
-        path=file_path,
-        media_type=(
-            document.content_type
-            or "application/octet-stream"
-        ),
-        headers={
-            "Content-Disposition": (
-                f"inline; filename*=UTF-8''{encoded_filename}"
-            ),
-            "Cache-Control": "private, no-store",
-        },
+    return _build_document_file_response(
+        document=document,
+        file_path=file_path,
+        disposition="inline",
+    )
+
+
+@router.get(
+    "/{document_id}/download",
+    name="download_document_file",
+    response_class=FileResponse,
+)
+def download_document_file(
+    document_id: int,
+    db: DbSession,
+    token: Annotated[str, Query(min_length=1)],
+) -> FileResponse:
+    document, file_path = _get_file_for_signed_request(
+        db=db,
+        document_id=document_id,
+        token=token,
+        expected_purpose=DOCUMENT_DOWNLOAD_TOKEN_PURPOSE,
+        invalid_token_detail="Invalid or expired document download token.",
+    )
+
+    return _build_document_file_response(
+        document=document,
+        file_path=file_path,
+        disposition="attachment",
+    )
+
+
+@router.get(
+    "/{document_id}/download-url",
+    response_model=DocumentFileUrl,
+)
+def get_document_download_url(
+    document_id: int,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DocumentFileUrl:
+    document = _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+
+    download_url, expires_at = _create_document_download_url(
+        document=document,
+        request=request,
+        require_file=True,
+    )
+
+    return DocumentFileUrl(
+        url=download_url,
+        expires_at=expires_at,
     )
 
 
@@ -561,6 +569,90 @@ def reprocess_document(
     )
 
 
+def _get_file_for_signed_request(
+    *,
+    db: DbSession,
+    document_id: int,
+    token: str,
+    expected_purpose: str,
+    invalid_token_detail: str,
+) -> tuple[Document, Path]:
+    try:
+        payload = decode_document_file_token(
+            token=token,
+            expected_purpose=expected_purpose,
+        )
+        token_document_id = int(payload["document_id"])
+        token_owner_id = int(payload["sub"])
+
+    except (
+        jwt.InvalidTokenError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=invalid_token_detail,
+        ) from None
+
+    if token_document_id != document_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    document = db.get(Document, document_id)
+
+    if document is None or document.owner_id != token_owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if not document.storage_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file not found",
+        )
+
+    file_path = get_document_file_path(document.storage_key)
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file not found",
+        )
+
+    return document, file_path
+
+
+def _build_document_file_response(
+    *,
+    document: Document,
+    file_path: Path,
+    disposition: str,
+) -> FileResponse:
+    encoded_filename = quote(
+        document.original_filename,
+        safe="",
+    )
+
+    return FileResponse(
+        path=file_path,
+        media_type=(
+            document.content_type
+            or "application/octet-stream"
+        ),
+        headers={
+            "Content-Disposition": (
+                f"{disposition}; filename*=UTF-8''{encoded_filename}"
+            ),
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 def _get_owned_document(
     db: DbSession,
     document_id: int,
@@ -618,6 +710,8 @@ def _build_document_result(
 ) -> DocumentResultRead:
     file_preview_url: str | None = None
     file_preview_expires_at: datetime | None = None
+    file_download_url: str | None = None
+    file_download_expires_at: datetime | None = None
 
     if document.storage_key:
         file_path = get_document_file_path(
@@ -642,6 +736,15 @@ def _build_document_result(
             file_preview_url = str(preview_url)
             file_preview_expires_at = expires_at
 
+            (
+                file_download_url,
+                file_download_expires_at,
+            ) = _create_document_download_url(
+                document=document,
+                request=request,
+                require_file=False,
+            )
+
     processing_error: str | None = None
 
     if (
@@ -659,6 +762,8 @@ def _build_document_result(
         raw_text=document.raw_text,
         file_preview_url=file_preview_url,
         file_preview_expires_at=file_preview_expires_at,
+        file_download_url=file_download_url,
+        file_download_expires_at=file_download_expires_at,
         manual_corrections=document.manual_corrections,
         manually_corrected_at=document.manually_corrected_at,
         latest_job=latest_job,
@@ -679,6 +784,42 @@ def _build_document_result(
             and latest_job.status == ProcessingJobStatus.failed
         ),
     )
+
+
+def _create_document_download_url(
+    *,
+    document: Document,
+    request: Request,
+    require_file: bool,
+) -> tuple[str | None, datetime | None]:
+    if not document.storage_key:
+        if require_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document file not found",
+            )
+        return None, None
+
+    file_path = get_document_file_path(document.storage_key)
+
+    if not file_path.is_file():
+        if require_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document file not found",
+            )
+        return None, None
+
+    download_token, expires_at = create_document_download_token(
+        document_id=document.id,
+        owner_id=document.owner_id,
+    )
+    download_url = request.url_for(
+        "download_document_file",
+        document_id=document.id,
+    ).include_query_params(token=download_token)
+
+    return str(download_url), expires_at
 
 
 def _serialize_audit_value(value: object | None) -> object | None:

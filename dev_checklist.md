@@ -117,7 +117,7 @@ After AI extraction, user can manually correct fields:
 
 ## MVP 1.2 — Presigned URLs
 
-- [ ] Presigned download URLs for preview/download
+- [x] Presigned download URLs for preview/download
 - [ ] Presigned upload URLs later, if direct upload to MinIO is required
 
 ---
@@ -223,6 +223,7 @@ DELETE /documents/{document_id}
 POST   /documents/{document_id}/reprocess
 PATCH  /documents/{document_id}/extraction
 POST   /documents/{document_id}/confirm
+GET    /documents/{document_id}/download-url
 ```
 
 ---

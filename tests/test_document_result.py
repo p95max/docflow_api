@@ -68,6 +68,8 @@ def test_get_document_result_returns_extraction_and_preview(
 
     assert payload["file_preview_url"] is not None
     assert payload["file_preview_expires_at"] is not None
+    assert payload["file_download_url"] is not None
+    assert payload["file_download_expires_at"] is not None
 
     preview_url = urlsplit(payload["file_preview_url"])
 
@@ -83,6 +85,75 @@ def test_get_document_result_returns_extraction_and_preview(
     assert preview_response.headers["content-disposition"].startswith(
         "inline;"
     )
+
+    download_url = urlsplit(payload["file_download_url"])
+    download_response = client.get(
+        f"{download_url.path}?{download_url.query}",
+    )
+
+    assert download_response.status_code == status.HTTP_200_OK
+    assert download_response.content == PDF_BYTES
+    assert download_response.headers["content-disposition"].startswith(
+        "attachment;"
+    )
+
+
+def test_get_download_url_returns_signed_attachment_url(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    response = client.get(
+        f"/api/v1/documents/{document.id}/download-url",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["expires_at"] is not None
+
+    download_url = urlsplit(payload["url"])
+    download_response = client.get(
+        f"{download_url.path}?{download_url.query}",
+    )
+
+    assert download_response.status_code == status.HTTP_200_OK
+    assert download_response.headers["content-disposition"].startswith(
+        "attachment;"
+    )
+
+
+def test_download_rejects_preview_token(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    result_response = client.get(
+        f"/api/v1/documents/{document.id}/result",
+        headers=auth_headers,
+    )
+    preview_url = urlsplit(result_response.json()["file_preview_url"])
+
+    response = client.get(
+        f"/api/v1/documents/{document.id}/download?{preview_url.query}",
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {
+        "detail": "Invalid or expired document download token.",
+    }
 
 
 def test_manual_correction_updates_effective_fields(

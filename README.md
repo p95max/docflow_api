@@ -97,6 +97,13 @@ Users can correct the amount, document date, document type, sender/vendor and
 other existing extraction fields. Every effective field change is stored as a
 separate immutable `AuditLog` row with the old and new value.
 
+### Signed File URLs
+
+Document result responses include short-lived, signed URLs for inline preview
+and attachment download. A preview token cannot be used to download a file,
+and a download token cannot be used for preview. Tokens expire after
+`DOCUMENT_PREVIEW_TOKEN_EXPIRE_MINUTES` (10 minutes by default).
+
 ---
 
 ## Project Structure
@@ -303,6 +310,10 @@ curl http://localhost:8000/api/v1/documents \
 curl http://localhost:8000/api/v1/documents/1 \
   -H "Authorization: Bearer $TOKEN"
 
+# Create a signed download URL for one document
+curl http://localhost:8000/api/v1/documents/1/download-url \
+  -H "Authorization: Bearer $TOKEN"
+
 # List processing jobs for a document
 curl http://localhost:8000/api/v1/documents/1/jobs \
   -H "Authorization: Bearer $TOKEN"
@@ -325,6 +336,7 @@ curl -X PATCH http://localhost:8000/api/v1/documents/1/extraction \
 # Confirm the current extraction
 curl -X POST http://localhost:8000/api/v1/documents/1/confirm \
   -H "Authorization: Bearer $TOKEN"
+
 ```
 
 > Reprocessing is allowed only for documents with status `failed`.

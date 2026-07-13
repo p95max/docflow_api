@@ -8,6 +8,7 @@ from app.core.config import settings
 
 JWT_ALGORITHM = "HS256"
 DOCUMENT_PREVIEW_TOKEN_PURPOSE = "document_preview"
+DOCUMENT_DOWNLOAD_TOKEN_PURPOSE = "document_download"
 
 
 def hash_password(password: str) -> str:
@@ -58,7 +59,33 @@ def create_document_preview_token(
     document_id: int,
     owner_id: int,
 ) -> tuple[str, datetime]:
-    """Create a short-lived token granting access to one document file."""
+    """Create a short-lived token granting inline preview access."""
+    return _create_document_file_token(
+        document_id=document_id,
+        owner_id=owner_id,
+        purpose=DOCUMENT_PREVIEW_TOKEN_PURPOSE,
+    )
+
+
+def create_document_download_token(
+    *,
+    document_id: int,
+    owner_id: int,
+) -> tuple[str, datetime]:
+    """Create a short-lived token granting download access."""
+    return _create_document_file_token(
+        document_id=document_id,
+        owner_id=owner_id,
+        purpose=DOCUMENT_DOWNLOAD_TOKEN_PURPOSE,
+    )
+
+
+def _create_document_file_token(
+    *,
+    document_id: int,
+    owner_id: int,
+    purpose: str,
+) -> tuple[str, datetime]:
     expires_at = datetime.now(UTC) + timedelta(
         minutes=settings.document_preview_token_expire_minutes,
     )
@@ -66,7 +93,7 @@ def create_document_preview_token(
     payload = {
         "sub": str(owner_id),
         "document_id": document_id,
-        "purpose": DOCUMENT_PREVIEW_TOKEN_PURPOSE,
+        "purpose": purpose,
         "exp": expires_at,
     }
 
@@ -81,13 +108,33 @@ def create_document_preview_token(
 
 def decode_document_preview_token(token: str) -> dict:
     """Decode and validate a document preview token."""
+    return decode_document_file_token(
+        token=token,
+        expected_purpose=DOCUMENT_PREVIEW_TOKEN_PURPOSE,
+    )
+
+
+def decode_document_download_token(token: str) -> dict:
+    """Decode and validate a document download token."""
+    return decode_document_file_token(
+        token=token,
+        expected_purpose=DOCUMENT_DOWNLOAD_TOKEN_PURPOSE,
+    )
+
+
+def decode_document_file_token(
+    *,
+    token: str,
+    expected_purpose: str,
+) -> dict:
+    """Decode a document file token and verify its intended operation."""
     payload = jwt.decode(
         token,
         settings.app_secret_key,
         algorithms=[JWT_ALGORITHM],
     )
 
-    if payload.get("purpose") != DOCUMENT_PREVIEW_TOKEN_PURPOSE:
-        raise jwt.InvalidTokenError("Invalid preview token purpose.")
+    if payload.get("purpose") != expected_purpose:
+        raise jwt.InvalidTokenError("Invalid document file token purpose.")
 
     return payload

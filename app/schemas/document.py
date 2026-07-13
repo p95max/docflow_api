@@ -44,6 +44,11 @@ class DocumentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DocumentFileUrl(BaseModel):
+    url: str
+    expires_at: datetime
+
+
 class DocumentCorrection(BaseModel):
     document_type: DocumentType | None = None
 
@@ -87,6 +92,8 @@ class DocumentResultRead(DocumentRead):
 
     file_preview_url: str | None
     file_preview_expires_at: datetime | None
+    file_download_url: str | None
+    file_download_expires_at: datetime | None
 
     manual_corrections: dict[str, Any] | None
     manually_corrected_at: datetime | None
