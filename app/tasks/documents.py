@@ -58,7 +58,10 @@ def process_document_task(self, job_id: int) -> None:
             document.raw_text = extracted_text
 
             if document.processing_mode == ProcessingMode.confidential:
-                document.document_type = classify_document_type(extracted_text)
+                local_document_type = classify_document_type(extracted_text)
+
+                if local_document_type != "other":
+                    document.document_type = local_document_type
             else:
                 ai_result = run_standard_ai_processing(
                     raw_text=extracted_text,
