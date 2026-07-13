@@ -21,4 +21,11 @@ jobs:
         run: cp .env.example .env
 
       - name: Run test suite
-        run: docker compose run --rm api pytest
+        shell: bash
+        run: |
+          log_file=/tmp/docsflow-pytest.log
+          if ! docker compose run --rm api pytest -q --tb=short >"$log_file" 2>&1; then
+            tail -n 250 "$log_file"
+            exit 1
+          fi
+          cat "$log_file"
