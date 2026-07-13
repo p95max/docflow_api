@@ -12,7 +12,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -109,13 +109,17 @@ def _get_web_current_user(
 
 
 def _redirect_to_login() -> RedirectResponse:
-    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(
+        url="/login",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 def _is_local_development_host(request: Request) -> bool:
     hostname = request.url.hostname or ""
-    return hostname in {"localhost", "127.0.0.1", "0.0.0.0"} or hostname.endswith(
-        ".app.github.dev"
+    return (
+        hostname in {"localhost", "127.0.0.1", "0.0.0.0"}
+        or hostname.endswith(".app.github.dev")
     )
 
 
@@ -209,14 +213,21 @@ def frontend_root(
         if _get_web_current_user(request, db) is not None
         else "/login"
     )
-    return RedirectResponse(url=destination, status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get(
+    "/login",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def login_page(
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     if _get_web_current_user(request, db) is not None:
         return RedirectResponse(
             url="/documents",
@@ -234,13 +245,17 @@ def login_page(
     )
 
 
-@router.post("/login", response_class=HTMLResponse)
+@router.post(
+    "/login",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def login_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     user = authenticate_user(
         db=db,
         email=email,
@@ -287,11 +302,15 @@ def logout() -> RedirectResponse:
     return response
 
 
-@router.get("/register", response_class=HTMLResponse)
+@router.get(
+    "/register",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def register_page(
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     if _get_web_current_user(request, db) is not None:
         return RedirectResponse(
             url="/documents",
@@ -305,17 +324,27 @@ def register_page(
     )
 
 
-@router.post("/register", response_class=HTMLResponse)
+@router.post(
+    "/register",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def register_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     try:
-        payload = UserCreate(email=email, password=password)
+        payload = UserCreate(
+            email=email,
+            password=password,
+        )
     except ValidationError as exc:
-        error = exc.errors()[0].get("msg", "Invalid registration data.")
+        error = exc.errors()[0].get(
+            "msg",
+            "Invalid registration data.",
+        )
         return _template_response(
             request=request,
             name="register.html",
@@ -345,11 +374,15 @@ def register_submit(
     )
 
 
-@router.get("/documents", response_class=HTMLResponse)
+@router.get(
+    "/documents",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def documents_page(
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -369,11 +402,15 @@ def documents_page(
     )
 
 
-@router.get("/documents/upload", response_class=HTMLResponse)
+@router.get(
+    "/documents/upload",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def upload_page(
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -386,13 +423,17 @@ def upload_page(
     )
 
 
-@router.post("/documents/upload", response_class=HTMLResponse)
+@router.post(
+    "/documents/upload",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 async def upload_submit(
     request: Request,
     file: UploadFile = File(...),
     confidential: bool = Form(False),
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -423,12 +464,16 @@ async def upload_submit(
     )
 
 
-@router.get("/documents/{document_id}", response_class=HTMLResponse)
+@router.get(
+    "/documents/{document_id}",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def document_detail_page(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -442,7 +487,11 @@ def document_detail_page(
     )
 
 
-@router.post("/documents/{document_id}/correct", response_class=HTMLResponse)
+@router.post(
+    "/documents/{document_id}/correct",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def correct_document_submit(
     document_id: int,
     request: Request,
@@ -455,7 +504,7 @@ def correct_document_submit(
     deadline: str = Form(""),
     confidence_score: str = Form(""),
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -480,7 +529,10 @@ def correct_document_submit(
             current_user=current_user,
         )
     except ValidationError as exc:
-        error = exc.errors()[0].get("msg", "Invalid correction data.")
+        error = exc.errors()[0].get(
+            "msg",
+            "Invalid correction data.",
+        )
         return _render_document_detail(
             request=request,
             db=db,
@@ -505,12 +557,16 @@ def correct_document_submit(
     )
 
 
-@router.post("/documents/{document_id}/confirm", response_class=HTMLResponse)
+@router.post(
+    "/documents/{document_id}/confirm",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def confirm_document_submit(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -539,12 +595,16 @@ def confirm_document_submit(
     )
 
 
-@router.post("/documents/{document_id}/reprocess", response_class=HTMLResponse)
+@router.post(
+    "/documents/{document_id}/reprocess",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def reprocess_document_submit(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -575,12 +635,13 @@ def reprocess_document_submit(
 @router.get(
     "/documents/{document_id}/delete",
     response_class=HTMLResponse,
+    response_model=None,
 )
 def delete_document_confirmation(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
@@ -609,12 +670,16 @@ def delete_document_confirmation(
     )
 
 
-@router.post("/documents/{document_id}/delete", response_class=HTMLResponse)
+@router.post(
+    "/documents/{document_id}/delete",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 def delete_document_submit(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
