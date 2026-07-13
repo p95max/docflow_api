@@ -35,8 +35,8 @@ def ensure_test_user(
 
 
 def main() -> None:
-    if settings.app_env != "local":
-        print("Skipping test user initialization outside local environment.")
+    if settings.app_env != "local" or not settings.init_test_user:
+        print("Skipping local test user initialization.")
         return
 
     with SessionLocal() as db:
