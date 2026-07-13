@@ -73,7 +73,7 @@
     notice.innerHTML = [
       "<strong>Confidential mode:</strong>",
       "This document was processed locally only.",
-      "Structured AI fields are intentionally not generated, and no document data was sent to OpenAI.",
+      "The document type was classified locally; structured AI fields were not generated, and no document data was sent to OpenAI.",
     ].join(" ");
 
     header.insertAdjacentElement("afterend", notice);
@@ -164,19 +164,49 @@
   }
 
   function enhanceDocumentList() {
-    appRoot.querySelectorAll('a[href^="/documents/"]').forEach((openLink) => {
-      const match = openLink.getAttribute("href")?.match(/^\/documents\/(\d+)$/);
-      const cell = openLink.parentElement;
-
-      if (!match || !cell || cell.querySelector("[data-document-delete]")) return;
-
-      const row = openLink.closest("tr");
-      const filename = row?.querySelector(".fw-semibold")?.textContent?.trim()
-        || `document ${match[1]}`;
-
-      cell.append(
-        createDeleteButton(match[1], filename, "btn-sm ms-2"),
+    appRoot.querySelectorAll("table tbody tr").forEach((row) => {
+      const detailLinks = Array.from(
+        row.querySelectorAll('a[href^="/documents/"]'),
       );
+      const detailLink = detailLinks.find((link) => (
+        documentDetailPattern.test(link.getAttribute("href") || "")
+      ));
+
+      if (!detailLink) return;
+
+      const match = detailLink.getAttribute("href").match(documentDetailPattern);
+
+      if (!match) return;
+
+      const filenameElement = row.querySelector(".fw-semibold");
+      const filename = filenameElement?.textContent?.trim() || `document ${match[1]}`;
+
+      if (filenameElement && !filenameElement.matches("a")) {
+        const filenameLink = document.createElement("a");
+        filenameLink.href = detailLink.getAttribute("href");
+        filenameLink.className = `${filenameElement.className} text-decoration-none`;
+        filenameLink.dataset.documentLink = "true";
+        filenameLink.textContent = filename;
+        filenameElement.replaceWith(filenameLink);
+      } else if (filenameElement) {
+        filenameElement.dataset.documentLink = "true";
+      }
+
+      if (!detailLink.dataset.documentLink) {
+        detailLink.remove();
+      }
+
+      const actionsCell = row.lastElementChild;
+
+      if (!actionsCell) return;
+
+      actionsCell.classList.add("text-end");
+
+      if (!actionsCell.querySelector("[data-document-delete]")) {
+        actionsCell.append(
+          createDeleteButton(match[1], filename, "btn-sm"),
+        );
+      }
     });
   }
 
