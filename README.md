@@ -104,6 +104,24 @@ and attachment download. A preview token cannot be used to download a file,
 and a download token cannot be used for preview. Tokens expire after
 `DOCUMENT_PREVIEW_TOKEN_EXPIRE_MINUTES` (10 minutes by default).
 
+### Web Interface
+
+DocsFlow includes a lightweight Bootstrap 5 interface served by FastAPI. No
+separate frontend server or JavaScript build step is required.
+
+| Page | Purpose |
+|---|---|
+| `/login` | Authenticate with email and password |
+| `/register` | Create an account |
+| `/documents` | List the current user's documents |
+| `/documents/upload` | Upload a document and select confidential mode |
+| `/documents/{id}` | Preview, download, correct, and confirm extraction |
+
+The browser stores the short-lived access token in `sessionStorage`, so closing
+the browser tab removes it. Bootstrap is loaded from its CDN; production
+deployments may vendor the Bootstrap files under `app/frontend/assets/` if a
+network-independent interface is required.
+
 ---
 
 ## Project Structure
@@ -135,6 +153,10 @@ app/
     documents.py
   worker.py
   main.py
+  web.py
+  frontend/
+    index.html
+    assets/
 
 alembic/
 tests/

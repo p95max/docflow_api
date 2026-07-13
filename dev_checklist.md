@@ -122,6 +122,23 @@ After AI extraction, user can manually correct fields:
 
 ---
 
+## Frontend — Bootstrap 5
+
+**Goal:** provide a simple responsive web interface over the existing API.
+
+- [x] Bootstrap 5 application shell and responsive navigation
+- [x] Login and registration pages using the existing JWT API
+- [x] Document list with status and document type
+- [x] Upload page with confidential-mode switch
+- [x] Document result page with preview and signed download URL
+- [x] Manual correction and extraction confirmation controls
+- [x] Static frontend assets served by FastAPI
+- [x] Smoke tests for frontend pages and assets
+- [ ] Improve client-side form validation and loading states
+- [ ] Add browser end-to-end tests
+
+---
+
 ## MVP 1.5 — Google Drive JSON Backup
 
 **Goal:** implement a simple and reliable backup strategy.
@@ -194,7 +211,7 @@ GET  /backups/{backup_id}
 | Storage        | MinIO / local storage              |
 | AI             | OpenAI API                         |
 | Integrations   | Google Drive API                   |
-| Frontend       | Bootstrap 5 + Jinja2               |
+| Frontend       | Bootstrap 5 + vanilla JavaScript   |
 | Testing        | Pytest                             |
 | Infrastructure | Docker Compose                     |
 
