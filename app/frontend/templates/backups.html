@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Backups · DocsFlow{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Google Drive backups</h1>
+      <p class="text-secondary mb-0">
+        Export your DocsFlow records and document metadata as compressed JSON.
+      </p>
+    </div>
+    <form method="post" action="/backups/run">
+      <button class="btn btn-primary" type="submit">Create backup</button>
+    </form>
+  </div>
+
+  {% if created %}
+    <div class="alert alert-success" role="alert">
+      Backup job created. Refresh this page to see the final status.
+    </div>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6">Backup scope</h2>
+      <p class="text-secondary mb-0">
+        Backups are uploaded to <code>/docsflow_backups</code> as <code>.json.gz</code> files.
+        Original PDF, JPG and PNG files are not included.
+      </p>
+    </div>
+  </div>
+
+  {% if backup_jobs %}
+    <div class="card shadow-sm overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Created</th>
+              <th scope="col">Status</th>
+              <th scope="col">File</th>
+              <th scope="col">Size</th>
+              <th scope="col">Checksum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in backup_jobs %}
+              <tr>
+                <td class="text-nowrap">{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                <td>
+                  <span class="badge {{ job.status|status_badge_class }}">{{ job.status.value }}</span>
+                  {% if job.error_message %}
+                    <div class="small text-danger mt-1">{{ job.error_message }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if job.drive_web_view_link %}
+                    <a href="{{ job.drive_web_view_link }}" target="_blank" rel="noopener noreferrer">
+                      {{ job.drive_file_name or "Open in Google Drive" }}
+                    </a>
+                  {% else %}
+                    {{ job.drive_file_name or "—" }}
+                  {% endif %}
+                </td>
+                <td class="text-nowrap">{{ job.compressed_size_bytes|file_size }}</td>
+                <td>
+                  {% if job.checksum_sha256 %}
+                    <code title="{{ job.checksum_sha256 }}">{{ job.checksum_sha256[:12] }}…</code>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state text-center p-5">
+      <h2 class="h5">No backups yet</h2>
+      <p class="text-secondary mb-0">Create the first Google Drive backup for this account.</p>
+    </div>
+  {% endif %}
+{% endblock %}
