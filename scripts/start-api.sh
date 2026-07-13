@@ -19,6 +19,9 @@ until alembic upgrade head; do
 done
 
 echo "Database migrations completed."
+echo "Initializing local test user..."
+python scripts/init_test_user.py
+
 echo "Starting API server..."
 
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
