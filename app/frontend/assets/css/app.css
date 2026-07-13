@@ -27,3 +27,20 @@ body {
   max-width: 34rem;
   margin: 4rem auto;
 }
+
+.raw-text {
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+table td,
+table th {
+  vertical-align: middle;
+}
