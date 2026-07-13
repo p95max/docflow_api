@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Documents · DocsFlow{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h2 mb-1">Your documents</h1>
+    <p class="text-secondary mb-0">Signed in as {{ current_user.email }}</p>
+  </div>
+  <a class="btn btn-primary" href="/documents/upload">Upload document</a>
+</div>
+
+{% if deleted %}
+  <div class="alert alert-success">Document deleted.</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  {% if documents %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Document</th>
+            <th>Size</th>
+            <th>Status</th>
+            <th>Type</th>
+            <th>Uploaded</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for document in documents %}
+            <tr>
+              <td>
+                <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
+              </td>
+              <td>{{ document.file_size_bytes|file_size }}</td>
+              <td>
+                <span class="badge {{ document.status|status_badge_class }}">{{ document.status.value }}</span>
+              </td>
+              <td>{{ document.document_type or "—" }}</td>
+              <td>{{ document.created_at.strftime("%b %d, %Y") }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-danger" href="/documents/{{ document.id }}/delete">Delete</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-body text-center empty-state">
+      <h2 class="h4">No documents yet</h2>
+      <p class="text-secondary">Upload a PDF, JPG or PNG to start processing it.</p>
+      <a class="btn btn-primary" href="/documents/upload">Upload document</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

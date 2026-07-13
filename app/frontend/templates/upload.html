@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Upload · DocsFlow{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <section class="col-lg-7">
+    <a class="text-decoration-none" href="/documents">← Documents</a>
+    <div class="card shadow-sm mt-3">
+      <div class="card-body p-4">
+        <h1 class="h3">Upload document</h1>
+        <p class="text-secondary">PDF, JPG or PNG. Processing runs asynchronously.</p>
+        {% if error %}
+          <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/documents/upload" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label" for="file">File</label>
+            <input class="form-control" id="file" name="file" type="file" accept="application/pdf,image/jpeg,image/png" required>
+          </div>
+          <div class="form-check mb-4">
+            <input class="form-check-input" id="confidential" name="confidential" type="checkbox" value="true" {% if confidential %}checked{% endif %}>
+            <label class="form-check-label" for="confidential">Confidential mode — local OCR and local document classification only</label>
+          </div>
+          <button class="btn btn-primary" type="submit">Upload</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

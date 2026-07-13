@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error · DocsFlow{% endblock %}
+{% block content %}
+<div class="alert alert-danger">
+  <h1 class="h4">Unable to complete the request</h1>
+  <p class="mb-0">{{ error }}</p>
+</div>
+<a class="btn btn-primary" href="/documents">Back to documents</a>
+{% endblock %}
