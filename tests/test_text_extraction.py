@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import fitz
 import pytest
 from PIL import Image
 
@@ -59,6 +60,41 @@ def test_extract_text_from_pdf_returns_plain_text(tmp_path: Path) -> None:
 
     assert "Invoice number 12345" in text
     assert "Amount 99.95 EUR" in text
+
+
+def test_extract_text_from_scanned_pdf_uses_local_ocr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    image_path = tmp_path / "scan.png"
+    Image.new("RGB", (100, 50), color="white").save(image_path)
+
+    file_path = tmp_path / "scan.pdf"
+    with fitz.open() as pdf_document:
+        page = pdf_document.new_page(width=200, height=100)
+        page.insert_image(page.rect, filename=str(image_path))
+        pdf_document.save(file_path)
+
+    received_images: list[Image.Image] = []
+
+    def fake_run_tesseract_ocr(image: Image.Image) -> str:
+        received_images.append(image.copy())
+        return "  OCR result from scanned PDF\n"
+
+    monkeypatch.setattr(
+        text_extraction,
+        "_run_tesseract_ocr",
+        fake_run_tesseract_ocr,
+    )
+
+    text = extract_text_from_file(
+        file_path=file_path,
+        content_type="application/pdf",
+    )
+
+    assert text == "OCR result from scanned PDF"
+    assert len(received_images) == 1
+    assert received_images[0].mode == "RGB"
 
 
 def test_extract_text_from_image_uses_local_ocr(
