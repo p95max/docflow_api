@@ -22,6 +22,7 @@ backup_job_status_enum = postgresql.ENUM(
     "completed",
     "failed",
     name="backup_job_status",
+    create_type=False,
 )
 
 
