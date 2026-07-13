@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Log in · DocsFlow{% endblock %}
+{% block content %}
+<section class="card shadow-sm auth-card">
+  <div class="card-body p-4">
+    <h1 class="h3 mb-2">Welcome back</h1>
+    <p class="text-secondary mb-4">Log in to manage your documents.</p>
+    {% if registered %}
+      <div class="alert alert-success">Account created. You can log in now.</div>
+    {% endif %}
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login">
+      <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" id="email" name="email" type="email" required autocomplete="email" value="{{ email_value }}">
+      </div>
+      <div class="mb-4">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" id="password" name="password" type="password" required autocomplete="current-password" value="{{ password_value }}">
+      </div>
+      <button class="btn btn-primary w-100" type="submit">Log in</button>
+    </form>
+    <p class="small text-center mt-3 mb-0">No account? <a href="/register">Register</a></p>
+  </div>
+</section>
+{% endblock %}
