@@ -97,12 +97,8 @@
   }
 
   function formatDocumentFileSizes() {
-    appRoot.querySelectorAll("table tbody small.text-secondary").forEach((element) => {
-      const match = element.textContent.trim().match(/^(\d+)\s+bytes$/i);
-
-      if (!match) return;
-
-      const bytes = Number(match[1]);
+    appRoot.querySelectorAll("table tbody [data-file-size]").forEach((element) => {
+      const bytes = Number(element.dataset.fileSize);
 
       if (!Number.isFinite(bytes)) return;
 

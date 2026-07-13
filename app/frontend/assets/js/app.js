@@ -37,6 +37,11 @@ function formatAmount(amount, currency) {
   return `${amount} ${currency || ""}`.trim();
 }
 
+function formatFileSize(bytes) {
+  if (!Number.isFinite(Number(bytes))) return "—";
+  return `${(Number(bytes) / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 function statusBadge(status) {
   const classes = {
     uploaded: "text-bg-secondary",
@@ -176,7 +181,7 @@ async function renderDocuments() {
       content.innerHTML = `<div class="card-body text-center empty-state"><h2 class="h4">No documents yet</h2><p class="text-secondary">Upload a PDF, JPG or PNG to start processing it.</p><a class="btn btn-primary" href="/documents/upload">Upload document</a></div>`;
       return;
     }
-    content.innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Document</th><th>Status</th><th>Type</th><th>Uploaded</th><th></th></tr></thead><tbody>${documents.map((document) => `<tr><td><div class="fw-semibold">${escapeHtml(document.original_filename)}</div><small class="text-secondary">${document.file_size_bytes || 0} bytes</small></td><td>${statusBadge(document.status)}</td><td>${escapeHtml(document.document_type || "—")}</td><td>${formatDate(document.created_at?.slice(0, 10))}</td><td><a class="btn btn-sm btn-outline-primary" href="/documents/${document.id}">Open</a></td></tr>`).join("")}</tbody></table></div>`;
+    content.innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Document</th><th>Size</th><th>Status</th><th>Type</th><th>Uploaded</th><th></th></tr></thead><tbody>${documents.map((document) => `<tr><td><div class="fw-semibold">${escapeHtml(document.original_filename)}</div></td><td data-file-size="${Number(document.file_size_bytes) || 0}">${formatFileSize(document.file_size_bytes)}</td><td>${statusBadge(document.status)}</td><td>${escapeHtml(document.document_type || "—")}</td><td>${formatDate(document.created_at?.slice(0, 10))}</td><td><a class="btn btn-sm btn-outline-primary" href="/documents/${document.id}">Open</a></td></tr>`).join("")}</tbody></table></div>`;
   } catch (error) {
     app.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message)}</div>`;
   }

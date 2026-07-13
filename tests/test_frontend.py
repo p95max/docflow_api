@@ -23,6 +23,7 @@ def test_frontend_assets_are_served(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert "renderDocuments" in response.text
+    assert "data-file-size" in response.text
 
 
 def test_api_routes_remain_available(client: TestClient) -> None:
