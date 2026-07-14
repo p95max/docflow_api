@@ -1,5 +1,5 @@
-import re
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -28,6 +28,13 @@ class SemanticSearchResult(BaseModel):
     page_to: int
     snippet: str
     score: float
+    document_type: str | None = None
+    sender: str | None = None
+    summary: str | None = None
+    amount: Decimal | None = None
+    currency: str | None = None
+    document_date: date | None = None
+    deadline: date | None = None
 
 
 class SemanticSearchResponse(BaseModel):
@@ -51,14 +58,10 @@ class KnowledgeQuestionCreate(BaseModel):
 
     @field_validator("question")
     @classmethod
-    def validate_single_sentence_question(cls, value: str) -> str:
-        normalized = value.strip()
+    def normalize_question(cls, value: str) -> str:
+        normalized = " ".join(value.split())
         if not normalized:
             raise ValueError("Question must not be blank")
-
-        sentence_endings = re.findall(r"[.!?]+(?=\s|$)", normalized)
-        if len(sentence_endings) > 1:
-            raise ValueError("Question must contain no more than one sentence")
         return normalized
 
 
