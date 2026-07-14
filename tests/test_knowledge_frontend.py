@@ -82,6 +82,8 @@ def test_knowledge_message_timestamp_uses_berlin_time() -> None:
     timestamp = datetime(2026, 7, 14, 8, 43, tzinfo=timezone.utc)
 
     assert web._format_berlin_datetime(timestamp) == "2026-07-14 10:43"
+    assert web._format_berlin_date(timestamp) == "14 July 2026"
+    assert web._format_berlin_time(timestamp) == "10:43"
 
 
 def test_knowledge_can_be_disabled_without_enqueuing_embeddings(

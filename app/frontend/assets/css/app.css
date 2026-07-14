@@ -85,6 +85,24 @@ table th {
   display: flex;
 }
 
+.knowledge-date-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.knowledge-date-divider::before,
+.knowledge-date-divider::after {
+  flex: 1;
+  height: 1px;
+  content: "";
+  background: var(--bs-border-color);
+}
+
 .knowledge-message-row-user {
   justify-content: flex-end;
 }
@@ -115,6 +133,16 @@ table th {
   background: var(--bs-tertiary-bg);
   border: 1px solid var(--bs-border-color);
   border-bottom-left-radius: 0.25rem;
+}
+
+.knowledge-message-assistant-new {
+  background: linear-gradient(135deg, #12354f, #183d68);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.15);
+}
+
+.knowledge-new-badge {
+  vertical-align: text-top;
 }
 
 .knowledge-message-user .knowledge-message-author,

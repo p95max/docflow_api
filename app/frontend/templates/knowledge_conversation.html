@@ -16,14 +16,25 @@
   {% endif %}
 
   {% if conversation.messages %}
+    {% if latest_unread_assistant_message_id %}
+      <div class="knowledge-new-messages mb-3">
+        <a class="btn btn-sm btn-outline-info" href="#knowledge-message-{{ latest_unread_assistant_message_id }}">New messages &darr;</a>
+      </div>
+    {% endif %}
     <div class="vstack gap-3 knowledge-message-list">
       {% for message in conversation.messages %}
+        {% if loop.first or message.created_at|berlin_date != loop.previtem.created_at|berlin_date %}
+          <div class="knowledge-date-divider"><span>{{ message.created_at|berlin_date }}</span></div>
+        {% endif %}
         <div class="knowledge-message-row knowledge-message-row-{{ message.role.value }}">
-        <article class="card shadow-sm knowledge-message knowledge-message-{{ message.role.value }}">
+        <article id="knowledge-message-{{ message.id }}" class="card shadow-sm knowledge-message knowledge-message-{{ message.role.value }}{% if message.id in unread_assistant_message_ids %} knowledge-message-assistant-new{% endif %}">
           <div class="card-body">
             <div class="d-flex justify-content-between gap-3 mb-2">
-              <h2 class="h6 mb-0 knowledge-message-author">{{ "You" if message.role.value == "user" else "DocsFlow" }}</h2>
-              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|berlin_datetime }}</time>
+              <h2 class="h6 mb-0 knowledge-message-author">
+                {{ "You" if message.role.value == "user" else "DocsFlow" }}
+                {% if message.id in unread_assistant_message_ids %}<span class="badge text-bg-info ms-1 knowledge-new-badge">New</span>{% endif %}
+              </h2>
+              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|berlin_time }}</time>
             </div>
             <div class="knowledge-message-content">{{ message.content }}</div>
             {% if message.sources %}

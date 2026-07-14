@@ -17,7 +17,7 @@ def _login(client: TestClient, user: User) -> None:
     assert response.status_code == 303
 
 
-def test_conversation_shows_newest_messages_first_and_collapses_sources(
+def test_conversation_marks_unread_assistant_messages_and_collapses_sources(
     client: TestClient,
     test_user: User,
     db_session: Session,
@@ -66,9 +66,13 @@ def test_conversation_shows_newest_messages_first_and_collapses_sources(
     response = client.get(f"/knowledge/conversations/{conversation.id}")
 
     assert response.status_code == 200
-    assert response.text.index("Newest message") < response.text.index("Older message")
+    assert response.text.index("Older message") < response.text.index("Newest message")
+    assert "New messages &darr;" in response.text
+    assert "knowledge-message-assistant-new" in response.text
+    assert ">New</span>" in response.text
     assert "Sources (1)" in response.text
     assert "Show source excerpt" in response.text
     assert f'href="/documents/{document.id}"' in response.text
     assert "<details" in response.text
     assert "<details open" not in response.text
+    assert conversation.last_read_assistant_message_id == newer_message.id

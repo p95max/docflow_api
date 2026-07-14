@@ -39,6 +39,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_index_job import DocumentIndexJobStatus
+from app.models.knowledge_message import KnowledgeMessageRole
 from app.schemas.document import DocumentCorrection
 from app.schemas.knowledge import KnowledgeConversationCreate, KnowledgeQuestionCreate
 from app.services.document_search import DocumentSortField, SortDirection
@@ -98,15 +99,29 @@ def _status_badge_class(value: object) -> str:
     }.get(status_value, "text-bg-secondary")
 
 
-def _format_berlin_datetime(value: datetime) -> str:
+def _to_berlin_timezone(value: datetime) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(BERLIN_TIMEZONE).strftime("%Y-%m-%d %H:%M")
+    return value.astimezone(BERLIN_TIMEZONE)
+
+
+def _format_berlin_datetime(value: datetime) -> str:
+    return _to_berlin_timezone(value).strftime("%Y-%m-%d %H:%M")
+
+
+def _format_berlin_date(value: datetime) -> str:
+    return _to_berlin_timezone(value).strftime("%d %B %Y")
+
+
+def _format_berlin_time(value: datetime) -> str:
+    return _to_berlin_timezone(value).strftime("%H:%M")
 
 
 templates.env.filters["file_size"] = _format_file_size
 templates.env.filters["status_badge_class"] = _status_badge_class
 templates.env.filters["berlin_datetime"] = _format_berlin_datetime
+templates.env.filters["berlin_date"] = _format_berlin_date
+templates.env.filters["berlin_time"] = _format_berlin_time
 
 
 def _pagination_query(request: Request) -> str:
@@ -316,6 +331,21 @@ def _render_knowledge_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
+    last_read_message_id = conversation.last_read_assistant_message_id or 0
+    unread_assistant_message_ids = {
+        message.id
+        for message in conversation.messages
+        if message.role == KnowledgeMessageRole.assistant
+        and message.id > last_read_message_id
+    }
+    latest_unread_assistant_message_id = max(
+        unread_assistant_message_ids,
+        default=None,
+    )
+    if latest_unread_assistant_message_id is not None:
+        conversation.last_read_assistant_message_id = latest_unread_assistant_message_id
+        db.commit()
+
     active_document_ids = set(
         db.scalars(
             select(Document.id).where(
@@ -330,6 +360,8 @@ def _render_knowledge_conversation(
         current_user=current_user,
         conversation=conversation,
         active_document_ids=active_document_ids,
+        unread_assistant_message_ids=unread_assistant_message_ids,
+        latest_unread_assistant_message_id=latest_unread_assistant_message_id,
         question_value=question_value,
         error=error,
         status_code=status_code,
