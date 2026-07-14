@@ -29,7 +29,7 @@ os.environ["BACKUP_HARD_TIME_LIMIT_SECONDS"] = "180"
 os.environ["GOOGLE_DRIVE_CLIENT_ID"] = "test-client-id"
 os.environ["GOOGLE_DRIVE_CLIENT_SECRET"] = "test-client-secret"
 os.environ["GOOGLE_DRIVE_REDIRECT_URI"] = "http://testserver/backups/google/callback"
-os.environ["GOOGLE_DRIVE_FOLDER_NAME"] = "docsflow_backups"
+os.environ["GOOGLE_DRIVE_FOLDER_NAME"] = "docflow_backup"
 os.environ["GOOGLE_DRIVE_TIMEOUT_SECONDS"] = "60"
 os.environ["GOOGLE_OAUTH_STATE_EXPIRE_MINUTES"] = "10"
 

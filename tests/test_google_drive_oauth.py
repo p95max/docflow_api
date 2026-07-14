@@ -69,6 +69,12 @@ def test_google_oauth_callback_persists_refresh_token(
         "exchange_google_drive_authorization_code",
         fake_exchange,
     )
+    created_folders: list[str] = []
+    monkeypatch.setattr(
+        web_backups,
+        "ensure_google_drive_backup_folder",
+        lambda *, refresh_token: created_folders.append(refresh_token),
+    )
 
     response = client.get(
         "/backups/google/callback",
@@ -82,6 +88,7 @@ def test_google_oauth_callback_persists_refresh_token(
     assert connection is not None
     assert connection.refresh_token == "oauth-refresh-token"
     assert connection.scope == GOOGLE_DRIVE_FILE_SCOPE
+    assert created_folders == ["oauth-refresh-token"]
 
 
 def test_google_oauth_callback_rejects_invalid_state(

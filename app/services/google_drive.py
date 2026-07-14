@@ -21,6 +21,28 @@ class DriveUploadResult:
     web_view_link: str | None
 
 
+def ensure_google_drive_backup_folder(
+    *,
+    refresh_token: str,
+    folder_name: str | None = None,
+) -> str:
+    folder_name = folder_name or settings.google_drive_folder_name
+
+    try:
+        with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
+            access_token = _get_access_token(
+                client=client,
+                refresh_token=refresh_token,
+            )
+            return _get_or_create_folder(
+                client=client,
+                access_token=access_token,
+                folder_name=folder_name,
+            )
+    except httpx.HTTPError as exc:
+        raise RuntimeError("Could not create the Google Drive backup folder.") from exc
+
+
 def upload_gzip_backup(
     *,
     filename: str,
@@ -58,6 +80,35 @@ def upload_gzip_backup(
             else None
         ),
     )
+
+
+def delete_gzip_backup(*, file_id: str, refresh_token: str) -> None:
+    try:
+        with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
+            access_token = _get_access_token(client=client, refresh_token=refresh_token)
+            response = client.delete(
+                f"{DRIVE_FILES_URL}/{file_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if response.status_code != httpx.codes.NOT_FOUND:
+                response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise RuntimeError("Could not delete the backup file from Google Drive.") from exc
+
+
+def download_gzip_backup(*, file_id: str, refresh_token: str) -> bytes:
+    try:
+        with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
+            access_token = _get_access_token(client=client, refresh_token=refresh_token)
+            response = client.get(
+                f"{DRIVE_FILES_URL}/{file_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"alt": "media"},
+            )
+            response.raise_for_status()
+            return response.content
+    except httpx.HTTPError as exc:
+        raise RuntimeError("Could not download the backup file from Google Drive.") from exc
 
 
 def _get_access_token(

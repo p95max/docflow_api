@@ -56,3 +56,20 @@ def get_backup_job(
         BackupJob.owner_id == owner_id,
     )
     return db.scalar(stmt)
+
+
+def delete_backup_job(
+    *,
+    db: Session,
+    backup_id: int,
+    owner_id: int,
+) -> BackupJob:
+    job = get_backup_job(db=db, backup_id=backup_id, owner_id=owner_id)
+    if job is None:
+        raise LookupError("Backup job not found.")
+    if job.status in (BackupJobStatus.pending, BackupJobStatus.running):
+        raise RuntimeError("A pending or running backup cannot be deleted.")
+
+    db.delete(job)
+    db.commit()
+    return job

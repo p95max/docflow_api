@@ -1,5 +1,7 @@
+import gzip
 import logging
 import secrets
+from urllib.parse import quote
 
 import jwt
 from fastapi import APIRouter, Depends, Request, status
@@ -8,11 +10,19 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
+from app.models.backup_job import BackupJobStatus
 from app.models.user import User
 from app.services.backup_jobs import (
     create_backup_job,
+    delete_backup_job,
     enqueue_backup_job,
+    get_backup_job,
     list_backup_jobs,
+)
+from app.services.google_drive import (
+    delete_gzip_backup,
+    download_gzip_backup,
+    ensure_google_drive_backup_folder,
 )
 from app.services.google_drive_oauth import (
     build_google_drive_authorization_url,
@@ -59,7 +69,9 @@ def _render_backups_page(
         ),
         google_oauth_configured=google_drive_oauth_is_configured(),
         google_oauth_missing_settings=missing_google_drive_oauth_settings(),
+        google_drive_folder_name=settings.google_drive_folder_name,
         created=request.query_params.get("created") == "1",
+        deleted=request.query_params.get("deleted") == "1",
         google_connected=request.query_params.get("google_connected") == "1",
         google_disconnected=request.query_params.get("google_disconnected") == "1",
         error=error,
@@ -189,11 +201,14 @@ def google_drive_oauth_callback(
             code=code,
             redirect_uri=_google_oauth_redirect_uri(request),
         )
-        save_google_drive_connection(
+        connection = save_google_drive_connection(
             db=db,
             user_id=current_user.id,
             refresh_token=token_result.refresh_token,
             scope=token_result.scope,
+        )
+        ensure_google_drive_backup_folder(
+            refresh_token=connection.refresh_token,
         )
     except (jwt.PyJWTError, RuntimeError) as exc:
         response = _render_backups_page(
@@ -280,4 +295,144 @@ def run_backup_submit(
     return RedirectResponse(
         url="/backups?created=1",
         status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/backups/{backup_id}/delete",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def delete_backup_submit(
+    backup_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    job = get_backup_job(
+        db=db,
+        backup_id=backup_id,
+        owner_id=current_user.id,
+    )
+    if job is None:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Backup job not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if job.status in (BackupJobStatus.pending, BackupJobStatus.running):
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="A pending or running backup cannot be deleted.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    if job.drive_file_id:
+        connection = get_google_drive_connection(db=db, user_id=current_user.id)
+        if connection is None:
+            return _render_backups_page(
+                request=request,
+                db=db,
+                current_user=current_user,
+                error="Connect Google Drive before deleting this backup file.",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        try:
+            delete_gzip_backup(
+                file_id=job.drive_file_id,
+                refresh_token=connection.refresh_token,
+            )
+        except RuntimeError as exc:
+            return _render_backups_page(
+                request=request,
+                db=db,
+                current_user=current_user,
+                error=str(exc),
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+    delete_backup_job(db=db, backup_id=backup_id, owner_id=current_user.id)
+    return RedirectResponse(
+        url="/backups?deleted=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get(
+    "/backups/{backup_id}/download",
+    response_model=None,
+)
+def download_backup(
+    backup_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    job = get_backup_job(
+        db=db,
+        backup_id=backup_id,
+        owner_id=current_user.id,
+    )
+    if job is None:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Backup job not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if job.status != BackupJobStatus.completed or not job.drive_file_id:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Only completed backups can be downloaded.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    connection = get_google_drive_connection(db=db, user_id=current_user.id)
+    if connection is None:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Connect Google Drive before downloading this backup file.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    try:
+        content = gzip.decompress(
+            download_gzip_backup(
+                file_id=job.drive_file_id,
+                refresh_token=connection.refresh_token,
+            )
+        )
+    except (EOFError, OSError, RuntimeError):
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Could not download a valid JSON backup file.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    filename = (job.drive_file_name or "docsflow-backup.json.gz").removesuffix(".gz")
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=docsflow-backup.json; "
+                f"filename*=UTF-8''{quote(filename)}"
+            )
+        },
     )
