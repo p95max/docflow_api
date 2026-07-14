@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.document import Document, DocumentStatus, ProcessingMode
@@ -24,7 +24,14 @@ def answer_structured_question(
     question: str,
     current_date: date | None = None,
 ) -> StructuredKnowledgeAnswer | None:
-    """Answer deterministic metadata queries without vector retrieval or an LLM."""
+    """Answer deterministic account and document metadata queries without an LLM."""
+    if _is_document_count_question(question):
+        return _answer_document_count(
+            db=db,
+            owner_id=owner_id,
+            indexed_only=_asks_for_indexed_documents(question),
+        )
+
     if not _is_current_month_invoice_deadline_question(question):
         return None
 
@@ -71,6 +78,99 @@ def answer_structured_question(
             f"{len(documents)} indexed {noun} due in {month_label}: {entries}."
         ),
         sources=verified_sources,
+    )
+
+
+def _answer_document_count(
+    *,
+    db: Session,
+    owner_id: int,
+    indexed_only: bool,
+) -> StructuredKnowledgeAnswer:
+    active_count = int(
+        db.scalar(
+            select(func.count(Document.id)).where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+    indexed_count = int(
+        db.scalar(
+            select(func.count(func.distinct(Document.id)))
+            .select_from(Document)
+            .join(DocumentIndexJob, DocumentIndexJob.document_id == Document.id)
+            .join(DocumentChunk, DocumentChunk.document_id == Document.id)
+            .where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+                Document.status == DocumentStatus.completed,
+                Document.processing_mode == ProcessingMode.standard,
+                DocumentIndexJob.status == DocumentIndexJobStatus.completed,
+            )
+        )
+        or 0
+    )
+
+    if indexed_only:
+        noun = "document" if indexed_count == 1 else "documents"
+        return StructuredKnowledgeAnswer(
+            answer=(
+                f"You have {indexed_count} indexed {noun} in the Knowledge Base."
+            ),
+            sources=[],
+        )
+
+    active_noun = "document" if active_count == 1 else "documents"
+    indexed_noun = "document is" if indexed_count == 1 else "documents are"
+    return StructuredKnowledgeAnswer(
+        answer=(
+            f"You have {active_count} active {active_noun} in your account; "
+            f"{indexed_count} {indexed_noun} indexed in the Knowledge Base."
+        ),
+        sources=[],
+    )
+
+
+def _is_document_count_question(question: str) -> bool:
+    normalized = " ".join(re.findall(r"[a-z0-9]+", question.casefold()))
+    has_count_intent = (
+        re.search(r"\bhow many\b", normalized) is not None
+        or re.search(r"\bnumber of\b", normalized) is not None
+        or re.search(r"\bcount\b", normalized) is not None
+    )
+    has_document_noun = (
+        re.search(r"\b(?:docs?|documents?|files?)\b", normalized) is not None
+    )
+    has_account_scope = any(
+        marker in normalized
+        for marker in (
+            "my account",
+            "in my account",
+            "do i have",
+            "i have",
+            "my uploaded",
+            "uploaded documents",
+            "uploaded docs",
+            "uploaded files",
+            "knowledge base",
+            "indexed document",
+            "indexed documents",
+            "indexed doc",
+            "indexed docs",
+            "indexed file",
+            "indexed files",
+        )
+    )
+    return has_count_intent and has_document_noun and has_account_scope
+
+
+def _asks_for_indexed_documents(question: str) -> bool:
+    normalized = " ".join(re.findall(r"[a-z0-9]+", question.casefold()))
+    return (
+        re.search(r"\bindexed\b", normalized) is not None
+        or "knowledge base" in normalized
     )
 
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -167,3 +167,118 @@ def test_current_month_invoice_question_skips_embeddings_and_openai(
 
     assert "indexed invoice" in assistant_message.content
     assert len(assistant_message.sources) == 1
+
+
+def test_document_count_question_returns_active_and_indexed_totals(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    _invoice(
+        db=db_session,
+        owner=test_user,
+        filename="indexed.pdf",
+        deadline=date(2026, 7, 31),
+    )
+    db_session.add(
+        Document(
+            owner_id=test_user.id,
+            original_filename="confidential.pdf",
+            status=DocumentStatus.completed,
+            processing_mode=ProcessingMode.confidential,
+            raw_text="Local only",
+        )
+    )
+    deleted_document = Document(
+        owner_id=test_user.id,
+        original_filename="deleted.pdf",
+        status=DocumentStatus.completed,
+        processing_mode=ProcessingMode.standard,
+        raw_text="Deleted",
+        deleted_at=datetime.now(UTC),
+    )
+    db_session.add(deleted_document)
+    db_session.commit()
+
+    result = answer_structured_question(
+        db=db_session,
+        owner_id=test_user.id,
+        question="How many docs are in my account?",
+    )
+
+    assert result is not None
+    assert result.answer == (
+        "You have 2 active documents in your account; "
+        "1 document is indexed in the Knowledge Base."
+    )
+    assert result.sources == []
+
+
+def test_indexed_document_count_question_returns_knowledge_base_total(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    _invoice(
+        db=db_session,
+        owner=test_user,
+        filename="indexed.pdf",
+        deadline=date(2026, 7, 31),
+    )
+    _invoice(
+        db=db_session,
+        owner=test_user,
+        filename="not-indexed.pdf",
+        deadline=date(2026, 8, 1),
+        indexed=False,
+    )
+
+    result = answer_structured_question(
+        db=db_session,
+        owner_id=test_user.id,
+        question="How many indexed documents do I have?",
+    )
+
+    assert result is not None
+    assert result.answer == "You have 1 indexed document in the Knowledge Base."
+    assert result.sources == []
+
+
+def test_document_count_question_skips_embeddings_and_openai(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _invoice(
+        db=db_session,
+        owner=test_user,
+        filename="indexed.pdf",
+        deadline=date(2026, 7, 31),
+    )
+    conversation = create_conversation(
+        db=db_session,
+        owner_id=test_user.id,
+        title="Documents",
+    )
+
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "search_document_chunks",
+        lambda **_: pytest.fail("semantic retrieval must not run"),
+    )
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "create_openai_client",
+        lambda: pytest.fail("OpenAI must not run"),
+    )
+
+    _, assistant_message = answer_conversation_question(
+        db=db_session,
+        owner_id=test_user.id,
+        conversation_id=conversation.id,
+        question="How many docs in my account?",
+    )
+
+    assert assistant_message.content == (
+        "You have 1 active document in your account; "
+        "1 document is indexed in the Knowledge Base."
+    )
+    assert assistant_message.sources == []
