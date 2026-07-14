@@ -1,3 +1,4 @@
+import hashlib
 from datetime import UTC, datetime
 
 from celery.exceptions import SoftTimeLimitExceeded
@@ -6,7 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.backup_job import BackupJob, BackupJobStatus
+from app.models.user import User
 from app.services.backup_export import build_backup_archive
+from app.services.backup_recovery import encrypt_recovery_archive, get_recovery_key
 from app.services.google_drive import upload_gzip_backup
 from app.services.google_drive_oauth import get_google_drive_connection
 from app.worker import celery_app
@@ -36,6 +39,10 @@ def run_backup_task(self, backup_job_id: int) -> None:
                 raise RuntimeError(
                     "Google Drive is not connected. Connect it on the Backups page."
                 )
+            owner = db.get(User, job.owner_id)
+            if owner is None:
+                raise RuntimeError("Backup owner does not exist.")
+            recovery_key = get_recovery_key(user=owner)
 
             job.status = BackupJobStatus.running
             job.started_at = job.started_at or datetime.now(UTC)
@@ -44,11 +51,15 @@ def run_backup_task(self, backup_job_id: int) -> None:
             db.commit()
 
             archive = build_backup_archive(db=db, owner_id=job.owner_id)
+            encrypted_content = encrypt_recovery_archive(
+                content=archive.content,
+                recovery_key=recovery_key,
+            )
             timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-            filename = f"docsflow-backup-user-{job.owner_id}-{timestamp}.json.gz"
+            filename = f"docsflow-recovery-user-{job.owner_id}-{timestamp}.json.gz.enc"
             drive_result = upload_gzip_backup(
                 filename=filename,
-                content=archive.content,
+                content=encrypted_content,
                 refresh_token=connection.refresh_token,
             )
 
@@ -58,8 +69,9 @@ def run_backup_task(self, backup_job_id: int) -> None:
             job.drive_file_id = drive_result.file_id
             job.drive_file_name = drive_result.file_name
             job.drive_web_view_link = drive_result.web_view_link
-            job.compressed_size_bytes = len(archive.content)
-            job.checksum_sha256 = archive.checksum_sha256
+            job.content_type = "application/vnd.docsflow.recovery+fernet"
+            job.compressed_size_bytes = len(encrypted_content)
+            job.checksum_sha256 = hashlib.sha256(encrypted_content).hexdigest()
             job.record_counts = archive.record_counts
             job.finished_at = datetime.now(UTC)
             job.error_message = None

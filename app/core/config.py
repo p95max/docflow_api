@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     backup_soft_time_limit_seconds: int = 120
     backup_hard_time_limit_seconds: int = 180
+    backup_master_key: str | None = None
 
     google_drive_client_id: str | None = None
     google_drive_client_secret: str | None = None

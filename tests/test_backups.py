@@ -3,11 +3,13 @@ import json
 from types import TracebackType
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi import status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 import app.api.v1.routes_backups as routes_backups
+import app.services.backup_recovery as backup_recovery
 import app.tasks.backups as backup_tasks
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.document import Document, DocumentStatus, ProcessingMode
@@ -16,6 +18,12 @@ from app.models.knowledge_conversation import KnowledgeConversation
 from app.models.knowledge_message import KnowledgeMessage, KnowledgeMessageRole
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
+from app.services.backup_recovery import (
+    decrypt_recovery_archive,
+    encrypt_recovery_archive,
+    generate_recovery_key,
+    restore_recovery_backup,
+)
 from app.services.google_drive import DriveUploadResult
 from app.services.users import create_user
 from app.tasks.backups import run_backup_task
@@ -49,7 +57,7 @@ def _connect_drive(db: Session, user: User) -> GoogleDriveConnection:
     return connection
 
 
-def test_backup_archive_excludes_sensitive_credentials_and_document_text(
+def test_recovery_backup_excludes_credentials_and_keeps_document_text(
     db_session: Session,
     test_user: User,
 ) -> None:
@@ -86,20 +94,84 @@ def test_backup_archive_excludes_sensitive_credentials_and_document_text(
     payload = json.loads(gzip.decompress(archive.content))
     serialized = json.dumps(payload)
 
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert payload["records"]["users"][0]["email"] == test_user.email
     assert payload["records"]["documents"][0]["storage_key"] == "1/invoice.pdf"
     document_payload = payload["records"]["documents"][0]
 
-    assert "raw_text" not in document_payload
+    assert document_payload["raw_text"] == "Sensitive invoice text that must not leave the database."
     assert "password_hash" not in serialized
     assert "refresh_token" not in serialized
     assert test_user.password_hash not in serialized
-    assert "Sensitive invoice text that must not leave the database." not in serialized
+    assert "Sensitive invoice text that must not leave the database." in serialized
     assert "knowledge_conversations" not in payload["records"]
     assert "Sensitive conversation content that must not leave the database." not in serialized
     assert archive.checksum_sha256
     assert archive.record_counts["documents"] == 1
+
+
+def test_recovery_backup_restores_document_text_and_queues_indexing(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_user = create_user(
+        db=db_session,
+        email="backup-source@example.com",
+        password="strong-password",
+    )
+    source_document = Document(
+        owner_id=source_user.id,
+        original_filename="invoice.pdf",
+        status=DocumentStatus.completed,
+        processing_mode=ProcessingMode.standard,
+        content_type="application/pdf",
+        checksum_sha256="b" * 64,
+        storage_key="2/invoice.pdf",
+        raw_text="Invoice 161126 is due in 30 days.",
+        document_type="invoice",
+        ai_extracted_data={"invoice_number": "161126"},
+    )
+    db_session.add(source_document)
+    db_session.commit()
+    archive = build_backup_archive(db=db_session, owner_id=source_user.id)
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    queued_document_ids: list[int] = []
+    monkeypatch.setattr(
+        backup_recovery,
+        "enqueue_document_index_job",
+        lambda *, db, document: queued_document_ids.append(document.id),
+    )
+
+    encrypted_archive = encrypt_recovery_archive(
+        content=archive.content,
+        recovery_key=recovery_key,
+    )
+    result = restore_recovery_backup(
+        db=db_session,
+        owner_id=test_user.id,
+        encrypted_content=encrypted_archive,
+        recovery_key=recovery_key,
+    )
+
+    assert result.restored_documents == 1
+    assert result.skipped_documents == 0
+    restored = db_session.query(Document).filter_by(owner_id=test_user.id).one()
+    assert restored.original_filename == "invoice.pdf"
+    assert restored.storage_key is None
+    assert restored.raw_text == "Invoice 161126 is due in 30 days."
+    assert restored.ai_extracted_data == {"invoice_number": "161126"}
+    assert queued_document_ids == [restored.id]
+
+    second_result = restore_recovery_backup(
+        db=db_session,
+        owner_id=test_user.id,
+        encrypted_content=encrypted_archive,
+        recovery_key=recovery_key,
+    )
+    assert second_result.restored_documents == 0
+    assert second_result.skipped_documents == 1
+    assert queued_document_ids == [restored.id]
 
 
 def test_run_backup_endpoint_requires_google_drive_connection(
@@ -120,6 +192,7 @@ def test_run_backup_endpoint_creates_pending_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _connect_drive(db_session, test_user)
+    recovery_key = generate_recovery_key(db=db_session, user=test_user)
 
     def fake_enqueue_backup_job(*, db: Session, job: BackupJob) -> BackupJob:
         job.celery_task_id = "fake-backup-task-id"
@@ -179,6 +252,7 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _connect_drive(db_session, test_user)
+    generate_recovery_key(db=db_session, user=test_user)
     job = BackupJob(owner_id=test_user.id)
     db_session.add(job)
     db_session.commit()
@@ -197,8 +271,15 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
         refresh_token: str,
     ) -> DriveUploadResult:
         assert refresh_token == "stored-refresh-token"
-        assert filename.endswith(".json.gz")
-        payload = json.loads(gzip.decompress(content))
+        assert filename.endswith(".json.gz.enc")
+        payload = json.loads(
+            gzip.decompress(
+                decrypt_recovery_archive(
+                    content=content,
+                    recovery_key=recovery_key,
+                )
+            )
+        )
         assert payload["owner_id"] == test_user.id
         return DriveUploadResult(
             folder_id="folder-1",
@@ -260,6 +341,7 @@ def test_run_backup_task_marks_job_failed_when_drive_upload_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _connect_drive(db_session, test_user)
+    generate_recovery_key(db=db_session, user=test_user)
     job = BackupJob(owner_id=test_user.id)
     db_session.add(job)
     db_session.commit()

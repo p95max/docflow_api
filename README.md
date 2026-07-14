@@ -117,6 +117,7 @@ separate frontend server or JavaScript build step is required.
 | `/documents/upload` | Upload a document and select confidential mode |
 | `/documents/{id}` | Preview, download, correct, and confirm extraction |
 | `/knowledge` | Ask questions about indexed documents and check indexing status |
+| `/backups` | Create encrypted Google Drive recovery backups and restore document data |
 
 The browser receives the short-lived access token in an HTTP-only cookie.
 Bootstrap is loaded from its CDN; production
@@ -151,6 +152,31 @@ documents. Apply the database migration before enabling the feature:
 ```powershell
 python -m poetry run alembic upgrade head
 ```
+
+### Recovery backups
+
+Backups on `/backups` are recovery archives: they contain document metadata,
+extracted text, and the structured extraction result, but not original PDF,
+JPG, or PNG files. Each archive is encrypted with a per-user **Recovery Key**
+before it is uploaded to Google Drive. The key is displayed once after it is
+generated; save it in a password manager or another secure location.
+
+DocsFlow stores only an encrypted copy of that key. Set a separate application
+master key before generating Recovery Keys or restoring backups:
+
+```powershell
+python -m poetry run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Put the generated value in `BACKUP_MASTER_KEY` in the deployment secret store
+or `.env`. Keep this value stable and private: changing it prevents DocsFlow
+from creating or downloading backups for existing accounts. A user can still
+restore an existing archive anywhere with the saved Recovery Key.
+
+To recover after a database loss, recreate or sign in to the account, open
+`/backups`, select the encrypted `.json.gz.enc` archive, and enter its
+Recovery Key. Documents are restored without their original files; completed
+standard documents are automatically queued for Knowledge Base indexing.
 
 ---
 
@@ -498,6 +524,7 @@ Main settings are configured through `.env`.
 | `DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS` | `90` | Hard task limit |
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
+| `BACKUP_MASTER_KEY` | â€” | Valid Fernet key used to protect stored per-user Recovery Keys |
 
 ---
 

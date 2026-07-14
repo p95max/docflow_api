@@ -12,6 +12,7 @@ from app.services.backup_jobs import (
 )
 from app.services.google_drive import delete_gzip_backup
 from app.services.google_drive_oauth import get_google_drive_connection
+from app.services.backup_recovery import get_recovery_key
 
 router = APIRouter()
 
@@ -30,6 +31,13 @@ def run_backup(
             status_code=status.HTTP_409_CONFLICT,
             detail="Google Drive is not connected. Connect it on the Backups page.",
         )
+    try:
+        get_recovery_key(user=current_user)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     job = create_backup_job(db=db, owner_id=current_user.id)
     db.commit()

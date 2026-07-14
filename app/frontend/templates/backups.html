@@ -5,16 +5,18 @@
 {% block content %}
   <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
     <div>
-      <h1 class="h3 mb-1">Google Drive backups</h1>
+      <h1 class="h3 mb-1">Google Drive recovery backups</h1>
       <p class="text-secondary mb-0">
-        Export your DocsFlow records and document metadata as compressed JSON.
+        Encrypted recovery archives for your DocsFlow document data.
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      {% if google_drive_connection %}
+      {% if google_drive_connection and recovery_key_configured %}
         <form method="post" action="/backups/run">
           <button class="btn btn-primary" type="submit">Create backup</button>
         </form>
+      {% elif google_drive_connection %}
+        <button class="btn btn-primary" type="button" disabled title="Generate a Recovery Key first">Create backup</button>
         <form method="post" action="/backups/google/disconnect">
           <button class="btn btn-outline-danger" type="submit">Disconnect Google Drive</button>
         </form>
@@ -58,6 +60,18 @@
     <div class="alert alert-danger" role="alert">{{ error }}</div>
   {% endif %}
 
+  {% if restore_result %}
+    <div class="alert alert-success" role="alert">{{ restore_result }}</div>
+  {% endif %}
+
+  {% if recovery_key_once %}
+    <div class="alert alert-warning" role="alert">
+      <h2 class="h6">Save your Recovery Key now</h2>
+      <p>This key is required to restore encrypted backups and will not be shown again.</p>
+      <code class="d-block text-break user-select-all">{{ recovery_key_once }}</code>
+    </div>
+  {% endif %}
+
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
@@ -91,11 +105,43 @@
     <div class="card-body">
       <h2 class="h6">Backup scope</h2>
       <p class="text-secondary mb-0">
-        Backups are uploaded to <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as <code>.json.gz</code> files.
+        Recovery backups include extracted document text and are uploaded to <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as encrypted <code>.json.gz.enc</code> files.
         Original PDF, JPG and PNG files are not included.
       </p>
     </div>
   </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6">Recovery Key</h2>
+      {% if recovery_key_configured %}
+        <p class="text-success mb-0">A Recovery Key is configured. It is independent of Google Drive; keep your saved copy secure.</p>
+      {% else %}
+        <p class="text-secondary">Generate a key before creating the first recovery backup.</p>
+        <form method="post" action="/backups/recovery-key">
+          <button class="btn btn-outline-primary" type="submit">Generate Recovery Key</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <details class="card shadow-sm mb-4">
+    <summary class="card-header cursor-pointer">Restore recovery backup</summary>
+    <div class="card-body">
+      <p class="text-secondary">Restores document text without original PDF, JPG or PNG files. Standard documents are indexed again automatically.</p>
+      <form method="post" action="/backups/restore" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label class="form-label" for="backup_file">Encrypted backup file</label>
+          <input class="form-control" id="backup_file" name="backup_file" type="file" accept=".enc" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="recovery_key">Recovery Key</label>
+          <input class="form-control" id="recovery_key" name="recovery_key" type="password" autocomplete="off" required>
+        </div>
+        <button class="btn btn-outline-primary" type="submit">Restore documents</button>
+      </form>
+    </div>
+  </details>
 
   {% if backup_jobs %}
     <div class="card shadow-sm overflow-hidden">

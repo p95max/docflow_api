@@ -1,13 +1,19 @@
 import gzip
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 import app.web_backups as web_backups
+import app.services.backup_recovery as backup_recovery
 from app.models.backup_job import BackupJob, BackupJobStatus
+from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.google_drive_connection import GoogleDriveConnection
 from app.models.user import User
+from app.services.backup_export import build_backup_archive
+from app.services.backup_recovery import encrypt_recovery_archive, generate_recovery_key
+from app.services.users import create_user
 
 
 def _login(client: TestClient, user: User) -> None:
@@ -38,7 +44,7 @@ def test_backup_page_prompts_user_to_connect_google_drive(
     response = client.get("/backups")
 
     assert response.status_code == 200
-    assert "Google Drive backups" in response.text
+    assert "Google Drive recovery backups" in response.text
     assert "Connect Google Drive" in response.text
     assert '<form method="post" action="/backups/run">' not in response.text
 
@@ -58,6 +64,7 @@ def test_backup_page_renders_and_creates_job(
         )
     )
     db_session.commit()
+    generate_recovery_key(db=db_session, user=test_user)
 
     def fake_enqueue_backup_job(*, db: Session, job: BackupJob) -> BackupJob:
         job.celery_task_id = "frontend-backup-task-id"
@@ -74,7 +81,7 @@ def test_backup_page_renders_and_creates_job(
 
     page_response = client.get("/backups")
     assert page_response.status_code == 200
-    assert "Google Drive backups" in page_response.text
+    assert "Google Drive recovery backups" in page_response.text
     assert '<form method="post" action="/backups/run">' in page_response.text
     assert "Disconnect Google Drive" in page_response.text
 
@@ -86,6 +93,87 @@ def test_backup_page_renders_and_creates_job(
     assert history_response.status_code == 200
     assert "Backup job created" in history_response.text
     assert "pending" in history_response.text
+
+
+def test_recovery_key_is_shown_only_when_generated(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+) -> None:
+    _login(client, test_user)
+
+    response = client.post("/backups/recovery-key")
+
+    assert response.status_code == 200
+    assert "Save your Recovery Key now" in response.text
+    db_session.refresh(test_user)
+    assert test_user.backup_recovery_key_encrypted is not None
+
+    page_response = client.get("/backups")
+    assert "Save your Recovery Key now" not in page_response.text
+    assert "A Recovery Key is configured" in page_response.text
+
+
+def test_restore_recovery_backup_restores_text_and_queues_indexing(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_user = create_user(
+        db=db_session,
+        email="backup-source@example.com",
+        password="strong-password",
+    )
+    source_document = Document(
+        owner_id=source_user.id,
+        original_filename="invoice.pdf",
+        status=DocumentStatus.completed,
+        processing_mode=ProcessingMode.standard,
+        content_type="application/pdf",
+        checksum_sha256="b" * 64,
+        raw_text="Invoice 161126 is due in 30 days.",
+        document_type="invoice",
+        ai_extracted_data={"invoice_number": "161126"},
+    )
+    db_session.add(source_document)
+    db_session.commit()
+    archive = build_backup_archive(db=db_session, owner_id=source_user.id)
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    encrypted_archive = encrypt_recovery_archive(
+        content=archive.content,
+        recovery_key=recovery_key,
+    )
+    queued_document_ids: list[int] = []
+    monkeypatch.setattr(
+        backup_recovery,
+        "enqueue_document_index_job",
+        lambda *, db, document: queued_document_ids.append(document.id),
+    )
+    _login(client, test_user)
+
+    response = client.post(
+        "/backups/restore",
+        data={"recovery_key": recovery_key},
+        files={
+            "backup_file": (
+                "docsflow-recovery.json.gz.enc",
+                encrypted_archive,
+                "application/octet-stream",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Restored 1 document(s); skipped 0 duplicate(s)." in response.text
+    restored = db_session.query(Document).filter_by(owner_id=test_user.id).one()
+    assert restored.original_filename == "invoice.pdf"
+    assert restored.storage_key is None
+    assert restored.raw_text == "Invoice 161126 is due in 30 days."
+    assert restored.ai_extracted_data == {"invoice_number": "161126"}
+    assert queued_document_ids == [restored.id]
+    db_session.refresh(test_user)
+    assert test_user.backup_recovery_key_encrypted is not None
 
 
 def test_failed_backup_can_be_deleted_from_history(

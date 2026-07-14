@@ -4,7 +4,7 @@ import secrets
 from urllib.parse import quote
 
 import jwt
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,14 @@ from app.services.backup_jobs import (
     enqueue_backup_job,
     get_backup_job,
     list_backup_jobs,
+)
+from app.services.backup_recovery import (
+    decrypt_recovery_archive,
+    generate_recovery_key,
+    get_recovery_key,
+    restore_recovery_backup,
+    save_recovery_key,
+    validate_backup_master_key,
 )
 from app.services.google_drive import (
     delete_gzip_backup,
@@ -56,6 +64,8 @@ def _render_backups_page(
     db: Session,
     current_user: User,
     error: str | None = None,
+    recovery_key_once: str | None = None,
+    restore_result: str | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> HTMLResponse:
     return _template_response(
@@ -70,6 +80,9 @@ def _render_backups_page(
         google_oauth_configured=google_drive_oauth_is_configured(),
         google_oauth_missing_settings=missing_google_drive_oauth_settings(),
         google_drive_folder_name=settings.google_drive_folder_name,
+        recovery_key_configured=bool(current_user.backup_recovery_key_encrypted),
+        recovery_key_once=recovery_key_once,
+        restore_result=restore_result,
         created=request.query_params.get("created") == "1",
         deleted=request.query_params.get("deleted") == "1",
         drive_file_retained=request.query_params.get("drive_file_retained") == "1",
@@ -278,6 +291,17 @@ def run_backup_submit(
             status_code=status.HTTP_409_CONFLICT,
         )
 
+    try:
+        get_recovery_key(user=current_user)
+    except RuntimeError as exc:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
     job = create_backup_job(db=db, owner_id=current_user.id)
     db.commit()
     db.refresh(job)
@@ -296,6 +320,83 @@ def run_backup_submit(
     return RedirectResponse(
         url="/backups?created=1",
         status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/backups/recovery-key", response_class=HTMLResponse, response_model=None)
+def generate_backup_recovery_key(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    if current_user.backup_recovery_key_encrypted:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="A Recovery Key has already been generated for this account.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    try:
+        recovery_key = generate_recovery_key(db=db, user=current_user)
+    except RuntimeError as exc:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return _render_backups_page(
+        request=request,
+        db=db,
+        current_user=current_user,
+        recovery_key_once=recovery_key,
+    )
+
+
+@router.post("/backups/restore", response_class=HTMLResponse, response_model=None)
+def restore_backup_submit(
+    request: Request,
+    recovery_key: str = Form(...),
+    backup_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        validate_backup_master_key()
+        result = restore_recovery_backup(
+            db=db,
+            owner_id=current_user.id,
+            encrypted_content=backup_file.file.read(),
+            recovery_key=recovery_key,
+        )
+        if not current_user.backup_recovery_key_encrypted:
+            save_recovery_key(
+                db=db,
+                user=current_user,
+                recovery_key=recovery_key,
+            )
+    except RuntimeError as exc:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    return _render_backups_page(
+        request=request,
+        db=db,
+        current_user=current_user,
+        restore_result=(
+            f"Restored {result.restored_documents} document(s); "
+            f"skipped {result.skipped_documents} duplicate(s)."
+        ),
     )
 
 
@@ -447,12 +548,16 @@ def download_backup(
             status_code=status.HTTP_409_CONFLICT,
         )
     try:
-        content = gzip.decompress(
-            download_gzip_backup(
-                file_id=job.drive_file_id,
-                refresh_token=connection.refresh_token,
-            )
+        downloaded_content = download_gzip_backup(
+            file_id=job.drive_file_id,
+            refresh_token=connection.refresh_token,
         )
+        if job.content_type == "application/vnd.docsflow.recovery+fernet":
+            downloaded_content = decrypt_recovery_archive(
+                content=downloaded_content,
+                recovery_key=get_recovery_key(user=current_user),
+            )
+        content = gzip.decompress(downloaded_content)
     except (EOFError, OSError, RuntimeError):
         return _render_backups_page(
             request=request,
