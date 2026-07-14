@@ -13,7 +13,16 @@
   <div class="alert alert-success">Document deleted.</div>
 {% endif %}
 
-<form class="card card-body shadow-sm mb-4" method="get" action="/documents">
+{% set filters_active = filters.query or filters.document_type or filters.status or filters.uploaded_from or filters.uploaded_to or filters.document_date_from or filters.document_date_to or filters.amount_min or filters.amount_max or filters.deadline_from or filters.deadline_to or filters.requires_action is not none or filters.page_size != 25 or filters.sort_by != 'created_at' or filters.sort_direction != 'desc' %}
+<details class="card shadow-sm mb-4 documents-filters">
+  <summary class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="fw-semibold">Filters</span>
+    <span class="small text-secondary">
+      {% if filters_active %}<span class="badge text-bg-info">Active</span>{% endif %}
+      <span class="documents-filters-toggle">Show filters</span>
+    </span>
+  </summary>
+  <form class="card-body" method="get" action="/documents">
   <div class="row g-3">
     <div class="col-md-4">
       <label class="form-label" for="query">Search</label>
@@ -105,7 +114,8 @@
       <a class="btn btn-outline-secondary" href="/documents">Clear</a>
     </div>
   </div>
-</form>
+  </form>
+</details>
 
 <div class="card shadow-sm">
   <div class="card-header d-flex justify-content-between align-items-center">

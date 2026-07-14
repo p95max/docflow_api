@@ -175,6 +175,31 @@ table th {
   height: 1rem;
 }
 
+.documents-filters {
+  overflow: hidden;
+}
+
+.documents-filters > summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+}
+
+.documents-filters > summary::-webkit-details-marker {
+  display: none;
+}
+
+.documents-filters-toggle::after {
+  display: inline-block;
+  margin-left: 0.4rem;
+  content: "⌄";
+  transition: transform 0.15s ease-in-out;
+}
+
+.documents-filters[open] .documents-filters-toggle::after {
+  transform: rotate(180deg);
+}
+
 .source-card {
   background: var(--bs-tertiary-bg);
 }

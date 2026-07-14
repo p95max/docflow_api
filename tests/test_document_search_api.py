@@ -77,3 +77,6 @@ def test_documents_page_renders_search_controls(
     assert 'name="query"' in response.text
     assert 'name="requires_action"' in response.text
     assert 'name="sort_by"' in response.text
+    assert '<details class="card shadow-sm mb-4 documents-filters">' in response.text
+    assert "<details open" not in response.text
+    assert "Active" in response.text
