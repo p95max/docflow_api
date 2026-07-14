@@ -77,7 +77,7 @@ table th {
 }
 
 .knowledge-message-list {
-  max-width: 62rem;
+  width: 100%;
 }
 
 .knowledge-message-row {
