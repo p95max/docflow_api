@@ -39,8 +39,13 @@ def ensure_google_drive_backup_folder(
                 access_token=access_token,
                 folder_name=folder_name,
             )
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(
+            "Could not create the Google Drive backup folder: "
+            + _drive_api_error_detail(exc)
+        ) from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError("Could not create the Google Drive backup folder.") from exc
+        raise RuntimeError("Could not reach Google Drive to create the backup folder.") from exc
 
 
 def upload_gzip_backup(
@@ -52,23 +57,31 @@ def upload_gzip_backup(
 ) -> DriveUploadResult:
     folder_name = folder_name or settings.google_drive_folder_name
 
-    with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
-        access_token = _get_access_token(
-            client=client,
-            refresh_token=refresh_token,
-        )
-        folder_id = _get_or_create_folder(
-            client=client,
-            access_token=access_token,
-            folder_name=folder_name,
-        )
-        file_data = _upload_file(
-            client=client,
-            access_token=access_token,
-            folder_id=folder_id,
-            filename=filename,
-            content=content,
-        )
+    try:
+        with httpx.Client(timeout=settings.google_drive_timeout_seconds) as client:
+            access_token = _get_access_token(
+                client=client,
+                refresh_token=refresh_token,
+            )
+            folder_id = _get_or_create_folder(
+                client=client,
+                access_token=access_token,
+                folder_name=folder_name,
+            )
+            file_data = _upload_file(
+                client=client,
+                access_token=access_token,
+                folder_id=folder_id,
+                filename=filename,
+                content=content,
+            )
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(
+            "Could not upload the backup file to Google Drive: "
+            + _drive_api_error_detail(exc)
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError("Could not reach Google Drive to upload the backup file.") from exc
 
     return DriveUploadResult(
         folder_id=folder_id,
@@ -92,8 +105,13 @@ def delete_gzip_backup(*, file_id: str, refresh_token: str) -> None:
             )
             if response.status_code != httpx.codes.NOT_FOUND:
                 response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(
+            "Could not delete the backup file from Google Drive: "
+            + _drive_api_error_detail(exc)
+        ) from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError("Could not delete the backup file from Google Drive.") from exc
+        raise RuntimeError("Could not reach Google Drive to delete the backup file.") from exc
 
 
 def download_gzip_backup(*, file_id: str, refresh_token: str) -> bytes:
@@ -107,8 +125,13 @@ def download_gzip_backup(*, file_id: str, refresh_token: str) -> bytes:
             )
             response.raise_for_status()
             return response.content
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(
+            "Could not download the backup file from Google Drive: "
+            + _drive_api_error_detail(exc)
+        ) from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError("Could not download the backup file from Google Drive.") from exc
+        raise RuntimeError("Could not reach Google Drive to download the backup file.") from exc
 
 
 def _get_access_token(
@@ -155,6 +178,19 @@ def _get_access_token(
         raise RuntimeError("Google OAuth token response does not contain access_token")
 
     return str(access_token)
+
+
+def _drive_api_error_detail(exc: httpx.HTTPStatusError) -> str:
+    response = exc.response
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict) and error.get("message"):
+        return str(error["message"])[:500]
+    return f"HTTP {response.status_code}"
 
 
 def _get_or_create_folder(
