@@ -69,3 +69,21 @@ table th {
   --bs-table-hover-bg: rgba(96, 165, 250, 0.08);
   --bs-table-border-color: var(--bs-border-color);
 }
+
+.knowledge-message-content,
+.source-snippet {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-message-user {
+  border-left: 3px solid var(--docsflow-primary);
+}
+
+.knowledge-message-assistant {
+  border-left: 3px solid var(--bs-success);
+}
+
+.source-card {
+  background: var(--bs-tertiary-bg);
+}

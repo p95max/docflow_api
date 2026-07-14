@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.v1.dependencies import CurrentUser, DbSession
+from app.core.config import settings
 from app.schemas.knowledge import (
     KnowledgeAnswerResponse,
     KnowledgeConversationCreate,
@@ -23,12 +24,21 @@ from app.services.semantic_search import search_document_chunks
 router = APIRouter()
 
 
+def _require_knowledge_enabled() -> None:
+    if not settings.knowledge_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Knowledge Base is disabled.",
+        )
+
+
 @router.post("/search", response_model=SemanticSearchResponse)
 def semantic_search(
     payload: SemanticSearchRequest,
     db: DbSession,
     current_user: CurrentUser,
 ) -> SemanticSearchResponse:
+    _require_knowledge_enabled()
     try:
         results = search_document_chunks(
             db=db,
@@ -61,6 +71,7 @@ def create_knowledge_conversation(
     db: DbSession,
     current_user: CurrentUser,
 ) -> KnowledgeConversationRead:
+    _require_knowledge_enabled()
     return create_conversation(
         db=db,
         owner_id=current_user.id,
@@ -73,6 +84,7 @@ def list_knowledge_conversations(
     db: DbSession,
     current_user: CurrentUser,
 ) -> list[KnowledgeConversationRead]:
+    _require_knowledge_enabled()
     return list_conversations(db=db, owner_id=current_user.id)
 
 
@@ -85,6 +97,7 @@ def get_knowledge_conversation(
     db: DbSession,
     current_user: CurrentUser,
 ) -> KnowledgeConversationDetail:
+    _require_knowledge_enabled()
     try:
         return get_owned_conversation(
             db=db,
@@ -108,6 +121,7 @@ def ask_knowledge_question(
     db: DbSession,
     current_user: CurrentUser,
 ) -> KnowledgeAnswerResponse:
+    _require_knowledge_enabled()
     try:
         user_message, assistant_message = answer_conversation_question(
             db=db,

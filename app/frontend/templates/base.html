@@ -15,6 +15,11 @@
         <div class="d-flex align-items-center gap-2">
           {% if current_user %}
             <a class="btn btn-sm btn-outline-light" href="/documents">Documents</a>
+            {% if knowledge_enabled %}
+              <a class="btn btn-sm btn-outline-light" href="/knowledge">Knowledge</a>
+            {% else %}
+              <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true" title="Knowledge Base is disabled">Knowledge</span>
+            {% endif %}
             <a class="btn btn-sm btn-outline-light" href="/backups">Backups</a>
             <a class="btn btn-sm btn-light" href="/documents/upload">Upload</a>
             <form method="post" action="/logout" class="m-0">

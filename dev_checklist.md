@@ -269,18 +269,19 @@ GET  /backups/{backup_id}
 
 #### MVP 3.3 — Bootstrap UI and Operations
 
-- [ ] Add server-rendered `/knowledge` page without JavaScript
-- [ ] Add conversation list and conversation detail pages
-- [ ] Add question form and render source cards under each answer
-- [ ] Set question textarea `maxlength="300"`
-- [ ] Explain that questions must be one simple sentence about uploaded documents
-- [ ] Show an example: "Which invoices are due this month?"
-- [ ] Link sources to the owned document and show page numbers
-- [ ] Display document indexing status and errors
-- [ ] Add a manual reindex action
-- [ ] Exclude deleted documents from retrieval without deleting conversation history
-- [ ] Exclude chunks and conversation content from Google Drive JSON backup
-- [ ] Document RAG configuration and indexing commands in README
+- [x] Add server-rendered `/knowledge` page without JavaScript
+- [x] Add conversation list and conversation detail pages
+- [x] Add question form and render source cards under each answer
+- [x] Set question textarea `maxlength="300"`
+- [x] Explain that questions must be one simple sentence about uploaded documents
+- [x] Show an example: "Which invoices are due this month?"
+- [x] Link sources to the owned document and show page numbers
+- [x] Display document indexing status and errors
+- [x] Add a manual reindex action
+- [x] Add `KNOWLEDGE_ENABLED` feature flag: disable UI/API access and new OpenAI embedding work
+- [x] Exclude deleted documents from retrieval without deleting conversation history
+- [x] Exclude chunks and conversation content from Google Drive JSON backup
+- [x] Document RAG configuration and indexing commands in README
 
 #### Security and Confidential Mode
 
@@ -427,7 +428,7 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 /documents/upload
 /documents/{document_id}
 /backups
-/knowledge  (later)
+/knowledge
 ```
 
 ---

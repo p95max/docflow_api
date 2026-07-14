@@ -4,12 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.tasks.knowledge as knowledge_tasks
+from app.core.config import settings
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_chunk import DocumentChunk
 from app.models.document_index_job import DocumentIndexJob, DocumentIndexJobStatus
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.user import User
 from app.services.document_chunking import build_document_chunk_drafts
+from app.services.document_index_jobs import prepare_document_index_job
 from app.services.embeddings import EmbeddingResult
 from app.services.text_extraction import ExtractedTextPage
 
@@ -211,3 +213,21 @@ def test_index_task_skips_embedding_when_existing_index_matches(
     db_session.refresh(job)
     assert result.successful()
     assert job.status == DocumentIndexJobStatus.completed
+
+
+def test_disabled_knowledge_does_not_create_an_index_job(
+    db_session: Session,
+    test_user: User,
+    monkeypatch,
+) -> None:
+    document = _completed_document(test_user)
+    db_session.add(document)
+    db_session.commit()
+    monkeypatch.setattr(settings, "knowledge_enabled", False)
+
+    job = prepare_document_index_job(db=db_session, document=document)
+
+    assert job is None
+    assert db_session.scalar(
+        select(DocumentIndexJob).where(DocumentIndexJob.document_id == document.id)
+    ) is None

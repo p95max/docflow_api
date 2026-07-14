@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     knowledge_min_similarity: float = 0.25
     knowledge_history_message_limit: int = 8
     knowledge_history_token_budget: int = 1600
+    knowledge_enabled: bool = True
     document_indexing_soft_time_limit_seconds: int = 120
     document_indexing_hard_time_limit_seconds: int = 180
     document_indexing_batch_size: int = 64

@@ -116,11 +116,41 @@ separate frontend server or JavaScript build step is required.
 | `/documents` | List the current user's documents |
 | `/documents/upload` | Upload a document and select confidential mode |
 | `/documents/{id}` | Preview, download, correct, and confirm extraction |
+| `/knowledge` | Ask questions about indexed documents and check indexing status |
 
-The browser stores the short-lived access token in `sessionStorage`, so closing
-the browser tab removes it. Bootstrap is loaded from its CDN; production
+The browser receives the short-lived access token in an HTTP-only cookie.
+Bootstrap is loaded from its CDN; production
 deployments may vendor the Bootstrap files under `app/frontend/assets/` if a
 network-independent interface is required.
+
+### Knowledge Base / RAG
+
+The Knowledge Base indexes completed `standard` documents into page-aware
+chunks and answers questions only from the current user's retrieved chunks.
+Each answer retains a snapshot of its source filename, page, snippet, and
+similarity score. `confidential` documents are never indexed or sent to OpenAI.
+
+Set the following values in `.env`:
+
+```bash
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_RAG_MODEL=gpt-5.6-terra
+OPENAI_RAG_REASONING_EFFORT=high
+KNOWLEDGE_ENABLED=true
+```
+
+Set `KNOWLEDGE_ENABLED=false` to disable the complete Knowledge Base: its
+navigation item becomes inactive, web/API access is rejected, new documents
+are not queued for embeddings, and queued indexing work exits without calling
+OpenAI. Existing conversations and indexes remain stored.
+
+Manual reindexing is available in `/knowledge` for completed standard
+documents. Apply the database migration before enabling the feature:
+
+```powershell
+python -m poetry run alembic upgrade head
+```
 
 ---
 
@@ -589,7 +619,8 @@ docker compose exec db psql -U docsflow -d docsflow \
 - AI extraction depends on successful local text extraction
 - Scanned PDFs without a text layer require OCR fallback before AI extraction can work well
 - Extracted JSON schema is generic and will be refined in later MVP steps
-- Semantic search and document Q&A are planned for later MVP stages
+- Knowledge Base retrieval is available only for indexed `standard` documents
+- Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
 - standard-mode AI extraction requires `OPENAI_API_KEY`
 - scanned PDF files without a text layer may produce empty `raw_text` until OCR fallback is implemented
 

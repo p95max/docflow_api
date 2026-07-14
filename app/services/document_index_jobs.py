@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_index_job import DocumentIndexJob, DocumentIndexJobStatus
+from app.core.config import settings
 
 
 def prepare_document_index_job(
@@ -13,6 +14,9 @@ def prepare_document_index_job(
     document: Document,
 ) -> DocumentIndexJob | None:
     """Create or reset a job for an indexable document."""
+    if not settings.knowledge_enabled:
+        return None
+
     if (
         document.status != DocumentStatus.completed
         or document.processing_mode != ProcessingMode.standard

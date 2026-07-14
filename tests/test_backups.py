@@ -12,6 +12,8 @@ import app.tasks.backups as backup_tasks
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.google_drive_connection import GoogleDriveConnection
+from app.models.knowledge_conversation import KnowledgeConversation
+from app.models.knowledge_message import KnowledgeMessage, KnowledgeMessageRole
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
 from app.services.google_drive import DriveUploadResult
@@ -64,6 +66,20 @@ def test_backup_archive_excludes_sensitive_credentials_and_document_text(
         ai_extracted_data={"document_type": "invoice", "amount": 49.99},
     )
     db_session.add(document)
+    db_session.flush()
+    conversation = KnowledgeConversation(
+        owner_id=test_user.id,
+        title="Sensitive knowledge conversation",
+    )
+    db_session.add(conversation)
+    db_session.flush()
+    db_session.add(
+        KnowledgeMessage(
+            conversation_id=conversation.id,
+            role=KnowledgeMessageRole.user,
+            content="Sensitive conversation content that must not leave the database.",
+        )
+    )
     db_session.commit()
 
     archive = build_backup_archive(db=db_session, owner_id=test_user.id)
@@ -80,6 +96,8 @@ def test_backup_archive_excludes_sensitive_credentials_and_document_text(
     assert "refresh_token" not in serialized
     assert test_user.password_hash not in serialized
     assert "Sensitive invoice text that must not leave the database." not in serialized
+    assert "knowledge_conversations" not in payload["records"]
+    assert "Sensitive conversation content that must not leave the database." not in serialized
     assert archive.checksum_sha256
     assert archive.record_counts["documents"] == 1
 

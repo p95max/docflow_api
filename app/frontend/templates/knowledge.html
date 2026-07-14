@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Base · DocsFlow{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Knowledge Base</h1>
+      <p class="text-secondary mb-0">Ask simple questions about your indexed documents.</p>
+    </div>
+  </div>
+
+  {% if reindexed %}
+    <div class="alert alert-success" role="alert">
+      Indexing was queued. Refresh this page to see its final status.
+    </div>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h2 class="h5">New conversation</h2>
+          <form method="post" action="/knowledge/conversations">
+            <label class="form-label" for="title">Title <span class="text-secondary">(optional)</span></label>
+            <input class="form-control" id="title" name="title" maxlength="120" value="{{ title_value }}" placeholder="Invoices, contracts, deadlines">
+            <button class="btn btn-primary mt-3" type="submit">Start conversation</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header">Conversations</div>
+        {% if conversations %}
+          <div class="list-group list-group-flush">
+            {% for conversation in conversations %}
+              <a class="list-group-item list-group-item-action" href="/knowledge/conversations/{{ conversation.id }}">
+                <span class="d-block fw-semibold">{{ conversation.title or "Untitled conversation" }}</span>
+                <small class="text-secondary">Updated {{ conversation.updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="card-body text-secondary">No conversations yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center">
+          <span>Document indexing</span>
+          <span class="small text-secondary">Confidential documents remain unavailable.</span>
+        </div>
+        {% if documents %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Status</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for document in documents %}
+                  <tr>
+                    <td>
+                      <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
+                      {% if document.processing_mode.value == "confidential" %}
+                        <div class="small text-warning">Unavailable: confidential document</div>
+                      {% elif document.status.value != "completed" %}
+                        <div class="small text-secondary">Document processing must complete first</div>
+                      {% elif not document.raw_text %}
+                        <div class="small text-secondary">No extracted text available</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if document.processing_mode.value == "confidential" %}
+                        <span class="badge text-bg-secondary">unavailable</span>
+                      {% elif document.index_job %}
+                        <span class="badge {{ document.index_job.status|status_badge_class }}">{{ document.index_job.status.value }}</span>
+                        {% if document.index_job.error_message %}
+                          <div class="small text-danger mt-1">{{ document.index_job.error_message }}</div>
+                        {% endif %}
+                      {% else %}
+                        <span class="badge text-bg-secondary">not indexed</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      {% if document.processing_mode.value == "standard" and document.status.value == "completed" and document.raw_text %}
+                        {% if document.index_job and document.index_job.status.value in ("pending", "running") %}
+                          <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Indexing…</button>
+                        {% else %}
+                          <form method="post" action="/knowledge/documents/{{ document.id }}/reindex">
+                            <button class="btn btn-sm btn-outline-primary" type="submit">Reindex</button>
+                          </form>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-secondary small">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="card-body text-secondary">Upload a standard document to start indexing it.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

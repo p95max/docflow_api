@@ -29,6 +29,13 @@ def index_document_task(self, index_job_id: int) -> None:
         if job is None or job.status == DocumentIndexJobStatus.completed:
             return
 
+        if not settings.knowledge_enabled:
+            job.status = DocumentIndexJobStatus.failed
+            job.error_message = "Knowledge Base is disabled."
+            job.finished_at = datetime.now(UTC)
+            db.commit()
+            return
+
         document = db.get(Document, job.document_id)
         if not _is_indexable(document):
             _mark_job_failed(

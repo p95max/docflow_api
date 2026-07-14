@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}{{ conversation.title or "Knowledge conversation" }} · DocsFlow{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+    <div>
+      <a class="small text-decoration-none" href="/knowledge">← Knowledge Base</a>
+      <h1 class="h3 mt-2 mb-1">{{ conversation.title or "Knowledge conversation" }}</h1>
+      <p class="text-secondary mb-0">Answers use only your indexed, non-confidential documents.</p>
+    </div>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="post" action="/knowledge/conversations/{{ conversation.id }}/messages">
+        <label class="form-label fw-semibold" for="question">Ask a question</label>
+        <textarea class="form-control" id="question" name="question" rows="3" maxlength="300" required placeholder="Which invoices are due this month?">{{ question_value }}</textarea>
+        <div class="form-text">Use one simple sentence (up to 300 characters) about your uploaded documents.</div>
+        <button class="btn btn-primary mt-3" type="submit">Ask</button>
+      </form>
+    </div>
+  </div>
+
+  {% if conversation.messages %}
+    <div class="vstack gap-3">
+      {% for message in conversation.messages %}
+        <article class="card shadow-sm knowledge-message knowledge-message-{{ message.role.value }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between gap-3 mb-2">
+              <h2 class="h6 mb-0">{{ "You" if message.role.value == "user" else "DocsFlow" }}</h2>
+              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
+            </div>
+            <div class="knowledge-message-content">{{ message.content }}</div>
+            {% if message.sources %}
+              <div class="mt-3 pt-3 border-top">
+                <h3 class="h6">Sources</h3>
+                <div class="row g-2">
+                  {% for source in message.sources %}
+                    <div class="col-md-6">
+                      <div class="card h-100 source-card">
+                        <div class="card-body p-3">
+                          {% if source.document_id in active_document_ids %}
+                            <a class="fw-semibold text-decoration-none" href="/documents/{{ source.document_id }}">{{ source.filename }}</a>
+                          {% else %}
+                            <span class="fw-semibold">{{ source.filename }}</span>
+                          {% endif %}
+                          <div class="small text-secondary mb-2">Page{% if source.page_from != source.page_to %}s{% endif %} {{ source.page_from }}{% if source.page_from != source.page_to %}–{{ source.page_to }}{% endif %}</div>
+                          <p class="small mb-0 source-snippet">{{ source.snippet }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state text-center p-5">
+      <h2 class="h5">Ask the first question</h2>
+      <p class="text-secondary mb-0">Only indexed standard documents can be used as sources.</p>
+    </div>
+  {% endif %}
+{% endblock %}

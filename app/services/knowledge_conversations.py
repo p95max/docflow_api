@@ -90,6 +90,9 @@ def answer_conversation_question(
     conversation_id: int,
     question: str,
 ) -> tuple[KnowledgeMessage, KnowledgeMessage]:
+    if not settings.knowledge_enabled:
+        raise RuntimeError("Knowledge Base is disabled.")
+
     conversation = get_owned_conversation(
         db=db,
         owner_id=owner_id,
