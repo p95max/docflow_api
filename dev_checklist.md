@@ -289,23 +289,23 @@ GET  /backups/{backup_id}
 - [x] Always exclude documents with `deleted_at IS NOT NULL`
 - [x] Validate requested document IDs belong to the current user
 - [x] Do not send `confidential` documents to external embeddings or Q&A APIs
-- [ ] Show that confidential documents are unavailable in Knowledge Base
+- [x] Show that confidential documents are unavailable in Knowledge Base
 - [ ] Add a separate local embedding and local LLM design before supporting
   confidential documents in RAG
 
 #### Testing Focus
 
 - [x] Test deterministic page-aware chunking and overlap
-- [ ] Test failed embedding retries
+- [x] Test failed embedding retries
 - [x] Test idempotent reindexing
 - [ ] Test semantic ranking against PostgreSQL with pgvector enabled
-- [ ] Test that another user's chunks never appear in search or Q&A
-- [ ] Test that soft-deleted documents never appear in retrieval
+- [ ] Test that another user's chunks never appear in search or Q&A (implemented; requires PostgreSQL/pgvector run)
+- [ ] Test that soft-deleted documents never appear in retrieval (implemented; requires PostgreSQL/pgvector run)
 - [x] Test that confidential documents never trigger external AI calls
 - [x] Test that source IDs cannot be invented by the answer model
 - [x] Test conversation ownership and history isolation
 - [x] Keep SQLite unit tests for pure services and models
-- [ ] Add PostgreSQL integration tests for vector queries and indexes
+- [ ] Add PostgreSQL integration tests for vector queries and indexes (implemented; requires PostgreSQL/pgvector run)
 
 ---
 

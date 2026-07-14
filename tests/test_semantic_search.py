@@ -1,3 +1,7 @@
+from datetime import UTC, datetime
+
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -42,4 +46,38 @@ def test_requested_documents_must_belong_to_current_user(
             db=db_session,
             owner_id=test_user.id,
             document_ids=[other_document.id],
+        )
+
+
+def test_soft_deleted_documents_are_not_available_for_semantic_search(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _document(test_user)
+    document.deleted_at = datetime.now(UTC)
+    db_session.add(document)
+    db_session.commit()
+
+    with pytest.raises(LookupError):
+        _validate_document_ids(
+            db=db_session,
+            owner_id=test_user.id,
+            document_ids=[document.id],
+        )
+
+
+def test_soft_deleted_documents_are_not_available_for_semantic_search(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _document(test_user)
+    document.deleted_at = datetime.now(UTC)
+    db_session.add(document)
+    db_session.commit()
+
+    with pytest.raises(LookupError):
+        _validate_document_ids(
+            db=db_session,
+            owner_id=test_user.id,
+            document_ids=[document.id],
         )

@@ -1,5 +1,6 @@
 from types import TracebackType
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -231,3 +232,141 @@ def test_disabled_knowledge_does_not_create_an_index_job(
     assert db_session.scalar(
         select(DocumentIndexJob).where(DocumentIndexJob.document_id == document.id)
     ) is None
+
+
+def test_failed_embedding_schedules_a_retry(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _completed_document(test_user)
+    db_session.add(document)
+    db_session.flush()
+    job = DocumentIndexJob(document_id=document.id)
+    db_session.add(job)
+    db_session.commit()
+
+    class RetryRequested(Exception):
+        pass
+
+    class FakeTask:
+        max_retries = 3
+        request = type("Request", (), {"retries": 0})()
+
+        def retry(self, *, exc: Exception, countdown: int) -> None:
+            assert str(exc) == "embedding service unavailable"
+            assert countdown == settings.document_processing_retry_delay_seconds
+            raise RetryRequested()
+
+    with pytest.raises(RetryRequested):
+        knowledge_tasks._handle_indexing_failure(
+            task=FakeTask(),
+            db=db_session,
+            job_id=job.id,
+            exc=RuntimeError("embedding service unavailable"),
+        )
+
+    db_session.refresh(job)
+    assert job.status == DocumentIndexJobStatus.pending
+    assert job.error_message == "embedding service unavailable"
+    assert job.finished_at is None
+
+
+def test_failed_embedding_marks_job_failed_after_last_retry(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _completed_document(test_user)
+    db_session.add(document)
+    db_session.flush()
+    job = DocumentIndexJob(document_id=document.id)
+    db_session.add(job)
+    db_session.commit()
+
+    class FakeTask:
+        max_retries = 3
+        request = type("Request", (), {"retries": 3})()
+
+        def retry(self, **_: object) -> None:
+            raise AssertionError("retry must not be scheduled after max retries")
+
+    with pytest.raises(RuntimeError, match="embedding service unavailable"):
+        knowledge_tasks._handle_indexing_failure(
+            task=FakeTask(),
+            db=db_session,
+            job_id=job.id,
+            exc=RuntimeError("embedding service unavailable"),
+        )
+
+    db_session.refresh(job)
+    assert job.status == DocumentIndexJobStatus.failed
+    assert job.error_message == "embedding service unavailable"
+    assert job.finished_at is not None
+
+
+def test_failed_embedding_schedules_a_retry(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _completed_document(test_user)
+    db_session.add(document)
+    db_session.flush()
+    job = DocumentIndexJob(document_id=document.id)
+    db_session.add(job)
+    db_session.commit()
+
+    class RetryRequested(Exception):
+        pass
+
+    class FakeTask:
+        max_retries = 3
+        request = type("Request", (), {"retries": 0})()
+
+        def retry(self, *, exc: Exception, countdown: int) -> None:
+            assert str(exc) == "embedding service unavailable"
+            assert countdown == settings.document_processing_retry_delay_seconds
+            raise RetryRequested()
+
+    with pytest.raises(RetryRequested):
+        knowledge_tasks._handle_indexing_failure(
+            task=FakeTask(),
+            db=db_session,
+            job_id=job.id,
+            exc=RuntimeError("embedding service unavailable"),
+        )
+
+    db_session.refresh(job)
+    assert job.status == DocumentIndexJobStatus.pending
+    assert job.error_message == "embedding service unavailable"
+    assert job.finished_at is None
+
+
+def test_failed_embedding_marks_job_failed_after_last_retry(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = _completed_document(test_user)
+    db_session.add(document)
+    db_session.flush()
+    job = DocumentIndexJob(document_id=document.id)
+    db_session.add(job)
+    db_session.commit()
+
+    class FakeTask:
+        max_retries = 3
+        request = type("Request", (), {"retries": 3})()
+
+        def retry(self, **_: object) -> None:
+            raise AssertionError("retry must not be scheduled after max retries")
+
+    with pytest.raises(RuntimeError, match="embedding service unavailable"):
+        knowledge_tasks._handle_indexing_failure(
+            task=FakeTask(),
+            db=db_session,
+            job_id=job.id,
+            exc=RuntimeError("embedding service unavailable"),
+        )
+
+    db_session.refresh(job)
+    assert job.status == DocumentIndexJobStatus.failed
+    assert job.error_message == "embedding service unavailable"
+    assert job.finished_at is not None

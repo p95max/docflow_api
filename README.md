@@ -429,6 +429,11 @@ docker compose run --rm api pytest
 docker compose run --rm api pytest tests/test_documents_upload.py
 docker compose run --rm api pytest tests/test_processing_jobs.py
 docker compose run --rm api pytest tests/test_text_extraction.py
+
+# Run real PostgreSQL + pgvector integration tests
+docker compose run --rm \
+  -e TEST_POSTGRESQL_URL=postgresql+psycopg://docsflow:docsflow@db:5432/docsflow \
+  api pytest -m postgres -q
 ```
 
 ### Windows (local Poetry environment)
@@ -441,6 +446,10 @@ python -m poetry run pytest -q
 # Example: backup tests only
 python -m poetry run pytest tests/test_backups.py -q
 ```
+
+PostgreSQL/pgvector integration tests are skipped locally unless
+`TEST_POSTGRESQL_URL` points to a disposable PostgreSQL database with the
+`vector` extension. The GitHub Actions workflow runs them in Docker Compose.
 
 ---
 
