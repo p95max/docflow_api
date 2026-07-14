@@ -72,6 +72,7 @@ def _render_backups_page(
         google_drive_folder_name=settings.google_drive_folder_name,
         created=request.query_params.get("created") == "1",
         deleted=request.query_params.get("deleted") == "1",
+        drive_file_retained=request.query_params.get("drive_file_retained") == "1",
         google_connected=request.query_params.get("google_connected") == "1",
         google_disconnected=request.query_params.get("google_disconnected") == "1",
         error=error,
@@ -373,33 +374,30 @@ def delete_backup_submit(
             status_code=status.HTTP_409_CONFLICT,
         )
 
+    drive_file_retained = False
     if job.drive_file_id:
         connection = get_google_drive_connection(db=db, user_id=current_user.id)
         if connection is None:
-            return _render_backups_page(
-                request=request,
-                db=db,
-                current_user=current_user,
-                error="Connect Google Drive before deleting this backup file.",
-                status_code=status.HTTP_409_CONFLICT,
-            )
-        try:
-            delete_gzip_backup(
-                file_id=job.drive_file_id,
-                refresh_token=connection.refresh_token,
-            )
-        except RuntimeError as exc:
-            return _render_backups_page(
-                request=request,
-                db=db,
-                current_user=current_user,
-                error=str(exc),
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+            drive_file_retained = True
+        else:
+            try:
+                delete_gzip_backup(
+                    file_id=job.drive_file_id,
+                    refresh_token=connection.refresh_token,
+                )
+            except RuntimeError as exc:
+                return _render_backups_page(
+                    request=request,
+                    db=db,
+                    current_user=current_user,
+                    error=str(exc),
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
     delete_backup_job(db=db, backup_id=backup_id, owner_id=current_user.id)
+    redirect_suffix = "&drive_file_retained=1" if drive_file_retained else ""
     return RedirectResponse(
-        url="/backups?deleted=1",
+        url=f"/backups?deleted=1{redirect_suffix}",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

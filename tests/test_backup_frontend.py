@@ -109,6 +109,27 @@ def test_failed_backup_can_be_deleted_from_history(
     assert db_session.get(BackupJob, job.id) is None
 
 
+def test_backup_record_can_be_deleted_when_google_drive_is_disconnected(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+) -> None:
+    job = BackupJob(
+        owner_id=test_user.id,
+        status=BackupJobStatus.completed,
+        drive_file_id="drive-file-id",
+    )
+    db_session.add(job)
+    db_session.commit()
+    _login(client, test_user)
+
+    response = client.post(f"/backups/{job.id}/delete", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/backups?deleted=1&drive_file_retained=1"
+    assert db_session.get(BackupJob, job.id) is None
+
+
 def test_backup_status_endpoint_returns_only_the_owner_job(
     client: TestClient,
     test_user: User,

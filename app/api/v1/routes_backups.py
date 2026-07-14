@@ -88,20 +88,16 @@ def delete_backup(
 
     if job.drive_file_id:
         connection = get_google_drive_connection(db=db, user_id=current_user.id)
-        if connection is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Connect Google Drive before deleting this backup file.",
-            )
-        try:
-            delete_gzip_backup(
-                file_id=job.drive_file_id,
-                refresh_token=connection.refresh_token,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=str(exc),
-            ) from exc
+        if connection is not None:
+            try:
+                delete_gzip_backup(
+                    file_id=job.drive_file_id,
+                    refresh_token=connection.refresh_token,
+                )
+            except RuntimeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=str(exc),
+                ) from exc
 
     delete_backup_job(db=db, backup_id=backup_id, owner_id=current_user.id)

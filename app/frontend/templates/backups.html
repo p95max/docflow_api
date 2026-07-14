@@ -36,6 +36,12 @@
     <div class="alert alert-success" role="alert">Backup deleted.</div>
   {% endif %}
 
+  {% if drive_file_retained %}
+    <div class="alert alert-warning" role="alert">
+      The backup record was deleted. Its Google Drive file remains because Drive is disconnected.
+    </div>
+  {% endif %}
+
   {% if google_connected %}
     <div class="alert alert-success" role="alert">
       Google Drive connected successfully. Backups will now be uploaded to this Google account.
