@@ -124,12 +124,17 @@ def _is_indexable(document: Document | None) -> bool:
 
 
 def _indexing_pages(document: Document) -> list[ExtractedTextPage]:
-    """Use original page extraction when available, otherwise index restored raw text."""
-    if document.storage_key:
+    """Preserve source pages, falling back to restored raw text without a file."""
+    try:
         return extract_text_pages_from_document(document)
-    if document.raw_text:
-        return [ExtractedTextPage(page_number=1, text=document.raw_text)]
-    return []
+    except ValueError as exc:
+        if (
+            not document.storage_key
+            and document.raw_text
+            and str(exc) == "Document has no storage key."
+        ):
+            return [ExtractedTextPage(page_number=1, text=document.raw_text)]
+        raise
 
 
 def _existing_chunks_match(*, db, document: Document, drafts) -> bool:
