@@ -27,8 +27,8 @@
   </div>
 
   {% if created %}
-    <div class="alert alert-success" role="alert">
-      Backup job created. Refresh this page to see the final status.
+    <div class="alert alert-success" role="alert" data-backup-created-message>
+      Backup job created. Its status updates automatically.
     </div>
   {% endif %}
 
@@ -107,15 +107,13 @@
           </thead>
           <tbody>
             {% for job in backup_jobs %}
-              <tr>
+              <tr{% if job.status.value in ("pending", "running") %} data-backup-status-url="/backups/{{ job.id }}/status" data-backup-id="{{ job.id }}"{% endif %}>
                 <td class="text-nowrap">{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
                 <td>
-                  <span class="badge {{ job.status|status_badge_class }}">{{ job.status.value }}</span>
-                  {% if job.error_message %}
-                    <div class="small text-danger mt-1">{{ job.error_message }}</div>
-                  {% endif %}
+                  <span class="badge {{ job.status|status_badge_class }}" data-backup-status>{{ job.status.value }}</span>
+                  <div class="small text-danger mt-1{% if not job.error_message %} d-none{% endif %}" data-backup-error>{{ job.error_message or "" }}</div>
                 </td>
-                <td>
+                <td data-backup-file>
                   {% if job.drive_web_view_link %}
                     <a href="{{ job.drive_web_view_link }}" target="_blank" rel="noopener noreferrer">
                       {{ job.drive_file_name or "Open in Google Drive" }}
@@ -124,15 +122,15 @@
                     {{ job.drive_file_name or "—" }}
                   {% endif %}
                 </td>
-                <td class="text-nowrap">{{ job.compressed_size_bytes|file_size }}</td>
-                <td>
+                <td class="text-nowrap" data-backup-size>{{ job.compressed_size_bytes|file_size }}</td>
+                <td data-backup-checksum>
                   {% if job.checksum_sha256 %}
                     <code title="{{ job.checksum_sha256 }}">{{ job.checksum_sha256[:12] }}…</code>
                   {% else %}
                     —
                   {% endif %}
                 </td>
-                <td class="text-end">
+                <td class="text-end" data-backup-actions>
                   <div class="d-inline-flex gap-2">
                     {% if job.status.value == "completed" and job.drive_file_id %}
                       <a class="btn btn-sm btn-outline-primary" href="/backups/{{ job.id }}/download">Download JSON</a>
@@ -164,4 +162,94 @@
       </p>
     </div>
   {% endif %}
+
+  <script>
+    (() => {
+      const badgeClasses = {
+        pending: "text-bg-secondary",
+        running: "text-bg-info",
+        completed: "text-bg-success",
+        failed: "text-bg-danger",
+      };
+      const formatFileSize = (bytes) => bytes == null ? "—" : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      const createDeleteForm = (id) => {
+        const form = document.createElement("form");
+        form.method = "post";
+        form.action = `/backups/${id}/delete`;
+        const button = document.createElement("button");
+        button.className = "btn btn-sm btn-outline-danger";
+        button.type = "submit";
+        button.textContent = "Delete";
+        form.append(button);
+        return form;
+      };
+      const updateActions = (row, backup) => {
+        const actions = row.querySelector("[data-backup-actions]");
+        if (!actions) return;
+        const container = document.createElement("div");
+        container.className = "d-inline-flex gap-2";
+        if (backup.status === "completed" && backup.drive_file_id) {
+          const download = document.createElement("a");
+          download.className = "btn btn-sm btn-outline-primary";
+          download.href = `/backups/${backup.id}/download`;
+          download.textContent = "Download JSON";
+          container.append(download);
+        }
+        container.append(createDeleteForm(backup.id));
+        actions.replaceChildren(container);
+      };
+      const updateFile = (row, backup) => {
+        const file = row.querySelector("[data-backup-file]");
+        if (!file) return;
+        file.replaceChildren();
+        if (backup.drive_web_view_link) {
+          const link = document.createElement("a");
+          link.href = backup.drive_web_view_link;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = backup.drive_file_name || "Open in Google Drive";
+          file.append(link);
+        } else {
+          file.textContent = backup.drive_file_name || "—";
+        }
+      };
+      const updateRow = (row, backup) => {
+        const badge = row.querySelector("[data-backup-status]");
+        badge.className = `badge ${badgeClasses[backup.status] || "text-bg-secondary"}`;
+        badge.textContent = backup.status;
+        const error = row.querySelector("[data-backup-error]");
+        error.textContent = backup.error_message || "";
+        error.classList.toggle("d-none", !backup.error_message);
+        row.querySelector("[data-backup-size]").textContent = formatFileSize(backup.compressed_size_bytes);
+        const checksum = row.querySelector("[data-backup-checksum]");
+        checksum.textContent = backup.checksum_sha256 ? `${backup.checksum_sha256.slice(0, 12)}…` : "—";
+        updateFile(row, backup);
+        if (backup.status === "completed" || backup.status === "failed") {
+          row.removeAttribute("data-backup-status-url");
+          updateActions(row, backup);
+          const message = document.querySelector("[data-backup-created-message]");
+          if (message) {
+            message.className = `alert ${backup.status === "completed" ? "alert-success" : "alert-danger"}`;
+            message.textContent = backup.status === "completed" ? "Backup completed." : "Backup failed.";
+          }
+        }
+      };
+      document.querySelectorAll("[data-backup-status-url]").forEach((row) => {
+        const poll = async () => {
+          try {
+            const response = await fetch(row.dataset.backupStatusUrl, { credentials: "same-origin", cache: "no-store" });
+            if (!response.ok) return;
+            const backup = await response.json();
+            updateRow(row, backup);
+            if (backup.status === "pending" || backup.status === "running") {
+              window.setTimeout(poll, 2500);
+            }
+          } catch (_) {
+            window.setTimeout(poll, 5000);
+          }
+        };
+        poll();
+      });
+    })();
+  </script>
 {% endblock %}

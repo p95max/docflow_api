@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import jwt
 from fastapi import APIRouter, Depends, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -295,6 +295,45 @@ def run_backup_submit(
     return RedirectResponse(
         url="/backups?created=1",
         status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get(
+    "/backups/{backup_id}/status",
+    response_model=None,
+)
+def get_backup_status(
+    backup_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    job = get_backup_job(
+        db=db,
+        backup_id=backup_id,
+        owner_id=current_user.id,
+    )
+    if job is None:
+        return JSONResponse(
+            {"detail": "Backup job not found."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    return JSONResponse(
+        {
+            "id": job.id,
+            "status": job.status.value,
+            "error_message": job.error_message,
+            "drive_file_id": job.drive_file_id,
+            "drive_file_name": job.drive_file_name,
+            "drive_web_view_link": job.drive_web_view_link,
+            "compressed_size_bytes": job.compressed_size_bytes,
+            "checksum_sha256": job.checksum_sha256,
+        },
+        headers={"Cache-Control": "no-store"},
     )
 
 
