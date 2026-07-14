@@ -11,7 +11,10 @@ from app.models.document_index_job import DocumentIndexJob, DocumentIndexJobStat
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.services.document_chunking import build_document_chunk_drafts
 from app.services.embeddings import create_embeddings
-from app.services.text_extraction import extract_text_pages_from_document
+from app.services.text_extraction import (
+    ExtractedTextPage,
+    extract_text_pages_from_document,
+)
 from app.worker import celery_app
 
 
@@ -48,7 +51,7 @@ def index_document_task(self, index_job_id: int) -> None:
         _mark_job_running(db=db, job=job, attempts=self.request.retries + 1)
 
         try:
-            pages = extract_text_pages_from_document(document)
+            pages = _indexing_pages(document)
             drafts = build_document_chunk_drafts(pages=pages)
             if not drafts:
                 raise ValueError("Document does not contain indexable text.")
@@ -118,6 +121,15 @@ def _is_indexable(document: Document | None) -> bool:
         and document.deleted_at is None
         and document.raw_text
     )
+
+
+def _indexing_pages(document: Document) -> list[ExtractedTextPage]:
+    """Use original page extraction when available, otherwise index restored raw text."""
+    if document.storage_key:
+        return extract_text_pages_from_document(document)
+    if document.raw_text:
+        return [ExtractedTextPage(page_number=1, text=document.raw_text)]
+    return []
 
 
 def _existing_chunks_match(*, db, document: Document, drafts) -> bool:
