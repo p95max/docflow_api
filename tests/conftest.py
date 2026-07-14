@@ -50,6 +50,8 @@ from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().
 from app.models.document import Document  # noqa: F401, E402
+from app.models.document_chunk import DocumentChunk  # noqa: F401, E402
+from app.models.document_index_job import DocumentIndexJob  # noqa: F401, E402
 from app.models.processing_job import ProcessingJob  # noqa: F401, E402
 from app.models.user import User  # noqa: F401, E402
 

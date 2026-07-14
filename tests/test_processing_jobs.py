@@ -454,6 +454,11 @@ def _patch_task_session(
         "SessionLocal",
         lambda: SessionLocalOverride(db_session),
     )
+    monkeypatch.setattr(
+        document_tasks,
+        "enqueue_document_index_job",
+        lambda **_: None,
+    )
 
 
 def _create_document_with_file(

@@ -5,6 +5,7 @@ from app.api.v1 import (
     routes_backups,
     routes_document_deletion,
     routes_documents,
+    routes_knowledge,
     routes_users,
 )
 
@@ -38,4 +39,10 @@ router.include_router(
     routes_backups.router,
     prefix="/backups",
     tags=["backups"],
+)
+
+router.include_router(
+    routes_knowledge.router,
+    prefix="/knowledge",
+    tags=["knowledge"],
 )

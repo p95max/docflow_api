@@ -5,7 +5,7 @@ import pytest
 from PIL import Image
 
 from app.services import text_extraction
-from app.services.text_extraction import extract_text_from_file
+from app.services.text_extraction import extract_text_from_file, extract_text_pages_from_file
 
 
 PDF_WITH_TEXT_BYTES = b"""%PDF-1.4
@@ -60,6 +60,26 @@ def test_extract_text_from_pdf_returns_plain_text(tmp_path: Path) -> None:
 
     assert "Invoice number 12345" in text
     assert "Amount 99.95 EUR" in text
+
+
+def test_extract_text_pages_from_pdf_preserves_page_numbers(tmp_path: Path) -> None:
+    file_path = tmp_path / "pages.pdf"
+    with fitz.open() as pdf_document:
+        first_page = pdf_document.new_page()
+        first_page.insert_text((72, 72), "First page text")
+        second_page = pdf_document.new_page()
+        second_page.insert_text((72, 72), "Second page text")
+        pdf_document.save(file_path)
+
+    pages = extract_text_pages_from_file(
+        file_path=file_path,
+        content_type="application/pdf",
+    )
+
+    assert [(page.page_number, page.text) for page in pages] == [
+        (1, "First page text"),
+        (2, "Second page text"),
+    ]
 
 
 def test_extract_text_from_scanned_pdf_uses_local_ocr(

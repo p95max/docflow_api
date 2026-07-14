@@ -190,14 +190,115 @@ GET  /backups/{backup_id}
 ## MVP 3 — Knowledge Base / RAG
 
 - [ ] Q&A over uploaded documents
-- [ ] Search across document content
+- [x] Search across document content
 - [ ] Source snippets
-- [ ] Limit context to user's own documents
+- [x] Limit context to user's own documents
 - [ ] Conversation history
-- [ ] Chunk `raw_text`
-- [ ] Generate embeddings
-- [ ] Store vectors in pgvector
-- [ ] Semantic search before Q&A
+- [x] Chunk `raw_text`
+- [x] Generate embeddings
+- [x] Store vectors in pgvector
+- [x] Semantic search before Q&A
+
+### Implementation Plan
+
+#### MVP 3.1 — Document Indexing and Semantic Search
+
+- [x] Replace the PostgreSQL Docker image with `pgvector/pgvector:pg16`
+- [x] Add the `pgvector` Python dependency
+- [x] Add Alembic migration with `CREATE EXTENSION IF NOT EXISTS vector`
+- [x] Add `DocumentChunk` model:
+  - `document_id`
+  - `owner_id`
+  - `chunk_index`
+  - `content`
+  - `page_from` / `page_to`
+  - `token_count`
+  - `content_sha256`
+  - `embedding`
+  - `embedding_model`
+  - `created_at`
+- [x] Add `DocumentIndexJob` with statuses:
+  - `pending`
+  - `running`
+  - `completed`
+  - `failed`
+- [x] Preserve page numbers during PDF text extraction
+- [x] Treat JPG and PNG documents as page 1
+- [x] Split extracted text into chunks of approximately 500–800 tokens
+- [x] Add approximately 100 tokens of overlap between adjacent chunks
+- [ ] Keep paragraph boundaries where possible
+- [x] Configure embeddings separately from the answer model:
+  - `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`
+  - `OPENAI_EMBEDDING_DIMENSIONS=1536`
+- [x] Generate embeddings in a separate Celery task
+- [x] Do not fail completed document processing when indexing fails
+- [x] Make indexing idempotent using content hash and embedding model
+- [x] Replace old chunks only after all new embeddings are ready
+- [x] Add semantic search service using cosine distance
+- [x] Start with exact pgvector search; add HNSW only after benchmarks
+- [x] Add endpoint `POST /api/v1/knowledge/search`
+- [x] Return document name, page number, snippet, and similarity score
+
+#### MVP 3.2 — Conversations and Q&A
+
+- [ ] Add `KnowledgeConversation` model owned by a user
+- [ ] Add `KnowledgeMessage` model with `user` / `assistant` roles
+- [ ] Add `KnowledgeMessageSource` model
+- [ ] Store a snapshot of filename, page, snippet, and score for each source
+- [ ] Extend AI usage logging for embeddings and multi-document Q&A
+- [ ] Add a shared OpenAI client factory for extraction, embeddings, and Q&A
+- [ ] Implement the RAG flow:
+  1. Validate conversation ownership
+  2. Embed the user question
+  3. Retrieve the nearest owned active document chunks
+  4. Build a size-limited context
+  5. Generate an answer grounded only in the retrieved context
+  6. Validate returned source references against retrieved chunks
+  7. Persist the question, answer, usage, and sources
+- [ ] Return a clear "not found in documents" answer when context is insufficient
+- [ ] Treat document content as untrusted input in the RAG prompt
+- [ ] Limit conversation history by message count and token budget
+- [ ] Add endpoints:
+  - `POST /api/v1/knowledge/conversations`
+  - `GET /api/v1/knowledge/conversations`
+  - `GET /api/v1/knowledge/conversations/{conversation_id}`
+  - `POST /api/v1/knowledge/conversations/{conversation_id}/messages`
+
+#### MVP 3.3 — Bootstrap UI and Operations
+
+- [ ] Add server-rendered `/knowledge` page without JavaScript
+- [ ] Add conversation list and conversation detail pages
+- [ ] Add question form and render source cards under each answer
+- [ ] Link sources to the owned document and show page numbers
+- [ ] Display document indexing status and errors
+- [ ] Add a manual reindex action
+- [ ] Exclude deleted documents from retrieval without deleting conversation history
+- [ ] Exclude chunks and conversation content from Google Drive JSON backup
+- [ ] Document RAG configuration and indexing commands in README
+
+#### Security and Confidential Mode
+
+- [x] Always filter retrieval by `owner_id`
+- [x] Always exclude documents with `deleted_at IS NOT NULL`
+- [x] Validate requested document IDs belong to the current user
+- [x] Do not send `confidential` documents to external embeddings or Q&A APIs
+- [ ] Show that confidential documents are unavailable in Knowledge Base
+- [ ] Add a separate local embedding and local LLM design before supporting
+  confidential documents in RAG
+
+#### Testing Focus
+
+- [x] Test deterministic page-aware chunking and overlap
+- [ ] Test failed embedding retries
+- [x] Test idempotent reindexing
+- [ ] Test semantic ranking against PostgreSQL with pgvector enabled
+- [ ] Test that another user's chunks never appear in search or Q&A
+- [ ] Test that soft-deleted documents never appear in retrieval
+- [x] Test that confidential documents never trigger external AI calls
+- [ ] Test that source IDs cannot be invented by the answer model
+- [ ] Test conversation ownership and history isolation
+- [x] Keep SQLite unit tests for pure services and models
+- [ ] Add PostgreSQL integration tests for vector queries and indexes
 
 ---
 

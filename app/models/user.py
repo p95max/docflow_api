@@ -44,3 +44,9 @@ class User(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+    document_chunks = relationship(
+        "DocumentChunk",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )

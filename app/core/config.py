@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_request_timeout_seconds: int = 45
     openai_max_input_chars: int = 12000
+    openai_embedding_model: str = "text-embedding-3-small"
+    openai_embedding_dimensions: int = 1536
+    document_indexing_soft_time_limit_seconds: int = 120
+    document_indexing_hard_time_limit_seconds: int = 180
+    document_indexing_batch_size: int = 64
+    document_chunk_size_tokens: int = 700
+    document_chunk_overlap_tokens: int = 100
 
     @property
     def upload_max_file_size_bytes(self) -> int:

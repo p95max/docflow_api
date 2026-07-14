@@ -15,6 +15,7 @@ from app.models.document import (
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
+from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.local_document_classification import classify_document_type
 from app.services.text_extraction import extract_text_from_document
 from app.worker import celery_app
@@ -80,6 +81,7 @@ def process_document_task(self, job_id: int) -> None:
             job.finished_at = datetime.now(UTC)
 
             db.commit()
+            enqueue_document_index_job(db=db, document=document)
 
         except SoftTimeLimitExceeded as exc:
             _handle_processing_failure(

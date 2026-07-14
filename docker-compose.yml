@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: docsflow
       POSTGRES_USER: docsflow

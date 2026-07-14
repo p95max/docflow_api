@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,12 @@ class LocalOCRError(RuntimeError):
     """Raised when the local Tesseract OCR engine cannot process a document."""
 
 
+@dataclass(frozen=True)
+class ExtractedTextPage:
+    page_number: int
+    text: str
+
+
 def extract_text_from_document(document: "Document") -> str:
     """Extract text from a stored document using only local processing."""
     if not document.storage_key:
@@ -36,7 +43,27 @@ def extract_text_from_document(document: "Document") -> str:
     if not file_path.exists():
         raise FileNotFoundError(f"Stored file does not exist: {document.storage_key}")
 
-    return extract_text_from_file(
+    pages = extract_text_pages_from_file(
+        file_path=file_path,
+        content_type=document.content_type,
+    )
+    return _join_extracted_pages(pages)
+
+
+def extract_text_pages_from_document(document: "Document") -> list[ExtractedTextPage]:
+    """Extract local text while preserving source page numbers for indexing."""
+    if not document.storage_key:
+        raise ValueError("Document has no storage key.")
+
+    if document.content_type not in SUPPORTED_TEXT_EXTRACTION_MIME_TYPES:
+        raise ValueError(f"Unsupported document content type: {document.content_type}")
+
+    file_path = Path(settings.local_storage_path) / document.storage_key
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"Stored file does not exist: {document.storage_key}")
+
+    return extract_text_pages_from_file(
         file_path=file_path,
         content_type=document.content_type,
     )
@@ -44,33 +71,56 @@ def extract_text_from_document(document: "Document") -> str:
 
 def extract_text_from_file(file_path: Path, content_type: str) -> str:
     """Extract plain text from a local PDF, JPG or PNG file."""
+    return _join_extracted_pages(
+        extract_text_pages_from_file(
+            file_path=file_path,
+            content_type=content_type,
+        )
+    )
+
+
+def extract_text_pages_from_file(
+    file_path: Path,
+    content_type: str,
+) -> list[ExtractedTextPage]:
+    """Extract plain text with page numbers; images are represented as page 1."""
     if content_type == "application/pdf":
-        return _extract_text_from_pdf(file_path)
+        return _extract_text_pages_from_pdf(file_path)
 
     if content_type in {"image/jpeg", "image/png"}:
-        return _extract_text_from_image(file_path)
+        return [
+            ExtractedTextPage(
+                page_number=1,
+                text=_extract_text_from_image(file_path),
+            )
+        ]
 
     raise ValueError(f"Unsupported file content type: {content_type}")
 
 
-def _extract_text_from_pdf(file_path: Path) -> str:
+def _extract_text_pages_from_pdf(file_path: Path) -> list[ExtractedTextPage]:
     try:
         with fitz.open(file_path) as pdf_document:
-            pages_text: list[str] = []
+            pages: list[ExtractedTextPage] = []
 
-            for page in pdf_document:
+            for page_number, page in enumerate(pdf_document, start=1):
                 page_text = page.get_text("text").strip()
 
                 if not page_text:
                     page_text = _extract_text_from_pdf_page_image(page)
 
-                pages_text.append(page_text)
+                pages.append(
+                    ExtractedTextPage(
+                        page_number=page_number,
+                        text=_normalize_extracted_text(page_text),
+                    )
+                )
     except LocalOCRError:
         raise
     except Exception as exc:
         raise ValueError(f"Could not extract text from PDF: {file_path.name}") from exc
 
-    return _normalize_extracted_text("\n\n".join(pages_text))
+    return pages
 
 
 def _extract_text_from_pdf_page_image(page: fitz.Page) -> str:
@@ -140,3 +190,9 @@ def _normalize_extracted_text(text: str) -> str:
         previous_line_empty = False
 
     return "\n".join(normalized_lines).strip()
+
+
+def _join_extracted_pages(pages: list[ExtractedTextPage]) -> str:
+    return _normalize_extracted_text(
+        "\n\n".join(page.text for page in pages if page.text)
+    )
