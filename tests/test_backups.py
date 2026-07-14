@@ -47,7 +47,7 @@ def _connect_drive(db: Session, user: User) -> GoogleDriveConnection:
     return connection
 
 
-def test_backup_archive_contains_records_and_excludes_password_hash(
+def test_backup_archive_excludes_sensitive_credentials_and_document_text(
     db_session: Session,
     test_user: User,
 ) -> None:
@@ -60,7 +60,7 @@ def test_backup_archive_contains_records_and_excludes_password_hash(
         file_size_bytes=1234,
         checksum_sha256="a" * 64,
         storage_key="1/invoice.pdf",
-        raw_text="Invoice text",
+        raw_text="Sensitive invoice text that must not leave the database.",
         ai_extracted_data={"document_type": "invoice", "amount": 49.99},
     )
     db_session.add(document)
@@ -73,10 +73,13 @@ def test_backup_archive_contains_records_and_excludes_password_hash(
     assert payload["schema_version"] == 1
     assert payload["records"]["users"][0]["email"] == test_user.email
     assert payload["records"]["documents"][0]["storage_key"] == "1/invoice.pdf"
-    assert payload["records"]["documents"][0]["raw_text"] == "Invoice text"
+    document_payload = payload["records"]["documents"][0]
+
+    assert "raw_text" not in document_payload
     assert "password_hash" not in serialized
     assert "refresh_token" not in serialized
     assert test_user.password_hash not in serialized
+    assert "Sensitive invoice text that must not leave the database." not in serialized
     assert archive.checksum_sha256
     assert archive.record_counts["documents"] == 1
 

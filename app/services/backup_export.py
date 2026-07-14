@@ -151,7 +151,6 @@ def _serialize_document(document: Document) -> dict[str, Any]:
         "file_size_bytes": document.file_size_bytes,
         "checksum_sha256": document.checksum_sha256,
         "storage_key": document.storage_key,
-        "raw_text": document.raw_text,
         "document_type": document.document_type,
         "ai_extracted_data": document.ai_extracted_data,
         "summary": document.summary,

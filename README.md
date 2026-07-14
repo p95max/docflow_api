@@ -397,6 +397,17 @@ docker compose run --rm api pytest tests/test_processing_jobs.py
 docker compose run --rm api pytest tests/test_text_extraction.py
 ```
 
+### Windows (local Poetry environment)
+
+FastAPI does not use `manage.py`; run pytest through Poetry:
+
+```powershell
+python -m poetry run pytest -q
+
+# Example: backup tests only
+python -m poetry run pytest tests/test_backups.py -q
+```
+
 ---
 
 ## Useful Development Commands

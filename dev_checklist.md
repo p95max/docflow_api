@@ -145,16 +145,16 @@ After AI extraction, user can manually correct fields:
 
 ### Features
 
-- [ ] JSON backup to Google Drive
+- [x] JSON backup to Google Drive
   MVP backup includes DB records and file metadata.
   Original uploaded files are not included in JSON backup.
-- [ ] Store backups in a dedicated GDrive folder (`/docsflow_backups`)
-- [ ] gzip compression
-- [ ] Backup metadata in DB
-- [ ] Manual backup trigger
-- [ ] Backup history
-- [ ] Statuses: `pending` / `running` / `completed` / `failed`
-- [ ] Exclude sensitive fields
+- [x] Store backups in a dedicated GDrive folder (`/docsflow_backups`)
+- [x] gzip compression
+- [x] Backup metadata in DB
+- [x] Manual backup trigger
+- [x] Backup history
+- [x] Statuses: `pending` / `running` / `completed` / `failed`
+- [x] Exclude sensitive fields
 
 ### Endpoints
 ```text
@@ -304,8 +304,8 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 - [ ] Validate AI JSON response with Pydantic
 - [ ] Save OpenAI usage log
 - [x] Apply manual correction
-- [ ] Create Google Drive backup
-- [ ] Exclude sensitive fields from backup
+- [x] Create Google Drive backup
+- [x] Exclude sensitive fields from backup
 - [ ] Search by document type
 - [ ] Search by deadline / due date
 
@@ -336,6 +336,7 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 
 **Excluded:**
 - Original uploaded PDF / image files
+- Extracted document `raw_text`
 - Password hashes
 - OAuth tokens
 - Refresh tokens
