@@ -14,6 +14,7 @@ from app.models.openai_usage_log import OpenAIUsageLog
 from app.schemas.knowledge import SemanticSearchResult
 from app.services.openai_client import create_openai_client, extract_openai_usage
 from app.services.semantic_search import search_document_chunks
+from app.services.structured_knowledge_queries import answer_structured_question
 
 
 NO_ANSWER_MESSAGE = "I couldn't find that in your uploaded documents."
@@ -113,6 +114,20 @@ def answer_conversation_question(
     db.flush()
 
     try:
+        structured_answer = answer_structured_question(
+            db=db,
+            owner_id=owner_id,
+            question=question,
+        )
+        if structured_answer is not None:
+            return _persist_answer(
+                db=db,
+                conversation=conversation,
+                user_message=user_message,
+                answer=structured_answer.answer,
+                sources=structured_answer.sources,
+            )
+
         search_results = search_document_chunks(
             db=db,
             owner_id=owner_id,
