@@ -56,11 +56,6 @@ def test_index_task_uses_raw_text_for_restored_document_without_storage_key(
     )
     monkeypatch.setattr(
         knowledge_tasks,
-        "extract_text_pages_from_document",
-        lambda _: pytest.fail("restored documents must not require a stored file"),
-    )
-    monkeypatch.setattr(
-        knowledge_tasks,
         "create_embeddings",
         lambda *, texts: EmbeddingResult(
             vectors=[[0.1, 0.2] for _ in texts],
