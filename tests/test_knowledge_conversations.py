@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -48,21 +50,47 @@ def _search_result() -> SemanticSearchResult:
         filename="invoice.pdf",
         page_from=2,
         page_to=2,
-        snippet="Invoice total is 42 EUR and due on 2026-08-01.",
+        snippet="Invoice total is 950 USD and payment is due 30 days after issue.",
         score=0.91,
+        document_type="invoice",
+        sender="YesLogic Pty. Ltd.",
+        summary="Invoice for Prince Upgrades & Support.",
+        amount=Decimal("950.00"),
+        currency="USD",
+        document_date=date(2016, 11, 26),
+        deadline=date(2016, 12, 26),
     )
 
 
-def test_question_schema_limits_user_to_one_short_sentence() -> None:
-    assert KnowledgeQuestionCreate(question="  Which invoices are due?  ").question == (
-        "Which invoices are due?"
-    )
-
-    with pytest.raises(ValidationError):
-        KnowledgeQuestionCreate(question="Which invoices are due? Which are overdue?")
+def test_question_schema_normalizes_without_sentence_counting() -> None:
+    assert KnowledgeQuestionCreate(
+        question="  What is due to YesLogic Pty. Ltd.?  "
+    ).question == "What is due to YesLogic Pty. Ltd.?"
+    assert KnowledgeQuestionCreate(
+        question="Which invoices are due? Include overdue items."
+    ).question == "Which invoices are due? Include overdue items."
 
     with pytest.raises(ValidationError):
         KnowledgeQuestionCreate(question="x" * 301)
+
+
+def test_rag_input_includes_current_date_and_structured_metadata() -> None:
+    rag_input = knowledge_conversations._build_rag_input(
+        question="When is invoice 161126 due?",
+        history=[],
+        sources=[_search_result()],
+        current_date=date(2026, 7, 14),
+    )
+
+    assert "Current UTC date:\n2026-07-14" in rag_input
+    assert "Structured metadata:" in rag_input
+    assert "document_type: invoice" in rag_input
+    assert "sender: YesLogic Pty. Ltd." in rag_input
+    assert "amount: 950.00" in rag_input
+    assert "currency: USD" in rag_input
+    assert "document_date: 2016-11-26" in rag_input
+    assert "deadline: 2016-12-26" in rag_input
+    assert "Document text:" in rag_input
 
 
 def test_rag_answer_persists_verified_sources_and_usage(
@@ -85,7 +113,7 @@ def test_rag_answer_persists_verified_sources_and_usage(
         "create_openai_client",
         lambda: _FakeClient(
             {
-                "answer": "The invoice is due on 2026-08-01.",
+                "answer": "The invoice is due on 2016-12-26.",
                 "source_chunk_ids": [42],
             }
         ),
@@ -100,7 +128,7 @@ def test_rag_answer_persists_verified_sources_and_usage(
 
     assert user_message.role == KnowledgeMessageRole.user
     assert assistant_message.role == KnowledgeMessageRole.assistant
-    assert assistant_message.content == "The invoice is due on 2026-08-01."
+    assert assistant_message.content == "The invoice is due on 2016-12-26."
     assert len(assistant_message.sources) == 1
     source = assistant_message.sources[0]
     assert source.chunk_id == 42
