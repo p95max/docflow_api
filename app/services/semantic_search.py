@@ -42,6 +42,13 @@ def search_document_chunks(
         select(
             DocumentChunk,
             Document.original_filename,
+            Document.document_type,
+            Document.sender,
+            Document.summary,
+            Document.amount,
+            Document.currency,
+            Document.document_date,
+            Document.deadline,
             distance,
         )
         .join(Document, Document.id == DocumentChunk.document_id)
@@ -60,8 +67,26 @@ def search_document_chunks(
             page_to=chunk.page_to,
             snippet=chunk.content,
             score=round(1 - float(distance_value), 6),
+            document_type=document_type,
+            sender=sender,
+            summary=summary,
+            amount=amount,
+            currency=currency,
+            document_date=document_date,
+            deadline=deadline,
         )
-        for chunk, filename, distance_value in rows
+        for (
+            chunk,
+            filename,
+            document_type,
+            sender,
+            summary,
+            amount,
+            currency,
+            document_date,
+            deadline,
+            distance_value,
+        ) in rows
     ]
 
 
