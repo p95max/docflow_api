@@ -15,6 +15,7 @@ from app.schemas.knowledge import (
 from app.services.knowledge_conversations import (
     answer_conversation_question,
     create_conversation,
+    delete_conversation,
     get_owned_conversation,
     list_conversations,
 )
@@ -100,6 +101,29 @@ def get_knowledge_conversation(
     _require_knowledge_enabled()
     try:
         return get_owned_conversation(
+            db=db,
+            owner_id=current_user.id,
+            conversation_id=conversation_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/conversations/{conversation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_knowledge_conversation(
+    conversation_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> None:
+    _require_knowledge_enabled()
+    try:
+        delete_conversation(
             db=db,
             owner_id=current_user.id,
             conversation_id=conversation_id,

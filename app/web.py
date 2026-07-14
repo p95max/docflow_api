@@ -47,6 +47,7 @@ from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.knowledge_conversations import (
     answer_conversation_question,
     create_conversation,
+    delete_conversation,
     get_owned_conversation,
     list_conversations,
 )
@@ -602,6 +603,46 @@ def create_knowledge_conversation_submit(
     )
     return RedirectResponse(
         url=f"/knowledge/conversations/{conversation.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/knowledge/conversations/{conversation_id}/delete",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def delete_knowledge_conversation_submit(
+    conversation_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    if not settings.knowledge_enabled:
+        return _knowledge_disabled_response(
+            request=request,
+            current_user=current_user,
+        )
+
+    try:
+        delete_conversation(
+            db=db,
+            owner_id=current_user.id,
+            conversation_id=conversation_id,
+        )
+    except LookupError as exc:
+        return _render_knowledge_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    return RedirectResponse(
+        url="/knowledge",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

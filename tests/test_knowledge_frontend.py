@@ -52,6 +52,7 @@ def test_knowledge_page_is_server_rendered_and_lists_indexing_status(
     assert "Document indexing" in response.text
     assert "Unavailable: confidential document" in response.text
     assert 'action="/knowledge/documents/' in response.text
+    assert 'aria-label="Delete conversation"' not in response.text
     assert "<script" not in response.text
 
 
@@ -75,7 +76,34 @@ def test_knowledge_conversation_page_has_short_question_form(
     assert 'maxlength="300"' in response.text
     assert "Which invoices are due this month?" in response.text
     assert "Ask a concise question" in response.text
+    assert f'action="/knowledge/conversations/{conversation.id}/delete"' in response.text
     assert "<script" not in response.text
+
+
+def test_knowledge_conversation_can_be_deleted_from_conversation_list(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+) -> None:
+    conversation = KnowledgeConversation(owner_id=test_user.id, title="Invoices")
+    db_session.add(conversation)
+    db_session.commit()
+    _login(client, test_user)
+
+    list_response = client.get("/knowledge")
+
+    assert list_response.status_code == 200
+    assert f'action="/knowledge/conversations/{conversation.id}/delete"' in list_response.text
+    assert 'aria-label="Delete conversation"' in list_response.text
+
+    response = client.post(
+        f"/knowledge/conversations/{conversation.id}/delete",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/knowledge"
+    assert db_session.get(KnowledgeConversation, conversation.id) is None
 
 
 def test_knowledge_message_timestamp_uses_berlin_time() -> None:

@@ -90,6 +90,25 @@ def get_owned_conversation(
     return conversation
 
 
+def delete_conversation(
+    *,
+    db: Session,
+    owner_id: int,
+    conversation_id: int,
+) -> None:
+    conversation = db.scalar(
+        select(KnowledgeConversation).where(
+            KnowledgeConversation.id == conversation_id,
+            KnowledgeConversation.owner_id == owner_id,
+        )
+    )
+    if conversation is None:
+        raise LookupError("Knowledge conversation not found")
+
+    db.delete(conversation)
+    db.commit()
+
+
 def answer_conversation_question(
     *,
     db: Session,

@@ -38,10 +38,19 @@
         {% if conversations %}
           <div class="list-group list-group-flush">
             {% for conversation in conversations %}
-              <a class="list-group-item list-group-item-action" href="/knowledge/conversations/{{ conversation.id }}">
-                <span class="d-block fw-semibold">{{ conversation.title or "Untitled conversation" }}</span>
-                <small class="text-secondary">Updated {{ conversation.updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
-              </a>
+              <div class="list-group-item d-flex align-items-center gap-3">
+                <a class="flex-grow-1 text-decoration-none" href="/knowledge/conversations/{{ conversation.id }}">
+                  <span class="d-block fw-semibold">{{ conversation.title or "Untitled conversation" }}</span>
+                  <small class="text-secondary">Updated {{ conversation.updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
+                </a>
+                <form method="post" action="/knowledge/conversations/{{ conversation.id }}/delete">
+                  <button class="btn btn-sm btn-outline-danger conversation-delete-button" type="submit" aria-label="Delete conversation" title="Delete conversation">
+                    <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
+                      <path d="M5.5 5.5v6m2.5-6v6m2.5-6v6M3.5 3.5h9m-6-2h3l.5 2h3v1h-11v-1h3l.5-2Zm-1 2 1 9h9l1-9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                </form>
+              </div>
             {% endfor %}
           </div>
         {% else %}

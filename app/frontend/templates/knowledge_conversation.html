@@ -9,6 +9,9 @@
       <h1 class="h3 mt-2 mb-1">{{ conversation.title or "Document chat" }}</h1>
       <p class="text-secondary mb-0">Answers use only your indexed, non-confidential documents.</p>
     </div>
+    <form method="post" action="/knowledge/conversations/{{ conversation.id }}/delete" class="align-self-md-end">
+      <button class="btn btn-outline-danger" type="submit">Delete conversation</button>
+    </form>
   </div>
 
   {% if error %}
