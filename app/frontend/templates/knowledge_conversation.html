@@ -27,12 +27,13 @@
   </div>
 
   {% if conversation.messages %}
-    <div class="vstack gap-3">
-      {% for message in conversation.messages|reverse %}
+    <div class="vstack gap-3 knowledge-message-list">
+      {% for message in conversation.messages %}
+        <div class="knowledge-message-row knowledge-message-row-{{ message.role.value }}">
         <article class="card shadow-sm knowledge-message knowledge-message-{{ message.role.value }}">
           <div class="card-body">
             <div class="d-flex justify-content-between gap-3 mb-2">
-              <h2 class="h6 mb-0">{{ "You" if message.role.value == "user" else "DocsFlow" }}</h2>
+              <h2 class="h6 mb-0 knowledge-message-author">{{ "You" if message.role.value == "user" else "DocsFlow" }}</h2>
               <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
             </div>
             <div class="knowledge-message-content">{{ message.content }}</div>
@@ -61,6 +62,7 @@
             {% endif %}
           </div>
         </article>
+        </div>
       {% endfor %}
     </div>
   {% else %}

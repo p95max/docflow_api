@@ -76,12 +76,53 @@ table th {
   overflow-wrap: anywhere;
 }
 
+.knowledge-message-list {
+  max-width: 62rem;
+}
+
+.knowledge-message-row {
+  display: flex;
+}
+
+.knowledge-message-row-user {
+  justify-content: flex-end;
+}
+
+.knowledge-message-row-assistant {
+  justify-content: flex-start;
+}
+
+.knowledge-message {
+  width: fit-content;
+  max-width: min(82%, 46rem);
+  border: 0;
+  border-radius: 1rem;
+}
+
+.knowledge-message .card-body {
+  padding: 0.875rem 1rem;
+}
+
 .knowledge-message-user {
-  border-left: 3px solid var(--docsflow-primary);
+  color: #fff;
+  background: linear-gradient(135deg, var(--docsflow-primary), #3858c8);
+  border-bottom-right-radius: 0.25rem;
 }
 
 .knowledge-message-assistant {
-  border-left: 3px solid var(--bs-success);
+  color: var(--bs-body-color);
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-bottom-left-radius: 0.25rem;
+}
+
+.knowledge-message-user .knowledge-message-author,
+.knowledge-message-user time {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.knowledge-message-user .knowledge-message-content {
+  color: #fff;
 }
 
 .source-card {
