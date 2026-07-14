@@ -127,7 +127,7 @@ def _decode_backup_json(*, content: bytes, recovery_key: str) -> bytes:
         raise RuntimeError("Recovery backup file is empty.")
 
     stripped = content.lstrip()
-    if stripped.startswith(b"{"):
+    if stripped.startswith((b"{", b"[")):
         # Compatibility with JSON files downloaded by older DocsFlow versions.
         return content
     if content.startswith(b"\x1f\x8b"):
