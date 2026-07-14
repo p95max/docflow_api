@@ -328,6 +328,10 @@ curl -X POST http://localhost:8000/api/v1/documents/upload \
 curl http://localhost:8000/api/v1/documents \
   -H "Authorization: Bearer $TOKEN"
 
+# Search, filter and paginate documents
+curl "http://localhost:8000/api/v1/documents?query=invoice&document_type=invoice&requires_action=true&page=1&page_size=25&sort_by=deadline" \
+  -H "Authorization: Bearer $TOKEN"
+
 # Get one document
 curl http://localhost:8000/api/v1/documents/1 \
   -H "Authorization: Bearer $TOKEN"

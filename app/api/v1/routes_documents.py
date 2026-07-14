@@ -36,8 +36,15 @@ from app.models.processing_job import (
 from app.schemas.document import (
     DocumentCorrection,
     DocumentFileUrl,
+    DocumentListRead,
     DocumentRead,
     DocumentResultRead,
+)
+from app.services.document_search import (
+    DocumentSearchFilters,
+    DocumentSortField,
+    SortDirection,
+    search_documents,
 )
 from app.schemas.processing_job import ProcessingJobRead
 from app.services.processing_jobs import (
@@ -188,19 +195,57 @@ async def upload_document(
 
 @router.get(
     "",
-    response_model=list[DocumentRead],
+    response_model=DocumentListRead,
 )
 def list_my_documents(
     db: DbSession,
     current_user: CurrentUser,
-) -> list[DocumentRead]:
-    stmt = (
-        select(Document)
-        .where(Document.owner_id == current_user.id)
-        .order_by(Document.created_at.desc())
+    query: Annotated[str | None, Query(max_length=500)] = None,
+    document_type: Annotated[str | None, Query(max_length=50)] = None,
+    status_filter: Annotated[DocumentStatus | None, Query(alias="status")] = None,
+    document_date_from: date | None = None,
+    document_date_to: date | None = None,
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
+    amount_min: Annotated[Decimal | None, Query(ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(ge=0)] = None,
+    deadline_from: date | None = None,
+    deadline_to: date | None = None,
+    requires_action: bool | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+    sort_by: DocumentSortField = "created_at",
+    sort_direction: SortDirection = "desc",
+) -> DocumentListRead:
+    documents, total = search_documents(
+        db=db,
+        owner_id=current_user.id,
+        filters=DocumentSearchFilters(
+            query=query,
+            document_type=document_type,
+            status=status_filter,
+            document_date_from=document_date_from,
+            document_date_to=document_date_to,
+            uploaded_from=uploaded_from,
+            uploaded_to=uploaded_to,
+            amount_min=amount_min,
+            amount_max=amount_max,
+            deadline_from=deadline_from,
+            deadline_to=deadline_to,
+            requires_action=requires_action,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+        ),
     )
-
-    return list(db.scalars(stmt).all())
+    return DocumentListRead(
+        items=documents,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size,
+    )
 
 
 @router.get(
@@ -660,7 +705,11 @@ def _get_owned_document(
 ) -> Document:
     document = db.get(Document, document_id)
 
-    if document is None or document.owner_id != current_user.id:
+    if (
+        document is None
+        or document.owner_id != current_user.id
+        or document.deleted_at is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",

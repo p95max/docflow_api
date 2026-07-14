@@ -171,19 +171,19 @@ GET  /backups/{backup_id}
 
 ### Features
 
-- [ ] Search by document name
-- [ ] Search by `raw_text`
-- [ ] Search by extracted fields
-- [ ] Filter by document type
-- [ ] Filter by status
-- [ ] Filter by document date
-- [ ] Filter by upload date
-- [ ] Filter by amount
-- [ ] Filter by deadline / due_date
-- [ ] Filter "requires action"
-- [ ] Pagination
-- [ ] Sorting
-- [ ] Soft delete
+- [x] Search by document name
+- [x] Search by `raw_text`
+- [x] Search by extracted fields
+- [x] Filter by document type
+- [x] Filter by status
+- [x] Filter by document date
+- [x] Filter by upload date
+- [x] Filter by amount
+- [x] Filter by deadline / due_date
+- [x] Filter "requires action"
+- [x] Pagination
+- [x] Sorting
+- [x] Soft delete
 
 ---
 

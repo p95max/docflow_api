@@ -52,7 +52,9 @@ class Document(Base):
             "owner_id",
             "checksum_sha256",
             unique=True,
-            postgresql_where=text("checksum_sha256 IS NOT NULL"),
+            postgresql_where=text(
+                "checksum_sha256 IS NOT NULL AND deleted_at IS NULL"
+            ),
         ),
         CheckConstraint(
             (
@@ -109,6 +111,12 @@ class Document(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        nullable=True,
     )
 
     owner = relationship("User", back_populates="documents")

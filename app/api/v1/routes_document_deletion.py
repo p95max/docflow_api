@@ -1,13 +1,9 @@
-import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.v1.dependencies import CurrentUser, DbSession
 from app.models.document import Document
-from app.services.storage import delete_document_file
-
-
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -20,26 +16,20 @@ def delete_document(
     db: DbSession,
     current_user: CurrentUser,
 ) -> Response:
-    """Delete an owned document and its locally stored file."""
+    """Soft-delete an owned document while retaining its audit trail."""
     document = db.get(Document, document_id)
 
-    if document is None or document.owner_id != current_user.id:
+    if (
+        document is None
+        or document.owner_id != current_user.id
+        or document.deleted_at is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
 
-    storage_key = document.storage_key
-
-    db.delete(document)
+    document.deleted_at = datetime.now(UTC)
     db.commit()
-
-    try:
-        delete_document_file(storage_key)
-    except OSError:
-        logger.exception(
-            "Document %s was deleted from the database, but its file could not be removed",
-            document_id,
-        )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,6 +42,14 @@ class DocumentRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentListRead(BaseModel):
+    items: list[DocumentRead]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class DocumentFileUrl(BaseModel):

@@ -1,5 +1,7 @@
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import jwt
 from fastapi import (
@@ -8,6 +10,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
@@ -32,7 +35,9 @@ from app.api.v1.routes_documents import (
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
+from app.models.document import DocumentStatus
 from app.schemas.document import DocumentCorrection
+from app.services.document_search import DocumentSortField, SortDirection
 from app.schemas.user import UserCreate
 from app.services.security import create_access_token, decode_access_token
 from app.services.uploads import enforce_upload_rate_limit
@@ -83,6 +88,15 @@ def _status_badge_class(value: object) -> str:
 
 templates.env.filters["file_size"] = _format_file_size
 templates.env.filters["status_badge_class"] = _status_badge_class
+
+
+def _pagination_query(request: Request) -> str:
+    params = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key != "page"
+    ]
+    return urlencode(params)
 
 
 def _get_web_current_user(
@@ -382,22 +396,77 @@ def register_submit(
 def documents_page(
     request: Request,
     db: Session = Depends(get_db),
+    query: str | None = Query(default=None, max_length=500),
+    document_type: str | None = Query(default=None, max_length=50),
+    status_filter: DocumentStatus | None = Query(default=None, alias="status"),
+    document_date_from: date | None = None,
+    document_date_to: date | None = None,
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
+    amount_min: Decimal | None = Query(default=None, ge=0),
+    amount_max: Decimal | None = Query(default=None, ge=0),
+    deadline_from: date | None = None,
+    deadline_to: date | None = None,
+    requires_action: bool | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    sort_by: DocumentSortField = "created_at",
+    sort_direction: SortDirection = "desc",
 ) -> Response:
     current_user = _get_web_current_user(request, db)
 
     if current_user is None:
         return _redirect_to_login()
 
-    documents = api_list_my_documents(
+    result = api_list_my_documents(
         db=db,
         current_user=current_user,
+        query=query,
+        document_type=document_type,
+        status_filter=status_filter,
+        document_date_from=document_date_from,
+        document_date_to=document_date_to,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        deadline_from=deadline_from,
+        deadline_to=deadline_to,
+        requires_action=requires_action,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
     )
 
     return _template_response(
         request=request,
         name="documents.html",
         current_user=current_user,
-        documents=documents,
+        documents=result.items,
+        total_documents=result.total,
+        page=result.page,
+        total_pages=result.total_pages,
+        filters={
+            "query": query or "",
+            "document_type": document_type or "",
+            "status": status_filter.value if status_filter else "",
+            "document_date_from": document_date_from.isoformat() if document_date_from else "",
+            "document_date_to": document_date_to.isoformat() if document_date_to else "",
+            "uploaded_from": uploaded_from.isoformat() if uploaded_from else "",
+            "uploaded_to": uploaded_to.isoformat() if uploaded_to else "",
+            "amount_min": amount_min if amount_min is not None else "",
+            "amount_max": amount_max if amount_max is not None else "",
+            "deadline_from": deadline_from.isoformat() if deadline_from else "",
+            "deadline_to": deadline_to.isoformat() if deadline_to else "",
+            "requires_action": requires_action,
+            "page_size": page_size,
+            "sort_by": sort_by,
+            "sort_direction": sort_direction,
+        },
+        document_types=DOCUMENT_TYPES,
+        document_statuses=DocumentStatus,
+        pagination_query=_pagination_query(request),
         deleted=request.query_params.get("deleted") == "1",
     )
 

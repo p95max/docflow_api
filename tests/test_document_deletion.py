@@ -62,7 +62,7 @@ def _create_stored_document(
     return document, file_path, processing_job, usage_log, audit_log
 
 
-def test_delete_document_removes_database_records_and_file(
+def test_delete_document_soft_deletes_database_record_and_keeps_file(
     client: TestClient,
     auth_headers: dict[str, str],
     db_session: Session,
@@ -82,11 +82,13 @@ def test_delete_document_removes_database_records_and_file(
 
     db_session.expire_all()
 
-    assert db_session.get(Document, document.id) is None
-    assert db_session.get(ProcessingJob, processing_job.id) is None
-    assert db_session.get(OpenAIUsageLog, usage_log.id) is None
-    assert db_session.get(AuditLog, audit_log.id) is None
-    assert not file_path.exists()
+    deleted_document = db_session.get(Document, document.id)
+    assert deleted_document is not None
+    assert deleted_document.deleted_at is not None
+    assert db_session.get(ProcessingJob, processing_job.id) is not None
+    assert db_session.get(OpenAIUsageLog, usage_log.id) is not None
+    assert db_session.get(AuditLog, audit_log.id) is not None
+    assert file_path.exists()
 
 
 def test_delete_document_hides_other_users_documents(

@@ -63,7 +63,10 @@ def build_backup_payload(
     documents = list(
         db.scalars(
             select(Document)
-            .where(Document.owner_id == owner_id)
+            .where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+            )
             .order_by(Document.id)
         ).all()
     )
