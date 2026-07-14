@@ -46,6 +46,11 @@ from app.models.backup_job import BackupJob  # noqa: F401, E402
 from app.models.google_drive_connection import (  # noqa: F401, E402
     GoogleDriveConnection,
 )
+from app.models.knowledge_conversation import KnowledgeConversation  # noqa: F401, E402
+from app.models.knowledge_message import KnowledgeMessage  # noqa: F401, E402
+from app.models.knowledge_message_source import (  # noqa: F401, E402
+    KnowledgeMessageSource,
+)
 from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().

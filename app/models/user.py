@@ -50,3 +50,15 @@ class User(Base):
         back_populates="owner",
         cascade="all, delete-orphan",
     )
+
+    knowledge_conversations = relationship(
+        "KnowledgeConversation",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+
+    openai_usage_logs = relationship(
+        "OpenAIUsageLog",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )

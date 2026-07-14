@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,6 +52,16 @@ class Settings(BaseSettings):
     openai_max_input_chars: int = 12000
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
+    openai_rag_model: str = "gpt-5.6-terra"
+    openai_rag_reasoning_effort: Literal[
+        "none", "low", "medium", "high", "xhigh", "max"
+    ] = "high"
+    openai_rag_max_context_chars: int = 24000
+    openai_rag_max_output_tokens: int = 800
+    knowledge_retrieval_limit: int = 8
+    knowledge_min_similarity: float = 0.25
+    knowledge_history_message_limit: int = 8
+    knowledge_history_token_budget: int = 1600
     document_indexing_soft_time_limit_seconds: int = 120
     document_indexing_hard_time_limit_seconds: int = 180
     document_indexing_batch_size: int = 64

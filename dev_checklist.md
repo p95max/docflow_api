@@ -189,11 +189,11 @@ GET  /backups/{backup_id}
 
 ## MVP 3 — Knowledge Base / RAG
 
-- [ ] Q&A over uploaded documents
+- [x] Q&A over uploaded documents
 - [x] Search across document content
-- [ ] Source snippets
+- [x] Source snippets
 - [x] Limit context to user's own documents
-- [ ] Conversation history
+- [x] Conversation history
 - [x] Chunk `raw_text`
 - [x] Generate embeddings
 - [x] Store vectors in pgvector
@@ -241,24 +241,27 @@ GET  /backups/{backup_id}
 
 #### MVP 3.2 — Conversations and Q&A
 
-- [ ] Add `KnowledgeConversation` model owned by a user
-- [ ] Add `KnowledgeMessage` model with `user` / `assistant` roles
-- [ ] Add `KnowledgeMessageSource` model
-- [ ] Store a snapshot of filename, page, snippet, and score for each source
-- [ ] Extend AI usage logging for embeddings and multi-document Q&A
-- [ ] Add a shared OpenAI client factory for extraction, embeddings, and Q&A
-- [ ] Implement the RAG flow:
-  1. Validate conversation ownership
-  2. Embed the user question
-  3. Retrieve the nearest owned active document chunks
-  4. Build a size-limited context
-  5. Generate an answer grounded only in the retrieved context
-  6. Validate returned source references against retrieved chunks
-  7. Persist the question, answer, usage, and sources
-- [ ] Return a clear "not found in documents" answer when context is insufficient
-- [ ] Treat document content as untrusted input in the RAG prompt
-- [ ] Limit conversation history by message count and token budget
-- [ ] Add endpoints:
+- [x] Add `KnowledgeConversation` model owned by a user
+- [x] Add `KnowledgeMessage` model with `user` / `assistant` roles
+- [x] Add `KnowledgeMessageSource` model
+- [x] Store a snapshot of filename, page, snippet, and score for each source
+- [x] Extend AI usage logging for embeddings and multi-document Q&A
+- [x] Add a shared OpenAI client factory for extraction, embeddings, and Q&A
+- [x] Implement the RAG flow:
+  1. [x] Validate conversation ownership
+  2. [x] Embed the user question
+  3. [x] Retrieve the nearest owned active document chunks
+  4. [x] Build a size-limited context
+  5. [x] Generate an answer grounded only in the retrieved context
+  6. [x] Validate returned source references against retrieved chunks
+  7. [x] Persist the question, answer, usage, and sources
+- [x] Return a clear "not found in documents" answer when context is insufficient
+- [x] Treat document content as untrusted input in the RAG prompt
+- [x] Limit conversation history by message count and token budget
+- [x] Limit a user question to one sentence and 300 characters
+- [x] Enforce the question limit in the API schema, not only in the UI
+- [x] Reject a question containing more than one sentence-ending `.`, `?`, or `!`
+- [x] Add endpoints:
   - `POST /api/v1/knowledge/conversations`
   - `GET /api/v1/knowledge/conversations`
   - `GET /api/v1/knowledge/conversations/{conversation_id}`
@@ -269,6 +272,9 @@ GET  /backups/{backup_id}
 - [ ] Add server-rendered `/knowledge` page without JavaScript
 - [ ] Add conversation list and conversation detail pages
 - [ ] Add question form and render source cards under each answer
+- [ ] Set question textarea `maxlength="300"`
+- [ ] Explain that questions must be one simple sentence about uploaded documents
+- [ ] Show an example: "Which invoices are due this month?"
 - [ ] Link sources to the owned document and show page numbers
 - [ ] Display document indexing status and errors
 - [ ] Add a manual reindex action
@@ -295,8 +301,8 @@ GET  /backups/{backup_id}
 - [ ] Test that another user's chunks never appear in search or Q&A
 - [ ] Test that soft-deleted documents never appear in retrieval
 - [x] Test that confidential documents never trigger external AI calls
-- [ ] Test that source IDs cannot be invented by the answer model
-- [ ] Test conversation ownership and history isolation
+- [x] Test that source IDs cannot be invented by the answer model
+- [x] Test conversation ownership and history isolation
 - [x] Keep SQLite unit tests for pure services and models
 - [ ] Add PostgreSQL integration tests for vector queries and indexes
 

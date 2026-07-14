@@ -11,10 +11,28 @@ class OpenAIUsageLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    document_id: Mapped[int] = mapped_column(
+    document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"),
         index=True,
-        nullable=False,
+        nullable=True,
+    )
+
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("knowledge_conversations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("knowledge_messages.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
     )
 
     operation: Mapped[str] = mapped_column(
@@ -38,3 +56,9 @@ class OpenAIUsageLog(Base):
     )
 
     document = relationship("Document", back_populates="openai_usage_logs")
+    owner = relationship("User", back_populates="openai_usage_logs")
+    conversation = relationship(
+        "KnowledgeConversation",
+        back_populates="openai_usage_logs",
+    )
+    message = relationship("KnowledgeMessage", back_populates="openai_usage_logs")

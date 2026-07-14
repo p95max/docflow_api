@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from typing import Any
 
-from openai import OpenAI
-
 from app.core.config import settings
+from app.services.openai_client import create_openai_client
 
 
 @dataclass(frozen=True)
@@ -18,13 +17,7 @@ def create_embeddings(*, texts: list[str]) -> EmbeddingResult:
     if not texts:
         return EmbeddingResult(vectors=[], input_tokens=0, total_tokens=0)
 
-    if not settings.openai_api_key or not settings.openai_api_key.strip():
-        raise RuntimeError("OPENAI_API_KEY is required for document embeddings.")
-
-    client = OpenAI(
-        api_key=settings.openai_api_key,
-        timeout=settings.openai_request_timeout_seconds,
-    )
+    client = create_openai_client()
     vectors: list[list[float]] = []
     input_tokens = 0
     total_tokens = 0
