@@ -161,6 +161,19 @@ JPG, or PNG files. Each archive is encrypted with a per-user **Recovery Key**
 before it is uploaded to Google Drive. The key is displayed once after it is
 generated; save it in a password manager or another secure location.
 
+For the first backup, use this sequence:
+
+1. Generate and securely save the Recovery Key.
+2. Connect the Google Drive account that will store the archive.
+3. Create the backup.
+
+Google Drive access does not replace the Recovery Key. DocsFlow cannot show or
+recover a lost Recovery Key. Anyone who obtains both the encrypted archive and
+its Recovery Key can read the backed-up document data, so keep them separately
+and securely. Recovery archives preserve extracted text and document data, but
+not the original PDF, JPG, or PNG files; deleting an archive from Google Drive
+removes that recovery copy.
+
 DocsFlow stores only an encrypted copy of that key. Set a separate application
 master key before generating Recovery Keys or restoring backups:
 
