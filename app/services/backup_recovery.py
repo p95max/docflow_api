@@ -73,18 +73,19 @@ def restore_recovery_backup(
     encrypted_content: bytes,
     recovery_key: str,
 ) -> RestoreResult:
+    """Restore encrypted archives and previously downloaded JSON export formats."""
     try:
         payload = json.loads(
-            gzip.decompress(
-                decrypt_recovery_archive(
-                    content=encrypted_content,
-                    recovery_key=recovery_key,
-                )
+            _decode_backup_json(
+                content=encrypted_content,
+                recovery_key=recovery_key,
             )
         )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimeError("Recovery backup is invalid or corrupted.") from exc
 
+    if not isinstance(payload, dict):
+        raise RuntimeError("This file is not a supported recovery backup.")
     if payload.get("schema_version") != 2:
         raise RuntimeError("This file is not a supported recovery backup.")
     records = payload.get("records")
@@ -119,6 +120,25 @@ def restore_recovery_backup(
         if document.raw_text:
             enqueue_document_index_job(db=db, document=document)
     return RestoreResult(restored_documents=len(restored), skipped_documents=skipped)
+
+
+def _decode_backup_json(*, content: bytes, recovery_key: str) -> bytes:
+    if not content:
+        raise RuntimeError("Recovery backup file is empty.")
+
+    stripped = content.lstrip()
+    if stripped.startswith((b"{", b"[")):
+        # Compatibility with JSON files downloaded by older DocsFlow versions.
+        return content
+    if content.startswith(b"\x1f\x8b"):
+        # Compatibility with unencrypted .json.gz backups.
+        return gzip.decompress(content)
+
+    decrypted_content = decrypt_recovery_archive(
+        content=content,
+        recovery_key=recovery_key,
+    )
+    return gzip.decompress(decrypted_content)
 
 
 def _document_from_record(*, owner_id: int, record: dict[str, Any]) -> Document:
