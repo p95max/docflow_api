@@ -1,6 +1,8 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,6 +19,17 @@ class StructuredKnowledgeAnswer:
     sources: list[SemanticSearchResult]
 
 
+@dataclass(frozen=True)
+class InvoiceMetadataIntent:
+    invoice_number: bool = False
+    sender: bool = False
+    amount: bool = False
+
+    @property
+    def requested(self) -> bool:
+        return self.invoice_number or self.sender or self.amount
+
+
 def answer_structured_question(
     *,
     db: Session,
@@ -31,6 +44,14 @@ def answer_structured_question(
             owner_id=owner_id,
             indexed_only=_asks_for_indexed_documents(question),
         )
+
+    invoice_metadata_answer = _answer_single_invoice_metadata_question(
+        db=db,
+        owner_id=owner_id,
+        question=question,
+    )
+    if invoice_metadata_answer is not None:
+        return invoice_metadata_answer
 
     if not _is_current_month_invoice_deadline_question(question):
         return None
@@ -79,6 +100,136 @@ def answer_structured_question(
         ),
         sources=verified_sources,
     )
+
+
+def _answer_single_invoice_metadata_question(
+    *,
+    db: Session,
+    owner_id: int,
+    question: str,
+) -> StructuredKnowledgeAnswer | None:
+    intent = _invoice_metadata_intent(question)
+    if not intent.requested:
+        return None
+
+    documents = _indexed_invoice_documents(db=db, owner_id=owner_id)
+    if len(documents) != 1:
+        return None
+
+    document = documents[0]
+    sentences: list[str] = []
+
+    if intent.invoice_number:
+        invoice_number = _extract_invoice_number(document.ai_extracted_data)
+        if invoice_number:
+            sentences.append(f"The invoice number is {invoice_number}.")
+
+    if intent.sender and intent.amount and document.sender and document.amount is not None:
+        sentences.append(
+            f"It was issued by {document.sender}, and the total amount is "
+            f"{_format_amount(document)}."
+        )
+    else:
+        if intent.sender and document.sender:
+            sentences.append(f"The invoice was issued by {document.sender}.")
+        if intent.amount and document.amount is not None:
+            sentences.append(f"The total amount is {_format_amount(document)}.")
+
+    if not sentences:
+        return None
+
+    source = _document_source(db=db, document=document)
+    return StructuredKnowledgeAnswer(
+        answer=" ".join(sentences),
+        sources=[source] if source is not None else [],
+    )
+
+
+def _indexed_invoice_documents(*, db: Session, owner_id: int) -> list[Document]:
+    return list(
+        db.scalars(
+            select(Document)
+            .join(DocumentIndexJob, DocumentIndexJob.document_id == Document.id)
+            .join(DocumentChunk, DocumentChunk.document_id == Document.id)
+            .where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+                Document.status == DocumentStatus.completed,
+                Document.processing_mode == ProcessingMode.standard,
+                Document.document_type == "invoice",
+                DocumentIndexJob.status == DocumentIndexJobStatus.completed,
+            )
+            .distinct()
+            .order_by(Document.id)
+        ).all()
+    )
+
+
+def _invoice_metadata_intent(question: str) -> InvoiceMetadataIntent:
+    normalized = " ".join(re.findall(r"[a-z0-9]+", question.casefold()))
+    has_invoice = re.search(r"\binvoices?\b", normalized) is not None
+    if not has_invoice:
+        return InvoiceMetadataIntent()
+
+    asks_number = (
+        re.search(r"\binvoice (?:number|no|id)\b", normalized) is not None
+        or re.search(r"\bnumber of (?:the |this )?invoice\b", normalized) is not None
+    )
+    asks_sender = any(
+        marker in normalized
+        for marker in (
+            "who issued",
+            "who sent",
+            "issued by",
+            "invoice issuer",
+            "invoice sender",
+            "which company issued",
+        )
+    )
+    asks_amount = (
+        re.search(r"\b(?:total amount|invoice total|amount due)\b", normalized)
+        is not None
+        or re.search(r"\bhow much\b", normalized) is not None
+    )
+    return InvoiceMetadataIntent(
+        invoice_number=asks_number,
+        sender=asks_sender,
+        amount=asks_amount,
+    )
+
+
+def _extract_invoice_number(value: object) -> str | None:
+    if isinstance(value, Mapping):
+        for key, nested_value in value.items():
+            normalized_key = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+            if normalized_key in {
+                "invoicenumber",
+                "invoiceno",
+                "invoiceid",
+            }:
+                scalar = _scalar_text(nested_value)
+                if scalar:
+                    return scalar
+
+        for nested_value in value.values():
+            nested_result = _extract_invoice_number(nested_value)
+            if nested_result:
+                return nested_result
+
+    if isinstance(value, list):
+        for item in value:
+            nested_result = _extract_invoice_number(item)
+            if nested_result:
+                return nested_result
+
+    return None
+
+
+def _scalar_text(value: Any) -> str | None:
+    if value is None or isinstance(value, (Mapping, list)):
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _answer_document_count(
@@ -200,9 +351,13 @@ def _format_invoice(document: Document) -> str:
     if document.deadline:
         parts.append(f"due {_format_date(document.deadline)}")
     if document.amount is not None:
-        amount = f"{document.amount:.2f}"
-        parts.append(f"{document.currency or ''} {amount}".strip())
+        parts.append(_format_amount(document))
     return ", ".join(parts)
+
+
+def _format_amount(document: Document) -> str:
+    amount = f"{document.amount:.2f}"
+    return f"{document.currency or ''} {amount}".strip()
 
 
 def _format_date(value: date) -> str:
