@@ -78,6 +78,7 @@ table th {
 
 .knowledge-message-list {
   width: 100%;
+  margin-bottom: 1.5rem;
 }
 
 .knowledge-message-row {
@@ -123,6 +124,13 @@ table th {
 
 .knowledge-message-user .knowledge-message-content {
   color: #fff;
+}
+
+.knowledge-composer {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 1;
+  background: var(--bs-card-bg);
 }
 
 .source-card {

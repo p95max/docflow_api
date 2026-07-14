@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit, urlunsplit
+from zoneinfo import ZoneInfo
 
 import jwt
 from fastapi import (
@@ -72,6 +73,7 @@ DOCUMENT_TYPES = (
     "medical_document",
     "other",
 )
+BERLIN_TIMEZONE = ZoneInfo("Europe/Berlin")
 
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -96,8 +98,15 @@ def _status_badge_class(value: object) -> str:
     }.get(status_value, "text-bg-secondary")
 
 
+def _format_berlin_datetime(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(BERLIN_TIMEZONE).strftime("%Y-%m-%d %H:%M")
+
+
 templates.env.filters["file_size"] = _format_file_size
 templates.env.filters["status_badge_class"] = _status_badge_class
+templates.env.filters["berlin_datetime"] = _format_berlin_datetime
 
 
 def _pagination_query(request: Request) -> str:
@@ -652,7 +661,7 @@ def ask_knowledge_question_submit(
         )
 
     return RedirectResponse(
-        url=f"/knowledge/conversations/{conversation_id}",
+        url=f"/knowledge/conversations/{conversation_id}#conversation-end",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

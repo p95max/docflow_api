@@ -15,17 +15,6 @@
     <div class="alert alert-danger" role="alert">{{ error }}</div>
   {% endif %}
 
-  <div class="card shadow-sm mb-4">
-    <div class="card-body">
-      <form method="post" action="/knowledge/conversations/{{ conversation.id }}/messages">
-        <label class="form-label fw-semibold" for="question">Ask a question</label>
-        <textarea class="form-control" id="question" name="question" rows="3" maxlength="300" required placeholder="Which invoices are due this month?">{{ question_value }}</textarea>
-        <div class="form-text">Ask a concise question (up to 300 characters) about your uploaded documents.</div>
-        <button class="btn btn-primary mt-3" type="submit">Ask</button>
-      </form>
-    </div>
-  </div>
-
   {% if conversation.messages %}
     <div class="vstack gap-3 knowledge-message-list">
       {% for message in conversation.messages %}
@@ -34,7 +23,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between gap-3 mb-2">
               <h2 class="h6 mb-0 knowledge-message-author">{{ "You" if message.role.value == "user" else "DocsFlow" }}</h2>
-              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
+              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|berlin_datetime }}</time>
             </div>
             <div class="knowledge-message-content">{{ message.content }}</div>
             {% if message.sources %}
@@ -71,4 +60,15 @@
       <p class="text-secondary mb-0">Only indexed standard documents can be used as sources.</p>
     </div>
   {% endif %}
+
+  <div class="card shadow-sm knowledge-composer" id="conversation-end">
+    <div class="card-body">
+      <form method="post" action="/knowledge/conversations/{{ conversation.id }}/messages">
+        <label class="form-label fw-semibold" for="question">Ask a question</label>
+        <textarea class="form-control" id="question" name="question" rows="3" maxlength="300" required placeholder="Which invoices are due this month?">{{ question_value }}</textarea>
+        <div class="form-text">Ask a concise question (up to 300 characters) about your uploaded documents.</div>
+        <button class="btn btn-primary mt-3" type="submit">Ask</button>
+      </form>
+    </div>
+  </div>
 {% endblock %}

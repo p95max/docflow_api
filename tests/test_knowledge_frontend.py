@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -74,6 +76,12 @@ def test_knowledge_conversation_page_has_short_question_form(
     assert "Which invoices are due this month?" in response.text
     assert "Ask a concise question" in response.text
     assert "<script" not in response.text
+
+
+def test_knowledge_message_timestamp_uses_berlin_time() -> None:
+    timestamp = datetime(2026, 7, 14, 8, 43, tzinfo=timezone.utc)
+
+    assert web._format_berlin_datetime(timestamp) == "2026-07-14 10:43"
 
 
 def test_knowledge_can_be_disabled_without_enqueuing_embeddings(
