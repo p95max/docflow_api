@@ -357,6 +357,36 @@ def generate_backup_recovery_key(
     )
 
 
+@router.post(
+    "/backups/recovery-key/reset",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def reset_backup_recovery_key(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        recovery_key = generate_recovery_key(db=db, user=current_user)
+    except RuntimeError as exc:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return _render_backups_page(
+        request=request,
+        db=db,
+        current_user=current_user,
+        recovery_key_once=recovery_key,
+    )
+
+
 @router.post("/backups/restore", response_class=HTMLResponse, response_model=None)
 def restore_backup_submit(
     request: Request,

@@ -81,7 +81,17 @@
     <div class="card-body">
       <h2 class="h6">1. Recovery Key</h2>
       {% if recovery_key_configured %}
-        <p class="text-success mb-0">A Recovery Key is configured. It is independent of Google Drive; keep your saved copy secure.</p>
+        <p class="text-success">A Recovery Key is configured. It is independent of Google Drive; keep your saved copy secure.</p>
+        <details>
+          <summary class="small text-danger cursor-pointer">Get a new Recovery Key</summary>
+          <div class="alert alert-warning small mt-3 mb-0">
+            <p>The new key replaces the current key for future backups. Save it, then replace the old entry in your password manager.</p>
+            <p>Existing backups remain encrypted with the old key and can only be restored with that old key.</p>
+            <form method="post" action="/backups/recovery-key/reset">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Get new key and replace current one</button>
+            </form>
+          </div>
+        </details>
       {% else %}
         <p class="text-secondary">Generate and save a key before connecting Google Drive.</p>
         <form method="post" action="/backups/recovery-key">

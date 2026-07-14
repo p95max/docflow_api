@@ -114,6 +114,7 @@ def test_recovery_key_is_shown_only_when_generated(
     page_response = client.get("/backups")
     assert "Save your Recovery Key now" not in page_response.text
     assert "A Recovery Key is configured" in page_response.text
+    assert 'action="/backups/recovery-key/reset"' in page_response.text
 
 
 def test_restore_recovery_backup_restores_text_and_queues_indexing(
