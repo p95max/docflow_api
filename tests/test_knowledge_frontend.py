@@ -48,7 +48,7 @@ def test_knowledge_page_is_server_rendered_and_lists_indexing_status(
     response = client.get("/knowledge")
 
     assert response.status_code == 200
-    assert "Knowledge Base" in response.text
+    assert "Chat with documents" in response.text
     assert "Document indexing" in response.text
     assert "Unavailable: confidential document" in response.text
     assert 'action="/knowledge/documents/' in response.text
