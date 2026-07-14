@@ -106,6 +106,8 @@ def test_recovery_key_is_shown_only_when_generated(
 
     assert response.status_code == 200
     assert "Save your Recovery Key now" in response.text
+    assert "Copy Recovery Key" in response.text
+    assert "password manager as a secure note" in response.text
     db_session.refresh(test_user)
     assert test_user.backup_recovery_key_encrypted is not None
 

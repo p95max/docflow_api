@@ -52,7 +52,14 @@
     <div class="alert alert-warning" role="alert">
       <h2 class="h6">Save your Recovery Key now</h2>
       <p>This key is required to restore encrypted backups and will not be shown again.</p>
-      <code class="d-block text-break user-select-all">{{ recovery_key_once }}</code>
+      <code id="recovery-key-once" class="d-block text-break user-select-all mb-3">{{ recovery_key_once }}</code>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-dark" type="button" data-copy-recovery-key>
+          Copy Recovery Key
+        </button>
+        <span class="small text-success d-none" aria-live="polite" data-copy-recovery-key-status>Copied.</span>
+      </div>
+      <p class="small mb-0 mt-3">Paste it into your password manager as a secure note before leaving this page.</p>
     </div>
   {% endif %}
 
@@ -254,6 +261,34 @@
 
   <script>
     (() => {
+      const copyRecoveryKeyButton = document.querySelector("[data-copy-recovery-key]");
+      const recoveryKeyStatus = document.querySelector("[data-copy-recovery-key-status]");
+      copyRecoveryKeyButton?.addEventListener("click", async () => {
+        const recoveryKey = document.querySelector("#recovery-key-once")?.textContent?.trim();
+        if (!recoveryKey) return;
+        try {
+          if (navigator.clipboard?.writeText && window.isSecureContext) {
+            await navigator.clipboard.writeText(recoveryKey);
+          } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = recoveryKey;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.append(textarea);
+            textarea.select();
+            const copied = document.execCommand("copy");
+            textarea.remove();
+            if (!copied) throw new Error("Copy command was rejected.");
+          }
+          recoveryKeyStatus?.classList.remove("d-none");
+          copyRecoveryKeyButton.textContent = "Copied";
+        } catch (_) {
+          recoveryKeyStatus?.classList.remove("d-none", "text-success");
+          recoveryKeyStatus?.classList.add("text-danger");
+          if (recoveryKeyStatus) recoveryKeyStatus.textContent = "Select and copy the key manually.";
+        }
+      });
+
       const badgeClasses = {
         pending: "text-bg-secondary",
         running: "text-bg-info",
