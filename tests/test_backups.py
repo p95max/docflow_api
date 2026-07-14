@@ -192,7 +192,7 @@ def test_run_backup_endpoint_creates_pending_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _connect_drive(db_session, test_user)
-    recovery_key = generate_recovery_key(db=db_session, user=test_user)
+    generate_recovery_key(db=db_session, user=test_user)
 
     def fake_enqueue_backup_job(*, db: Session, job: BackupJob) -> BackupJob:
         job.celery_task_id = "fake-backup-task-id"
@@ -252,7 +252,7 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _connect_drive(db_session, test_user)
-    generate_recovery_key(db=db_session, user=test_user)
+    recovery_key = generate_recovery_key(db=db_session, user=test_user)
     job = BackupJob(owner_id=test_user.id)
     db_session.add(job)
     db_session.commit()
