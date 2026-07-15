@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.db.types import EncryptedGoogleDriveRefreshToken
 
 
 class GoogleDriveConnection(Base):
@@ -16,7 +17,10 @@ class GoogleDriveConnection(Base):
         index=True,
         nullable=False,
     )
-    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token: Mapped[str] = mapped_column(
+        EncryptedGoogleDriveRefreshToken(),
+        nullable=False,
+    )
     scope: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

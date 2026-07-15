@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     google_drive_client_secret: str | None = None
     google_drive_redirect_uri: str | None = None
     google_drive_refresh_token: str | None = None  # Deprecated; ignored by OAuth flow.
+    google_drive_token_encryption_key: str | None = None
+    google_drive_token_previous_encryption_keys: str = ""
     google_drive_folder_name: str = "docflow_backup"
     google_drive_timeout_seconds: int = 60
     google_oauth_state_expire_minutes: int = 10

@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.google_drive_connection import GoogleDriveConnection
+from app.services.google_drive_token_encryption import (
+    validate_google_drive_token_encryption,
+)
 
 GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -157,7 +160,12 @@ def get_google_drive_connection(
     stmt = select(GoogleDriveConnection).where(
         GoogleDriveConnection.user_id == user_id,
     )
-    return db.scalar(stmt)
+    connection = db.scalar(stmt)
+    if connection is not None:
+        # Fail closed for legacy plaintext rows when the application is started
+        # without the server-side encryption key.
+        validate_google_drive_token_encryption()
+    return connection
 
 
 def save_google_drive_connection(
@@ -167,6 +175,7 @@ def save_google_drive_connection(
     refresh_token: str | None,
     scope: str | None,
 ) -> GoogleDriveConnection:
+    validate_google_drive_token_encryption()
     connection = get_google_drive_connection(db=db, user_id=user_id)
 
     if connection is None:

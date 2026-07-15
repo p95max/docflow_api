@@ -19,6 +19,8 @@ until alembic upgrade head; do
 done
 
 echo "Database migrations completed."
+echo "Encrypting Google Drive refresh tokens with the active key..."
+python -m scripts.rotate_google_drive_tokens
 echo "Initializing local test user..."
 python -m scripts.init_test_user
 

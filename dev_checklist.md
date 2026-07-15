@@ -456,29 +456,33 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 
 ---
 
-## Unfinished and Follow-up Work
+## Security and Hardening Audit
 
-This section is the single source of truth for work that is not complete. Items
-were reconciled with the code and test suite on 2026-07-15.
+Items were reconciled with the code and test suite on 2026-07-15.
 
-### Fixed in the current hardening pass
+### Completed in the current hardening pass
 
-- JWT access-token purpose validation, preventing document and OAuth JWTs from
+- [x] JWT access-token purpose validation, preventing document and OAuth JWTs from
   authenticating API or web sessions.
-- Signed preview/download URLs are rejected after a document is soft-deleted.
-- Codespaces login no longer pre-fills local test credentials.
-- Baseline browser security headers and a Content Security Policy.
-- One-sentence validation for Knowledge questions.
-- Bounded recovery restore upload, gzip expansion, document count, and per-document
+- [x] Signed preview/download URLs are rejected after a document is soft-deleted.
+- [x] Codespaces login no longer pre-fills local test credentials.
+- [x] Baseline browser security headers and a Content Security Policy.
+- [x] One-sentence validation for Knowledge questions.
+- [x] Bounded recovery restore upload, gzip expansion, document count, and per-document
   extracted text size.
-- CSRF protection for all cookie-authenticated HTML POST forms.
-- Celery enqueue failures now persist failed processing job/document state.
-- Concurrent duplicate registration returns 409 instead of a database 500.
-- Pytest discovery is limited to `tests/`.
+- [x] CSRF protection for all cookie-authenticated HTML POST forms.
+- [x] Celery enqueue failures now persist failed processing job/document state.
+- [x] Concurrent duplicate registration returns 409 instead of a database 500.
+- [x] Pytest discovery is limited to `tests/`.
+- [x] Google Drive refresh tokens are encrypted at rest, legacy plaintext tokens
+  are migrated on startup, and active/previous-key rotation is documented.
+- [x] Regression tests verify encrypted OAuth token storage, legacy-token migration,
+  and re-encryption with a rotated key.
+
+### Unfinished and Follow-up Work
 
 ### Security — high priority
 
-- [ ] Encrypt Google Drive refresh tokens at rest and define key rotation.
 - [ ] Add shared Redis-backed rate limits for login, registration, uploads,
   semantic search, and Q&A; add per-user OpenAI usage/cost quotas.
 - [ ] Harden deployment defaults: require a non-placeholder 32+ byte
@@ -519,4 +523,4 @@ were reconciled with the code and test suite on 2026-07-15.
   access.
 - [ ] Add a negative test proving malformed AI structured output is rejected by
   Pydantic and does not persist partial extraction/usage data.
-- [ ] Add tests for auth/Q&A rate limits and encrypted OAuth token storage.
+- [ ] Add tests for auth/Q&A rate limits.

@@ -192,6 +192,34 @@ To recover after a database loss, recreate or sign in to the account, open
 Recovery Key. Documents are restored without their original files; completed
 standard documents are automatically queued for Knowledge Base indexing.
 
+### Google Drive OAuth token encryption
+
+Google Drive refresh tokens are encrypted before they are stored in the
+database. Generate a separate Fernet key for this purpose:
+
+```powershell
+python -m poetry run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Store it as `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` in the deployment secret store
+or `.env`. This server-side key is different from both the user-facing Recovery
+Key and `BACKUP_MASTER_KEY`. If Google Drive connections already exist, the API
+startup intentionally fails until this key is configured; startup then encrypts
+legacy plaintext tokens automatically.
+
+To rotate the key without disconnecting users:
+
+1. Move the current key to `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS`.
+2. Put the newly generated key in `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY`.
+3. Restart the API. Startup decrypts tokens with either key and re-encrypts them
+   with the new active key.
+4. After startup and a Google Drive backup have succeeded, remove the old key
+   from `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS` and restart again.
+
+Multiple previous keys may be supplied as a comma-separated list during a
+staged rotation. Keep all token-encryption keys in the secret store, never in
+source control.
+
 ---
 
 ## Project Structure
@@ -539,6 +567,8 @@ Main settings are configured through `.env`.
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
 | `BACKUP_MASTER_KEY` | â€” | Valid Fernet key used to protect stored per-user Recovery Keys |
+| `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` | — | Active Fernet key used to encrypt Google Drive refresh tokens at rest |
+| `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS` | — | Comma-separated old Fernet keys used temporarily during key rotation |
 | `BACKUP_RESTORE_MAX_FILE_SIZE_MB` | `25` | Maximum uploaded recovery archive size |
 | `BACKUP_RESTORE_MAX_DECOMPRESSED_SIZE_MB` | `100` | Maximum JSON size after gzip decompression |
 | `BACKUP_RESTORE_MAX_DOCUMENTS` | `2000` | Maximum documents accepted from one restore |
