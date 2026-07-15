@@ -26,7 +26,8 @@ def test_login_page_is_server_rendered_without_javascript(
     assert '<form method="post" action="/login">' in response.text
     assert 'value="m@m.com"' in response.text
     assert 'value="12345678"' in response.text
-    assert "<script" not in response.text
+    assert "data-form-feedback" in response.text
+    assert 'src="/assets/js/app.js"' not in response.text
 
 
 def test_codespaces_login_does_not_prefill_test_credentials(
@@ -110,7 +111,7 @@ def test_html_login_uses_http_only_cookie_and_renders_documents(
     assert documents_response.status_code == 200
     assert "Your documents" in documents_response.text
     assert test_user.email in documents_response.text
-    assert "<script" not in documents_response.text
+    assert "data-form-feedback" in documents_response.text
 
 
 def test_frontend_css_is_served_and_javascript_bundle_is_removed(

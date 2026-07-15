@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.tasks.knowledge as knowledge_tasks
+import app.services.document_chunking as document_chunking
 from app.core.config import settings
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_chunk import DocumentChunk
@@ -67,6 +68,29 @@ def test_chunking_preserves_page_numbers_and_overlap() -> None:
     assert all(chunk.page_from == chunk.page_to for chunk in chunks)
     assert all(chunk.token_count <= 30 for chunk in chunks)
     assert chunks[0].content_sha256 != chunks[1].content_sha256
+
+
+def test_chunking_keeps_complete_paragraphs_when_they_fit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        document_chunking,
+        "_tokenize",
+        lambda text: text.split(),
+    )
+    paragraphs = [
+        "Alpha paragraph has three words.",
+        "Beta paragraph has three words.",
+        "Gamma paragraph has three words.",
+    ]
+
+    chunks = build_document_chunk_drafts(
+        pages=[ExtractedTextPage(page_number=1, text="\n\n".join(paragraphs))],
+        chunk_size_tokens=8,
+        overlap_tokens=0,
+    )
+
+    assert [chunk.content for chunk in chunks] == paragraphs
 
 
 def test_index_task_persists_page_aware_chunks_and_usage_log(

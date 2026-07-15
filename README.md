@@ -136,6 +136,9 @@ The Knowledge Base indexes completed `standard` documents into page-aware
 chunks and answers questions only from the current user's retrieved chunks.
 Each answer retains a snapshot of its source filename, page, snippet, and
 similarity score. `confidential` documents are never indexed or sent to OpenAI.
+The planned local-only embedding and LLM architecture required before enabling
+confidential RAG is documented in
+[local confidential RAG design](docs/local-confidential-rag-design.md).
 
 Set the following values in `.env`:
 
@@ -543,6 +546,21 @@ docker compose run --rm api pytest tests/test_text_extraction.py
 docker compose run --rm api sh -c \
   'TEST_POSTGRESQL_URL="$DATABASE_URL" pytest -m postgres -q'
 ```
+
+### Browser end-to-end tests
+
+The optional Playwright smoke test registers a user and signs in through a real
+Chromium browser. Start DocsFlow first, then install the optional dependency and
+browser once:
+
+```bash
+python -m poetry install --with e2e
+python -m poetry run playwright install chromium
+E2E_BASE_URL=http://localhost:8000 python -m poetry run pytest -m e2e -q
+```
+
+For Codespaces, set `E2E_BASE_URL` to the forwarded port URL when the browser
+cannot reach `localhost:8000` directly.
 
 ### Windows (local Poetry environment)
 

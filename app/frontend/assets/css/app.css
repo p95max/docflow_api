@@ -254,3 +254,7 @@ table th {
 .source-card {
   background: var(--bs-tertiary-bg);
 }
+
+form[aria-busy="true"] {
+  opacity: 0.75;
+}

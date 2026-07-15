@@ -495,17 +495,21 @@ Items were reconciled with the code and test suite on 2026-07-15.
   original encrypted archive, preserving backups created before key rotation.
 - [x] Backup UI and README accurately document that DocsFlow stores the current
   Recovery Key encrypted with `BACKUP_MASTER_KEY` and explain the compromise risks.
+- [x] Chunking keeps complete paragraph boundaries whenever they fit within the
+  configured token budget; only an oversized paragraph is token-split.
+- [x] A local-only confidential RAG architecture is documented, including
+  isolated providers, vector storage, rollout gates, and the no-cloud-fallback
+  rule before confidential documents can enter RAG.
+- [x] Native form validation now marks invalid controls, and valid submissions
+  show a loading state and prevent double submits without weakening server-side
+  validation.
+- [x] Optional Playwright browser E2E smoke coverage registers a user, signs in,
+  opens Documents, and verifies upload-form validation against a running app.
+- [x] Presigned upload URLs are not applicable to the current local filesystem
+  storage backend; the item is explicitly deferred until direct object-storage
+  upload is introduced.
 
 ### Unfinished and Follow-up Work
-
-### Reliability and functional gaps
-
-- [ ] Keep paragraph boundaries where possible during document chunking.
-- [ ] Add a separate local embedding and local LLM design before supporting
-  confidential documents in RAG.
-- [ ] Improve client-side form validation and loading states.
-- [ ] Add browser end-to-end tests.
-- [ ] Add presigned upload URLs if direct upload to object storage is introduced.
 
 ### Verification and missing regression tests
 

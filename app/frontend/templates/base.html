@@ -36,5 +36,34 @@
     <main class="container py-4 py-lg-5">
       {% block content %}{% endblock %}
     </main>
+    <script data-form-feedback>
+      (() => {
+        const controlSelector = "input, select, textarea";
+        document.addEventListener("invalid", (event) => {
+          if (event.target.matches(controlSelector)) {
+            event.target.classList.add("is-invalid");
+          }
+        }, true);
+        document.addEventListener("input", (event) => {
+          if (event.target.matches(controlSelector) && event.target.checkValidity()) {
+            event.target.classList.remove("is-invalid");
+          }
+        });
+        document.addEventListener("submit", (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement) || !form.checkValidity()) return;
+          if (form.dataset.submitting === "true") {
+            event.preventDefault();
+            return;
+          }
+          const submitter = event.submitter;
+          if (!(submitter instanceof HTMLButtonElement) || submitter.type !== "submit") return;
+          form.dataset.submitting = "true";
+          form.setAttribute("aria-busy", "true");
+          submitter.disabled = true;
+          submitter.textContent = submitter.dataset.loadingLabel || "Working…";
+        });
+      })();
+    </script>
   </body>
 </html>

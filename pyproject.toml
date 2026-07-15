@@ -41,5 +41,11 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "e2e: browser end-to-end test; requires Playwright and E2E_BASE_URL",
     "postgres: requires TEST_POSTGRESQL_URL and a PostgreSQL server with pgvector",
+]
+
+[dependency-groups]
+e2e = [
+    "playwright>=1.52,<2.0",
 ]
