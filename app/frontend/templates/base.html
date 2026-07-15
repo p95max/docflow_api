@@ -17,9 +17,15 @@
           {% if current_user %}
             <a class="btn btn-sm btn-outline-light" href="/documents">Documents</a>
             {% if knowledge_enabled %}
-              <a class="btn btn-sm btn-outline-light" href="/knowledge">Document chat</a>
+              <a class="btn btn-sm btn-outline-light docsflow-ai-nav" href="/knowledge">
+                <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
+                <span>Ask Documents</span>
+              </a>
             {% else %}
-              <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true" title="Document chat is disabled">Document chat</span>
+              <span class="btn btn-sm btn-outline-secondary disabled docsflow-ai-nav" aria-disabled="true" title="Ask Documents is disabled">
+                <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
+                <span>Ask Documents</span>
+              </span>
             {% endif %}
             <a class="btn btn-sm btn-outline-light" href="/backups">Backups</a>
             <a class="btn btn-sm btn-light" href="/documents/upload">Upload</a>

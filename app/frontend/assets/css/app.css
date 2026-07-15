@@ -23,6 +23,27 @@ body {
   border-bottom: 1px solid var(--bs-border-color);
 }
 
+.docsflow-ai-nav {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.docsflow-ai-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #dbeafe;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--docsflow-primary), #7c3aed);
+  border-radius: 0.35rem;
+}
+
 .auth-card {
   max-width: 28rem;
   margin: 2rem auto;

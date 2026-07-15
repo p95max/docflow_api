@@ -112,6 +112,8 @@ def test_html_login_uses_http_only_cookie_and_renders_documents(
     assert "Your documents" in documents_response.text
     assert test_user.email in documents_response.text
     assert "data-form-feedback" in documents_response.text
+    assert "Ask Documents" in documents_response.text
+    assert 'class="docsflow-ai-icon"' in documents_response.text
 
 
 def test_frontend_css_is_served_and_javascript_bundle_is_removed(
