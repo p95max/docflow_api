@@ -168,12 +168,15 @@ For the first backup, use this sequence:
 2. Connect the Google Drive account that will store the archive.
 3. Create the backup.
 
-Google Drive access does not replace the Recovery Key. DocsFlow cannot show or
-recover a lost Recovery Key. Anyone who obtains both the encrypted archive and
+Google Drive access does not replace the Recovery Key. The UI shows a newly
+generated key only once, while DocsFlow keeps a copy encrypted with
+`BACKUP_MASTER_KEY` so background backups and JSON downloads can use it. If the
+database or server master key is lost, only the user's separately saved Recovery
+Key can restore the archive. Anyone who obtains both the encrypted archive and
 its Recovery Key can read the backed-up document data, so keep them separately
-and securely. Recovery archives preserve extracted text and document data, but
-not the original PDF, JPG, or PNG files; deleting an archive from Google Drive
-removes that recovery copy.
+and securely. A compromise of both the database and `BACKUP_MASTER_KEY` can also
+expose the stored Recovery Key. Recovery archives preserve extracted text and
+document data, but not the original PDF, JPG, or PNG files.
 
 DocsFlow stores only an encrypted copy of that key. Set a separate application
 master key before generating Recovery Keys or restoring backups:
@@ -187,10 +190,20 @@ or `.env`. Keep this value stable and private: changing it prevents DocsFlow
 from creating or downloading backups for existing accounts. A user can still
 restore an existing archive anywhere with the saved Recovery Key.
 
+Every new backup records a non-secret Recovery Key ID. After rotating the key,
+`Download JSON` continues to work for backups made with the active key. For an
+older backup, use `Encrypted file` to download the original authenticated
+archive, then restore it with the saved old key. The encrypted download is not
+decrypted or re-encrypted by DocsFlow.
+
 To recover after a database loss, recreate or sign in to the account, open
 `/backups`, select the encrypted `.json.gz.enc` archive, and enter its
 Recovery Key. Documents are restored without their original files; completed
 standard documents are automatically queued for Knowledge Base indexing.
+Normal restore accepts only authenticated Fernet archives. To migrate an old
+unencrypted JSON or JSON.gz export, temporarily set
+`BACKUP_ALLOW_LEGACY_RESTORE=true`, explicitly select migration mode in the
+restore form, import only a trusted file, and disable the setting again.
 
 ### Google Drive OAuth token encryption
 
@@ -599,6 +612,7 @@ Main settings are configured through `.env`.
 | `BACKUP_RESTORE_MAX_DECOMPRESSED_SIZE_MB` | `100` | Maximum JSON size after gzip decompression |
 | `BACKUP_RESTORE_MAX_DOCUMENTS` | `2000` | Maximum documents accepted from one restore |
 | `BACKUP_RESTORE_MAX_RAW_TEXT_CHARS` | `2000000` | Maximum extracted text length per restored document |
+| `BACKUP_ALLOW_LEGACY_RESTORE` | `false` | Temporarily expose explicit migration mode for trusted unencrypted legacy exports |
 
 ---
 

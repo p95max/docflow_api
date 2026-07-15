@@ -1,4 +1,5 @@
 import gzip
+import hashlib
 import logging
 import secrets
 from urllib.parse import quote
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.backup_job import BackupJobStatus
+from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.user import User
 from app.services.backup_jobs import (
     create_backup_job,
@@ -24,6 +25,7 @@ from app.services.backup_recovery import (
     generate_recovery_key,
     get_recovery_key,
     restore_recovery_backup,
+    recovery_key_identifier,
     save_recovery_key,
     validate_backup_master_key,
 )
@@ -87,6 +89,7 @@ def _render_backups_page(
         google_drive_folder_name=settings.google_drive_folder_name,
         recovery_key_configured=bool(current_user.backup_recovery_key_encrypted),
         recovery_key_once=recovery_key_once,
+        legacy_restore_enabled=settings.backup_allow_legacy_restore,
         restore_result=restore_result,
         created=request.query_params.get("created") == "1",
         deleted=request.query_params.get("deleted") == "1",
@@ -409,6 +412,7 @@ def reset_backup_recovery_key(
 async def restore_backup_submit(
     request: Request,
     recovery_key: str = Form(...),
+    legacy_migration: bool = Form(False),
     backup_file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -416,6 +420,8 @@ async def restore_backup_submit(
     if current_user is None:
         return _redirect_to_login()
     try:
+        if legacy_migration and not settings.backup_allow_legacy_restore:
+            raise RuntimeError("Legacy backup migration mode is disabled.")
         validate_backup_master_key()
         encrypted_content = await backup_file.read(
             settings.backup_restore_max_file_size_bytes + 1
@@ -427,6 +433,7 @@ async def restore_backup_submit(
             owner_id=current_user.id,
             encrypted_content=encrypted_content,
             recovery_key=recovery_key,
+            allow_legacy=legacy_migration,
         )
         if not current_user.backup_recovery_key_encrypted:
             save_recovery_key(
@@ -487,6 +494,8 @@ def get_backup_status(
             "drive_web_view_link": job.drive_web_view_link,
             "compressed_size_bytes": job.compressed_size_bytes,
             "checksum_sha256": job.checksum_sha256,
+            "recovery_key_id": job.recovery_key_id,
+            "content_type": job.content_type,
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -558,6 +567,71 @@ def delete_backup_submit(
 
 
 @router.get(
+    "/backups/{backup_id}/download/raw",
+    response_model=None,
+)
+def download_raw_backup(
+    backup_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    job = get_backup_job(
+        db=db,
+        backup_id=backup_id,
+        owner_id=current_user.id,
+    )
+    validation_error = _backup_download_validation_error(
+        request=request,
+        db=db,
+        current_user=current_user,
+        job=job,
+    )
+    if validation_error is not None:
+        return validation_error
+    assert job is not None
+    if job.content_type != "application/vnd.docsflow.recovery+fernet":
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="This backup record does not contain an encrypted recovery archive.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    connection = get_google_drive_connection(db=db, user_id=current_user.id)
+    assert connection is not None
+    try:
+        content = _download_and_verify_backup(
+            job=job,
+            refresh_token=connection.refresh_token,
+        )
+    except RuntimeError as exc:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=str(exc),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    filename = job.drive_file_name or f"docsflow-backup-{job.id}.json.gz.enc"
+    return Response(
+        content=content,
+        media_type="application/vnd.docsflow.recovery+fernet",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=docsflow-recovery-backup.json.gz.enc; "
+                f"filename*=UTF-8''{quote(filename)}"
+            )
+        },
+    )
+
+
+@router.get(
     "/backups/{backup_id}/download",
     response_model=None,
 )
@@ -575,41 +649,41 @@ def download_backup(
         backup_id=backup_id,
         owner_id=current_user.id,
     )
-    if job is None:
-        return _render_backups_page(
-            request=request,
-            db=db,
-            current_user=current_user,
-            error="Backup job not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    if job.status != BackupJobStatus.completed or not job.drive_file_id:
-        return _render_backups_page(
-            request=request,
-            db=db,
-            current_user=current_user,
-            error="Only completed backups can be downloaded.",
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    validation_error = _backup_download_validation_error(
+        request=request,
+        db=db,
+        current_user=current_user,
+        job=job,
+    )
+    if validation_error is not None:
+        return validation_error
+    assert job is not None
 
     connection = get_google_drive_connection(db=db, user_id=current_user.id)
-    if connection is None:
-        return _render_backups_page(
-            request=request,
-            db=db,
-            current_user=current_user,
-            error="Connect Google Drive before downloading this backup file.",
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    assert connection is not None
     try:
-        downloaded_content = download_gzip_backup(
-            file_id=job.drive_file_id,
+        downloaded_content = _download_and_verify_backup(
+            job=job,
             refresh_token=connection.refresh_token,
         )
         if job.content_type == "application/vnd.docsflow.recovery+fernet":
+            recovery_key = get_recovery_key(user=current_user)
+            current_key_id = recovery_key_identifier(recovery_key)
+            if job.recovery_key_id and job.recovery_key_id != current_key_id:
+                return _render_backups_page(
+                    request=request,
+                    db=db,
+                    current_user=current_user,
+                    error=(
+                        f"This backup uses Recovery Key ID {job.recovery_key_id}, "
+                        f"but the active key is {current_key_id}. Download the encrypted "
+                        "archive and restore it with the saved old key."
+                    ),
+                    status_code=status.HTTP_409_CONFLICT,
+                )
             downloaded_content = decrypt_recovery_archive(
                 content=downloaded_content,
-                recovery_key=get_recovery_key(user=current_user),
+                recovery_key=recovery_key,
             )
         content = gzip.decompress(downloaded_content)
     except (EOFError, OSError, RuntimeError):
@@ -632,3 +706,52 @@ def download_backup(
             )
         },
     )
+
+
+def _backup_download_validation_error(
+    *,
+    request: Request,
+    db: Session,
+    current_user: User,
+    job: BackupJob | None,
+) -> HTMLResponse | None:
+    if job is None:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Backup job not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if job.status != BackupJobStatus.completed or not job.drive_file_id:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Only completed backups can be downloaded.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    if get_google_drive_connection(db=db, user_id=current_user.id) is None:
+        return _render_backups_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Connect Google Drive before downloading this backup file.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    return None
+
+
+def _download_and_verify_backup(*, job: BackupJob, refresh_token: str) -> bytes:
+    assert job.drive_file_id is not None
+    content = download_gzip_backup(
+        file_id=job.drive_file_id,
+        refresh_token=refresh_token,
+    )
+    if len(content) > settings.backup_restore_max_file_size_bytes:
+        raise RuntimeError("Downloaded backup file exceeds the allowed size.")
+    if job.checksum_sha256:
+        checksum = hashlib.sha256(content).hexdigest()
+        if not secrets.compare_digest(checksum, job.checksum_sha256):
+            raise RuntimeError("Downloaded backup checksum does not match its record.")
+    return content

@@ -44,6 +44,7 @@ class BackupJob(Base):
     )
     compressed_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recovery_key_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
     record_counts: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

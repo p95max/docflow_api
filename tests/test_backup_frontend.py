@@ -1,4 +1,5 @@
 import gzip
+import hashlib
 
 import pytest
 from cryptography.fernet import Fernet
@@ -7,12 +8,17 @@ from sqlalchemy.orm import Session
 
 import app.web_backups as web_backups
 import app.services.backup_recovery as backup_recovery
+from app.core.config import settings
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.google_drive_connection import GoogleDriveConnection
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
-from app.services.backup_recovery import encrypt_recovery_archive, generate_recovery_key
+from app.services.backup_recovery import (
+    encrypt_recovery_archive,
+    generate_recovery_key,
+    recovery_key_identifier,
+)
 from app.services.users import create_user
 
 
@@ -46,7 +52,25 @@ def test_backup_page_prompts_user_to_connect_google_drive(
     assert response.status_code == 200
     assert "Google Drive recovery backups" in response.text
     assert "Connect Google Drive" in response.text
+    assert "server-encrypted copy" in response.text
+    assert "cannot be recovered by DocsFlow" not in response.text
     assert '<form method="post" action="/backups/run">' not in response.text
+
+
+def test_legacy_restore_controls_require_deployment_migration_mode(
+    client: TestClient,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _login(client, test_user)
+
+    default_page = client.get("/backups")
+    assert 'name="legacy_migration"' not in default_page.text
+
+    monkeypatch.setattr(settings, "backup_allow_legacy_restore", True)
+    migration_page = client.get("/backups")
+    assert 'name="legacy_migration"' in migration_page.text
+    assert "trusted legacy file" in migration_page.text
 
 
 def test_backup_page_renders_and_creates_job(
@@ -271,3 +295,89 @@ def test_completed_backup_downloads_uncompressed_json(
     assert response.headers["content-type"].startswith("application/json")
     assert response.headers["content-disposition"].startswith("attachment;")
     assert response.content == b'{"records": {}}'
+
+
+def test_current_key_download_json_and_raw_encrypted_archive_both_work(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recovery_key = generate_recovery_key(db=db_session, user=test_user)
+    encrypted_content = encrypt_recovery_archive(
+        content=gzip.compress(b'{"schema_version": 2}'),
+        recovery_key=recovery_key,
+    )
+    job = BackupJob(
+        owner_id=test_user.id,
+        status=BackupJobStatus.completed,
+        drive_file_id="encrypted-drive-file-id",
+        drive_file_name="docsflow-recovery.json.gz.enc",
+        content_type="application/vnd.docsflow.recovery+fernet",
+        checksum_sha256=hashlib.sha256(encrypted_content).hexdigest(),
+        recovery_key_id=recovery_key_identifier(recovery_key),
+    )
+    connection = GoogleDriveConnection(
+        user_id=test_user.id,
+        refresh_token="frontend-encrypted-refresh-token",
+    )
+    db_session.add_all([job, connection])
+    db_session.commit()
+    _login(client, test_user)
+    monkeypatch.setattr(
+        web_backups,
+        "download_gzip_backup",
+        lambda **_: encrypted_content,
+    )
+
+    json_response = client.get(f"/backups/{job.id}/download")
+    assert json_response.status_code == 200
+    assert json_response.content == b'{"schema_version": 2}'
+
+    raw_response = client.get(f"/backups/{job.id}/download/raw")
+    assert raw_response.status_code == 200
+    assert raw_response.content == encrypted_content
+    assert "json.gz.enc" in raw_response.headers["content-disposition"]
+
+
+def test_backup_from_old_key_can_still_be_downloaded_encrypted(
+    client: TestClient,
+    test_user: User,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old_key = generate_recovery_key(db=db_session, user=test_user)
+    encrypted_content = encrypt_recovery_archive(
+        content=gzip.compress(b'{"schema_version": 2}'),
+        recovery_key=old_key,
+    )
+    job = BackupJob(
+        owner_id=test_user.id,
+        status=BackupJobStatus.completed,
+        drive_file_id="old-key-drive-file-id",
+        drive_file_name="old-key-backup.json.gz.enc",
+        content_type="application/vnd.docsflow.recovery+fernet",
+        checksum_sha256=hashlib.sha256(encrypted_content).hexdigest(),
+        recovery_key_id=recovery_key_identifier(old_key),
+    )
+    connection = GoogleDriveConnection(
+        user_id=test_user.id,
+        refresh_token="old-key-refresh-token",
+    )
+    db_session.add_all([job, connection])
+    db_session.commit()
+    generate_recovery_key(db=db_session, user=test_user)
+    _login(client, test_user)
+    monkeypatch.setattr(
+        web_backups,
+        "download_gzip_backup",
+        lambda **_: encrypted_content,
+    )
+
+    json_response = client.get(f"/backups/{job.id}/download")
+    assert json_response.status_code == 409
+    assert f"Recovery Key ID {job.recovery_key_id}" in json_response.text
+
+    raw_response = client.get(f"/backups/{job.id}/download/raw")
+    assert raw_response.status_code == 200
+    assert raw_response.content == encrypted_content

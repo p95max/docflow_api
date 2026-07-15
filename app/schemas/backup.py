@@ -18,6 +18,7 @@ class BackupJobRead(BaseModel):
     content_type: str
     compressed_size_bytes: int | None
     checksum_sha256: str | None
+    recovery_key_id: str | None
     record_counts: dict[str, Any] | None
     error_message: str | None
     started_at: datetime | None

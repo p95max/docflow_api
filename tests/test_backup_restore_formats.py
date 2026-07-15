@@ -1,7 +1,9 @@
 import gzip
+import json
 
 import pytest
 from cryptography.fernet import Fernet
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.services.backup_recovery as backup_recovery
@@ -9,7 +11,7 @@ from app.core.config import settings
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
-from app.services.backup_recovery import restore_recovery_backup
+from app.services.backup_recovery import encrypt_recovery_archive, restore_recovery_backup
 from app.services.users import create_user
 
 
@@ -60,6 +62,7 @@ def test_restore_accepts_plain_json_from_previous_download_endpoint(
         owner_id=test_user.id,
         encrypted_content=plain_json,
         recovery_key=Fernet.generate_key().decode("utf-8"),
+        allow_legacy=True,
     )
 
     assert result.restored_documents == 1
@@ -85,6 +88,7 @@ def test_restore_accepts_legacy_unencrypted_gzip_archive(
         owner_id=test_user.id,
         encrypted_content=archive,
         recovery_key=Fernet.generate_key().decode("utf-8"),
+        allow_legacy=True,
     )
 
     assert result.restored_documents == 1
@@ -108,11 +112,31 @@ def test_restore_rejects_json_with_invalid_top_level_shape(
     db_session: Session,
     test_user: User,
 ) -> None:
-    with pytest.raises(RuntimeError, match="not a supported recovery backup"):
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    encrypted = encrypt_recovery_archive(
+        content=gzip.compress(b"[]"),
+        recovery_key=recovery_key,
+    )
+    with pytest.raises(RuntimeError, match="supported version 2 schema"):
         restore_recovery_backup(
             db=db_session,
             owner_id=test_user.id,
-            encrypted_content=b"[]",
+            encrypted_content=encrypted,
+            recovery_key=recovery_key,
+        )
+
+
+@pytest.mark.parametrize("legacy_content", [b"{}", gzip.compress(b"{}")])
+def test_restore_rejects_unencrypted_legacy_backup_by_default(
+    db_session: Session,
+    test_user: User,
+    legacy_content: bytes,
+) -> None:
+    with pytest.raises(RuntimeError, match="migration mode"):
+        restore_recovery_backup(
+            db=db_session,
+            owner_id=test_user.id,
+            encrypted_content=legacy_content,
             recovery_key=Fernet.generate_key().decode("utf-8"),
         )
 
@@ -140,11 +164,72 @@ def test_restore_rejects_a_gzip_bomb_before_json_parsing(
 ) -> None:
     monkeypatch.setattr(settings, "backup_restore_max_decompressed_size_mb", 1)
     compressed = gzip.compress(b"x" * (1024 * 1024 + 1))
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    encrypted = encrypt_recovery_archive(
+        content=compressed,
+        recovery_key=recovery_key,
+    )
 
     with pytest.raises(RuntimeError, match="expands beyond the allowed size"):
         restore_recovery_backup(
             db=db_session,
             owner_id=test_user.id,
-            encrypted_content=compressed,
-            recovery_key=Fernet.generate_key().decode("utf-8"),
+            encrypted_content=encrypted,
+            recovery_key=recovery_key,
         )
+
+
+def test_restore_schema_rejects_unknown_document_fields(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    archive = _backup_archive(
+        db=db_session,
+        email="invalid-schema-source@example.com",
+    )
+    payload = json.loads(gzip.decompress(archive))
+    payload["records"]["documents"][0]["unexpected_secret"] = "reject-me"
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    encrypted = encrypt_recovery_archive(
+        content=gzip.compress(json.dumps(payload).encode("utf-8")),
+        recovery_key=recovery_key,
+    )
+
+    with pytest.raises(RuntimeError, match="supported version 2 schema"):
+        restore_recovery_backup(
+            db=db_session,
+            owner_id=test_user.id,
+            encrypted_content=encrypted,
+            recovery_key=recovery_key,
+        )
+
+
+def test_restore_rolls_back_database_errors(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive = _backup_archive(
+        db=db_session,
+        email="database-error-source@example.com",
+    )
+    recovery_key = Fernet.generate_key().decode("utf-8")
+    encrypted = encrypt_recovery_archive(
+        content=archive,
+        recovery_key=recovery_key,
+    )
+
+    def fail_commit() -> None:
+        raise IntegrityError("INSERT documents", {}, RuntimeError("constraint"))
+
+    monkeypatch.setattr(db_session, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="could not be stored"):
+        restore_recovery_backup(
+            db=db_session,
+            owner_id=test_user.id,
+            encrypted_content=encrypted,
+            recovery_key=recovery_key,
+        )
+
+    assert not db_session.new
+    assert db_session.query(Document).filter_by(owner_id=test_user.id).count() == 0

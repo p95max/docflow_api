@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     backup_restore_max_decompressed_size_mb: int = Field(default=100, ge=1)
     backup_restore_max_documents: int = Field(default=2000, ge=1)
     backup_restore_max_raw_text_chars: int = Field(default=2_000_000, ge=1)
+    backup_allow_legacy_restore: bool = False
 
     google_drive_client_id: str | None = None
     google_drive_client_secret: str | None = None

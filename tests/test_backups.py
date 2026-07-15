@@ -22,6 +22,7 @@ from app.services.backup_recovery import (
     decrypt_recovery_archive,
     encrypt_recovery_archive,
     generate_recovery_key,
+    recovery_key_identifier,
     restore_recovery_backup,
 )
 from app.services.google_drive import DriveUploadResult
@@ -305,6 +306,7 @@ def test_run_backup_task_uploads_gzip_and_completes_job(
     assert job.compressed_size_bytes is not None
     assert job.compressed_size_bytes > 0
     assert job.checksum_sha256 is not None
+    assert job.recovery_key_id == recovery_key_identifier(recovery_key)
     assert job.record_counts is not None
     assert job.record_counts["users"] == 1
     assert job.finished_at is not None

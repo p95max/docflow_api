@@ -487,22 +487,16 @@ Items were reconciled with the code and test suite on 2026-07-15.
   anonymous CORS mode.
 - [x] Regression tests cover auth/Q&A rate limiting, quota enforcement, Redis
   failure behavior, and production configuration validation.
+- [x] Recovery restore validates schema version 2 with strict Pydantic models and
+  rolls back SQLAlchemy/constraint failures as a clean user-facing 422.
+- [x] Normal restore requires an authenticated Fernet archive; unencrypted JSON
+  and gzip imports require both the deployment migration flag and explicit UI mode.
+- [x] Backup jobs track a non-secret Recovery Key ID and allow downloading the
+  original encrypted archive, preserving backups created before key rotation.
+- [x] Backup UI and README accurately document that DocsFlow stores the current
+  Recovery Key encrypted with `BACKUP_MASTER_KEY` and explain the compromise risks.
 
 ### Unfinished and Follow-up Work
-
-### Backup and restore hardening
-
-- [ ] Validate restore payloads with a versioned Pydantic schema and handle DB
-  constraint/data errors as a clean rollback plus a user-facing 422 response.
-- [ ] Put legacy plaintext JSON/gzip restore behind an explicit migration mode or
-  add authenticity/integrity verification; normal restore should require an
-  encrypted recovery archive.
-- [ ] Track a recovery-key identifier per backup and support downloading the raw
-  encrypted archive, so backups made before key rotation remain usable through
-  DocsFlow with their old key.
-- [ ] Decide and document the recovery-key trust model: the current server can
-  decrypt the stored per-user key with `BACKUP_MASTER_KEY`, so the UI must not
-  imply that DocsFlow is technically unable to recover it.
 
 ### Reliability and functional gaps
 

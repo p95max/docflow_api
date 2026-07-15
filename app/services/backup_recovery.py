@@ -1,25 +1,19 @@
 import gzip
+import hashlib
 import io
-import json
 from dataclasses import dataclass
-from datetime import date
-from decimal import Decimal
-from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
+from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.document import (
-    Document,
-    DocumentStatus,
-    ExtractionStatus,
-    ProcessingMode,
-)
+from app.models.document import Document, DocumentStatus
 from app.models.user import User
+from app.schemas.recovery_backup import RecoveryBackupPayloadV2, RecoveryDocumentV2
 from app.services.document_index_jobs import enqueue_document_index_job
-
 
 @dataclass(frozen=True)
 class RestoreResult:
@@ -67,48 +61,51 @@ def decrypt_recovery_archive(*, content: bytes, recovery_key: str) -> bytes:
         raise RuntimeError("Recovery Key does not match this backup.") from exc
 
 
+def recovery_key_identifier(recovery_key: str) -> str:
+    _recovery_fernet(recovery_key)
+    normalized = recovery_key.strip().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()[:16]
+
+
 def restore_recovery_backup(
     *,
     db: Session,
     owner_id: int,
     encrypted_content: bytes,
     recovery_key: str,
+    allow_legacy: bool = False,
 ) -> RestoreResult:
-    """Restore encrypted archives and previously downloaded JSON export formats."""
+    """Validate and atomically restore an authenticated recovery archive."""
     if len(encrypted_content) > settings.backup_restore_max_file_size_bytes:
         raise RuntimeError("Recovery backup file exceeds the allowed size.")
     try:
-        payload = json.loads(
+        payload = RecoveryBackupPayloadV2.model_validate_json(
             _decode_backup_json(
                 content=encrypted_content,
                 recovery_key=recovery_key,
+                allow_legacy=allow_legacy,
             )
         )
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError("Recovery backup is invalid or corrupted.") from exc
+    except ValidationError as exc:
+        raise RuntimeError(
+            "Recovery backup does not match the supported version 2 schema."
+        ) from exc
 
-    if not isinstance(payload, dict):
-        raise RuntimeError("This file is not a supported recovery backup.")
-    if payload.get("schema_version") != 2:
-        raise RuntimeError("This file is not a supported recovery backup.")
-    records = payload.get("records")
-    if not isinstance(records, dict) or not isinstance(records.get("documents"), list):
-        raise RuntimeError("Recovery backup does not contain document records.")
-    if len(records["documents"]) > settings.backup_restore_max_documents:
+    if len(payload.records.documents) > settings.backup_restore_max_documents:
         raise RuntimeError("Recovery backup contains too many document records.")
 
     restored: list[Document] = []
     skipped = 0
     try:
-        for record in records["documents"]:
-            if not isinstance(record, dict):
-                continue
-            raw_text = record.get("raw_text")
-            if isinstance(raw_text, str) and (
+        for record in payload.records.documents:
+            raw_text = record.raw_text
+            if raw_text is not None and (
                 len(raw_text) > settings.backup_restore_max_raw_text_chars
             ):
-                raise RuntimeError("Recovery backup contains document text that is too large.")
-            checksum = _text_or_none(record.get("checksum_sha256"))
+                raise RuntimeError(
+                    "Recovery backup contains document text that is too large."
+                )
+            checksum = record.checksum_sha256
             if checksum and db.scalar(
                 select(Document.id).where(
                     Document.owner_id == owner_id,
@@ -123,25 +120,41 @@ def restore_recovery_backup(
             restored.append(document)
 
         db.commit()
-    except (TypeError, ValueError) as exc:
+    except RuntimeError:
         db.rollback()
-        raise RuntimeError("Recovery backup contains invalid document data.") from exc
+        raise
+    except (SQLAlchemyError, TypeError, ValueError, ArithmeticError) as exc:
+        db.rollback()
+        raise RuntimeError(
+            "Recovery backup could not be stored because its document data is invalid."
+        ) from exc
     for document in restored:
         if document.raw_text:
             enqueue_document_index_job(db=db, document=document)
     return RestoreResult(restored_documents=len(restored), skipped_documents=skipped)
 
 
-def _decode_backup_json(*, content: bytes, recovery_key: str) -> bytes:
+def _decode_backup_json(
+    *,
+    content: bytes,
+    recovery_key: str,
+    allow_legacy: bool,
+) -> bytes:
     if not content:
         raise RuntimeError("Recovery backup file is empty.")
 
     stripped = content.lstrip()
     if stripped.startswith((b"{", b"[")):
-        # Compatibility with JSON files downloaded by older DocsFlow versions.
+        if not allow_legacy:
+            raise RuntimeError(
+                "Unencrypted legacy restore is disabled. Enable migration mode explicitly."
+            )
         return content
     if content.startswith(b"\x1f\x8b"):
-        # Compatibility with unencrypted .json.gz backups.
+        if not allow_legacy:
+            raise RuntimeError(
+                "Unencrypted legacy restore is disabled. Enable migration mode explicitly."
+            )
         return _decompress_gzip_limited(content)
 
     decrypted_content = decrypt_recovery_archive(
@@ -163,31 +176,30 @@ def _decompress_gzip_limited(content: bytes) -> bytes:
     return decompressed
 
 
-def _document_from_record(*, owner_id: int, record: dict[str, Any]) -> Document:
-    raw_text = _text_or_none(record.get("raw_text"))
-    processing_mode = ProcessingMode(record.get("processing_mode", "standard"))
+def _document_from_record(*, owner_id: int, record: RecoveryDocumentV2) -> Document:
+    raw_text = record.raw_text or None
     return Document(
         owner_id=owner_id,
-        original_filename=_text_or_none(record.get("original_filename")) or "recovered-document",
+        original_filename=record.original_filename,
         status=DocumentStatus.completed if raw_text else DocumentStatus.failed,
-        processing_mode=processing_mode,
-        content_type=_text_or_none(record.get("content_type")),
+        processing_mode=record.processing_mode,
+        content_type=record.content_type,
         file_size_bytes=None,
-        checksum_sha256=_text_or_none(record.get("checksum_sha256")),
+        checksum_sha256=record.checksum_sha256,
         storage_key=None,
         raw_text=raw_text,
-        document_type=_text_or_none(record.get("document_type")),
-        ai_extracted_data=record.get("ai_extracted_data"),
-        summary=_text_or_none(record.get("summary")),
-        amount=Decimal(str(record["amount"])) if record.get("amount") is not None else None,
-        currency=_text_or_none(record.get("currency")),
-        deadline=_parse_date(record.get("deadline")),
-        document_date=_parse_date(record.get("document_date")),
-        sender=_text_or_none(record.get("sender")),
-        confidence_score=record.get("confidence_score"),
-        ai_extraction_model=_text_or_none(record.get("ai_extraction_model")),
-        manual_corrections=record.get("manual_corrections"),
-        extraction_status=ExtractionStatus(record.get("extraction_status", "draft")),
+        document_type=record.document_type,
+        ai_extracted_data=record.ai_extracted_data,
+        summary=record.summary,
+        amount=record.amount,
+        currency=record.currency,
+        deadline=record.deadline,
+        document_date=record.document_date,
+        sender=record.sender,
+        confidence_score=record.confidence_score,
+        ai_extraction_model=record.ai_extraction_model,
+        manual_corrections=record.manual_corrections,
+        extraction_status=record.extraction_status,
     )
 
 
@@ -206,13 +218,3 @@ def _recovery_fernet(recovery_key: str) -> Fernet:
         return Fernet(recovery_key.strip().encode("utf-8"))
     except ValueError as exc:
         raise RuntimeError("Recovery Key must be a valid Fernet key.") from exc
-
-
-def _parse_date(value: object) -> date | None:
-    if not isinstance(value, str) or not value:
-        return None
-    return date.fromisoformat(value)
-
-
-def _text_or_none(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None

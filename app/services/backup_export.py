@@ -229,6 +229,7 @@ def _serialize_backup_job(job: BackupJob) -> dict[str, Any]:
         "content_type": job.content_type,
         "compressed_size_bytes": job.compressed_size_bytes,
         "checksum_sha256": job.checksum_sha256,
+        "recovery_key_id": job.recovery_key_id,
         "record_counts": job.record_counts,
         "error_message": job.error_message,
         "started_at": job.started_at,

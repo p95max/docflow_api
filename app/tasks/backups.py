@@ -9,7 +9,11 @@ from app.db.session import SessionLocal
 from app.models.backup_job import BackupJob, BackupJobStatus
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
-from app.services.backup_recovery import encrypt_recovery_archive, get_recovery_key
+from app.services.backup_recovery import (
+    encrypt_recovery_archive,
+    get_recovery_key,
+    recovery_key_identifier,
+)
 from app.services.google_drive import upload_gzip_backup
 from app.services.google_drive_oauth import get_google_drive_connection
 from app.worker import celery_app
@@ -72,6 +76,7 @@ def run_backup_task(self, backup_job_id: int) -> None:
             job.content_type = "application/vnd.docsflow.recovery+fernet"
             job.compressed_size_bytes = len(encrypted_content)
             job.checksum_sha256 = hashlib.sha256(encrypted_content).hexdigest()
+            job.recovery_key_id = recovery_key_identifier(recovery_key)
             job.record_counts = archive.record_counts
             job.finished_at = datetime.now(UTC)
             job.error_message = None
