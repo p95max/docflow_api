@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.document import (
     DocumentStatus,
@@ -98,6 +98,14 @@ class DocumentCorrection(BaseModel):
 
 class DocumentNoteUpdate(BaseModel):
     user_note: str | None = Field(default=None, max_length=5000)
+
+    @field_validator("user_note")
+    @classmethod
+    def normalize_blank_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class DocumentResultRead(DocumentRead):

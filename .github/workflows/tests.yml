@@ -20,14 +20,39 @@ jobs:
       - name: Configure local environment
         run: cp .env.example .env
 
-      - name: Run test suite
+      - name: Run test suite with coverage
         id: pytest
         continue-on-error: true
         shell: bash
         run: |
+          POSTGRES_PASSWORD="$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -n 1)"
+          test -n "$POSTGRES_PASSWORD"
+
           docker compose run --rm \
-            -e TEST_POSTGRESQL_URL=postgresql+psycopg://docsflow:docsflow@db:5432/docsflow \
-            api pytest -q --tb=short > /tmp/docsflow-pytest.log 2>&1
+            -e "TEST_POSTGRESQL_URL=postgresql+psycopg://docsflow:${POSTGRES_PASSWORD}@db:5432/docsflow" \
+            api sh -lc '
+              python -m pip install --disable-pip-version-check --no-cache-dir \
+                -r /app/.github/requirements-ci.txt &&
+              pytest -q --tb=short \
+                --cov=app \
+                --cov-report=term-missing \
+                --cov-report=xml:/app/coverage.xml
+            ' > /tmp/docsflow-pytest.log 2>&1
+
+      - name: Upload coverage reports to Codecov
+        if: >-
+          steps.pytest.outcome == 'success' &&
+          (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository)
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          disable_search: true
+          flags: unittests
+          name: docsflow-pytest
+          fail_ci_if_error: true
+          verbose: true
 
       - name: Upload pytest log
         if: steps.pytest.outcome == 'failure'
