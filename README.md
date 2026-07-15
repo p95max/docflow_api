@@ -1,6 +1,5 @@
-[![CI](https://github.com/p95max/docflow_api/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/p95max/docflow_api/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/p95max/docflow_api/actions/workflows/codeql-analysis.yml/badge.svg?branch=prod)](https://github.com/p95max/docflow_api/actions/workflows/codeql-analysis.yml)
-[![Coverage](https://codecov.io/gh/p95max/docflow_api/branch/prod/graph/badge.svg)](https://codecov.io/gh/p95max/docflow_api)
+[![Tests](https://github.com/p95max/docflow_api/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/p95max/docflow_api/actions/workflows/tests.yml)
+[![Coverage](https://codecov.io/gh/p95max/docflow_api/branch/master/graph/badge.svg)](https://codecov.io/gh/p95max/docflow_api)
 
 
 # DocsFlow API
