@@ -262,9 +262,9 @@
                 <td class="text-end" data-backup-actions>
                   <div class="d-inline-flex gap-2">
                     {% if job.status.value == "completed" and job.drive_file_id %}
-                      <a class="btn btn-sm btn-outline-primary" href="/backups/{{ job.id }}/download">Download JSON</a>
+                      <a class="btn btn-sm btn-outline-primary" href="/backups/{{ job.id }}/download" title="Readable, decrypted and decompressed JSON">Decrypted JSON</a>
                       {% if job.content_type == "application/vnd.docsflow.recovery+fernet" %}
-                        <a class="btn btn-sm btn-outline-secondary" href="/backups/{{ job.id }}/download/raw">Encrypted file</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="/backups/{{ job.id }}/download/raw" title="Original encrypted archive; requires its Recovery Key">Encrypted archive</a>
                       {% endif %}
                     {% endif %}
                     {% if job.status.value in ("pending", "running") %}
@@ -357,13 +357,15 @@
           const download = document.createElement("a");
           download.className = "btn btn-sm btn-outline-primary";
           download.href = `/backups/${backup.id}/download`;
-          download.textContent = "Download JSON";
+          download.title = "Readable, decrypted and decompressed JSON";
+          download.textContent = "Decrypted JSON";
           container.append(download);
           if (backup.content_type === "application/vnd.docsflow.recovery+fernet") {
             const rawDownload = document.createElement("a");
             rawDownload.className = "btn btn-sm btn-outline-secondary";
             rawDownload.href = `/backups/${backup.id}/download/raw`;
-            rawDownload.textContent = "Encrypted file";
+            rawDownload.title = "Original encrypted archive; requires its Recovery Key";
+            rawDownload.textContent = "Encrypted archive";
             container.append(rawDownload);
           }
         }

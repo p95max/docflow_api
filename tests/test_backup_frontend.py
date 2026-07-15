@@ -34,6 +34,22 @@ def _login(client: TestClient, user: User) -> None:
     assert response.status_code == 303
 
 
+@pytest.mark.parametrize(
+    ("drive_file_name", "expected"),
+    [
+        ("backup.json.gz.enc", "backup.json"),
+        ("backup.json.gz", "backup.json"),
+        ("backup.json", "backup.json"),
+        (None, "docsflow-backup.json"),
+    ],
+)
+def test_json_download_filename_uses_plain_json_extension(
+    drive_file_name: str | None,
+    expected: str,
+) -> None:
+    assert web_backups._json_download_filename(drive_file_name) == expected
+
+
 def test_backup_page_redirects_anonymous_user(client: TestClient) -> None:
     response = client.get("/backups", follow_redirects=False)
 
@@ -333,6 +349,8 @@ def test_current_key_download_json_and_raw_encrypted_archive_both_work(
     json_response = client.get(f"/backups/{job.id}/download")
     assert json_response.status_code == 200
     assert json_response.content == b'{"schema_version": 2}'
+    assert ".json.gz.enc" not in json_response.headers["content-disposition"]
+    assert ".json" in json_response.headers["content-disposition"]
 
     raw_response = client.get(f"/backups/{job.id}/download/raw")
     assert raw_response.status_code == 200

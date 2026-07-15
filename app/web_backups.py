@@ -695,7 +695,7 @@ def download_backup(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    filename = (job.drive_file_name or "docsflow-backup.json.gz").removesuffix(".gz")
+    filename = _json_download_filename(job.drive_file_name)
     return Response(
         content=content,
         media_type="application/json",
@@ -706,6 +706,18 @@ def download_backup(
             )
         },
     )
+
+
+def _json_download_filename(drive_file_name: str | None) -> str:
+    if not drive_file_name:
+        return "docsflow-backup.json"
+    if drive_file_name.endswith(".json.gz.enc"):
+        return drive_file_name.removesuffix(".gz.enc")
+    if drive_file_name.endswith(".json.gz"):
+        return drive_file_name.removesuffix(".gz")
+    if drive_file_name.endswith(".json"):
+        return drive_file_name
+    return "docsflow-backup.json"
 
 
 def _backup_download_validation_error(
