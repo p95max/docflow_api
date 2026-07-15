@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
 import app.services.backup_recovery as backup_recovery
+from app.core.config import settings
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
@@ -112,5 +113,38 @@ def test_restore_rejects_json_with_invalid_top_level_shape(
             db=db_session,
             owner_id=test_user.id,
             encrypted_content=b"[]",
+            recovery_key=Fernet.generate_key().decode("utf-8"),
+        )
+
+
+def test_restore_rejects_an_oversized_uploaded_archive(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "backup_restore_max_file_size_mb", 1)
+
+    with pytest.raises(RuntimeError, match="exceeds the allowed size"):
+        restore_recovery_backup(
+            db=db_session,
+            owner_id=test_user.id,
+            encrypted_content=b"x" * (1024 * 1024 + 1),
+            recovery_key=Fernet.generate_key().decode("utf-8"),
+        )
+
+
+def test_restore_rejects_a_gzip_bomb_before_json_parsing(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "backup_restore_max_decompressed_size_mb", 1)
+    compressed = gzip.compress(b"x" * (1024 * 1024 + 1))
+
+    with pytest.raises(RuntimeError, match="expands beyond the allowed size"):
+        restore_recovery_backup(
+            db=db_session,
+            owner_id=test_user.id,
+            encrypted_content=compressed,
             recovery_key=Fernet.generate_key().decode("utf-8"),
         )

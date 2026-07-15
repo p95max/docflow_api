@@ -649,7 +649,11 @@ def _get_file_for_signed_request(
 
     document = db.get(Document, document_id)
 
-    if document is None or document.owner_id != token_owner_id:
+    if (
+        document is None
+        or document.owner_id != token_owner_id
+        or document.deleted_at is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",

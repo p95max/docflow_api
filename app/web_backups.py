@@ -388,7 +388,7 @@ def reset_backup_recovery_key(
 
 
 @router.post("/backups/restore", response_class=HTMLResponse, response_model=None)
-def restore_backup_submit(
+async def restore_backup_submit(
     request: Request,
     recovery_key: str = Form(...),
     backup_file: UploadFile = File(...),
@@ -399,10 +399,15 @@ def restore_backup_submit(
         return _redirect_to_login()
     try:
         validate_backup_master_key()
+        encrypted_content = await backup_file.read(
+            settings.backup_restore_max_file_size_bytes + 1
+        )
+        if len(encrypted_content) > settings.backup_restore_max_file_size_bytes:
+            raise RuntimeError("Recovery backup file exceeds the allowed size.")
         result = restore_recovery_backup(
             db=db,
             owner_id=current_user.id,
-            encrypted_content=backup_file.file.read(),
+            encrypted_content=encrypted_content,
             recovery_key=recovery_key,
         )
         if not current_user.backup_recovery_key_encrypted:

@@ -1,5 +1,5 @@
 import hashlib
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import urlsplit
 
@@ -21,6 +21,7 @@ from app.models.processing_job import (
     ProcessingOperationType,
 )
 from app.models.user import User
+from app.services.security import create_document_preview_token
 from app.services.storage import save_document_file
 
 
@@ -406,6 +407,27 @@ def test_preview_rejects_invalid_token(
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_preview_rejects_a_token_issued_before_soft_delete(
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(db=db_session, user=test_user)
+    preview_token, _ = create_document_preview_token(
+        document_id=document.id,
+        owner_id=test_user.id,
+    )
+    document.deleted_at = datetime.now(UTC)
+    db_session.commit()
+
+    response = client.get(
+        f"/api/v1/documents/{document.id}/preview",
+        params={"token": preview_token},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def _create_document_result(

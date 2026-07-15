@@ -166,10 +166,7 @@ def _redirect_to_login() -> RedirectResponse:
 
 def _is_local_development_host(request: Request) -> bool:
     hostname = request.url.hostname or ""
-    return (
-        hostname in {"localhost", "127.0.0.1", "0.0.0.0"}
-        or hostname.endswith(".app.github.dev")
-    )
+    return hostname in {"localhost", "127.0.0.1", "0.0.0.0"}
 
 
 def _template_response(
@@ -400,7 +397,11 @@ def login_page(
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
-    use_test_credentials = _is_local_development_host(request)
+    use_test_credentials = (
+        settings.app_env == "local"
+        and settings.init_test_user
+        and _is_local_development_host(request)
+    )
 
     return _template_response(
         request=request,

@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     backup_soft_time_limit_seconds: int = 120
     backup_hard_time_limit_seconds: int = 180
     backup_master_key: str | None = None
+    backup_restore_max_file_size_mb: int = Field(default=25, ge=1)
+    backup_restore_max_decompressed_size_mb: int = Field(default=100, ge=1)
+    backup_restore_max_documents: int = Field(default=2000, ge=1)
+    backup_restore_max_raw_text_chars: int = Field(default=2_000_000, ge=1)
 
     google_drive_client_id: str | None = None
     google_drive_client_secret: str | None = None
@@ -73,6 +77,14 @@ class Settings(BaseSettings):
     @property
     def upload_max_file_size_bytes(self) -> int:
         return self.upload_max_file_size_mb * 1024 * 1024
+
+    @property
+    def backup_restore_max_file_size_bytes(self) -> int:
+        return self.backup_restore_max_file_size_mb * 1024 * 1024
+
+    @property
+    def backup_restore_max_decompressed_size_bytes(self) -> int:
+        return self.backup_restore_max_decompressed_size_mb * 1024 * 1024
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -62,16 +62,15 @@ def _search_result() -> SemanticSearchResult:
     )
 
 
-def test_question_schema_normalizes_without_sentence_counting() -> None:
+def test_question_schema_enforces_one_sentence() -> None:
     assert KnowledgeQuestionCreate(
         question="  What is due to YesLogic Pty. Ltd.?  "
     ).question == "What is due to YesLogic Pty. Ltd.?"
-    assert KnowledgeQuestionCreate(
-        question="Which invoices are due? Include overdue items."
-    ).question == "Which invoices are due? Include overdue items."
 
     with pytest.raises(ValidationError):
         KnowledgeQuestionCreate(question="x" * 301)
+    with pytest.raises(ValidationError, match="one sentence"):
+        KnowledgeQuestionCreate(question="Which invoices are due? Include overdue items.")
 
 
 def test_rag_input_includes_current_date_and_structured_metadata() -> None:

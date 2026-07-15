@@ -118,7 +118,6 @@ After AI extraction, user can manually correct fields:
 ## MVP 1.2 — Presigned URLs
 
 - [x] Presigned download URLs for preview/download
-- [ ] Presigned upload URLs later, if direct upload to MinIO is required
 
 ---
 
@@ -134,8 +133,6 @@ After AI extraction, user can manually correct fields:
 - [x] Manual correction and extraction confirmation controls
 - [x] Static frontend assets served by FastAPI
 - [x] Smoke tests for frontend pages and assets
-- [ ] Improve client-side form validation and loading states
-- [ ] Add browser end-to-end tests
 
 ---
 
@@ -148,7 +145,7 @@ After AI extraction, user can manually correct fields:
 - [x] JSON backup to Google Drive
   MVP backup includes DB records and file metadata.
   Original uploaded files are not included in JSON backup.
-- [x] Store backups in a dedicated GDrive folder (`/docsflow_backups`)
+- [x] Store backups in a dedicated GDrive folder (`/docflow_backup`)
 - [x] gzip compression
 - [x] Backup metadata in DB
 - [x] Manual backup trigger
@@ -226,7 +223,6 @@ GET  /backups/{backup_id}
 - [x] Treat JPG and PNG documents as page 1
 - [x] Split extracted text into chunks of approximately 500–800 tokens
 - [x] Add approximately 100 tokens of overlap between adjacent chunks
-- [ ] Keep paragraph boundaries where possible
 - [x] Configure embeddings separately from the answer model:
   - `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`
   - `OPENAI_EMBEDDING_DIMENSIONS=1536`
@@ -258,9 +254,8 @@ GET  /backups/{backup_id}
 - [x] Return a clear "not found in documents" answer when context is insufficient
 - [x] Treat document content as untrusted input in the RAG prompt
 - [x] Limit conversation history by message count and token budget
-- [x] Limit a user question to one sentence and 300 characters
-- [x] Enforce the question limit in the API schema, not only in the UI
-- [x] Reject a question containing more than one sentence-ending `.`, `?`, or `!`
+- [x] Limit a user question to 300 characters
+- [x] Enforce the 300-character question limit in the API schema, not only in the UI
 - [x] Add endpoints:
   - `POST /api/v1/knowledge/conversations`
   - `GET /api/v1/knowledge/conversations`
@@ -290,22 +285,17 @@ GET  /backups/{backup_id}
 - [x] Validate requested document IDs belong to the current user
 - [x] Do not send `confidential` documents to external embeddings or Q&A APIs
 - [x] Show that confidential documents are unavailable in Knowledge Base
-- [ ] Add a separate local embedding and local LLM design before supporting
-  confidential documents in RAG
 
 #### Testing Focus
 
 - [x] Test deterministic page-aware chunking and overlap
 - [x] Test failed embedding retries
 - [x] Test idempotent reindexing
-- [ ] Test semantic ranking against PostgreSQL with pgvector enabled
-- [ ] Test that another user's chunks never appear in search or Q&A (implemented; requires PostgreSQL/pgvector run)
-- [ ] Test that soft-deleted documents never appear in retrieval (implemented; requires PostgreSQL/pgvector run)
 - [x] Test that confidential documents never trigger external AI calls
 - [x] Test that source IDs cannot be invented by the answer model
 - [x] Test conversation ownership and history isolation
 - [x] Keep SQLite unit tests for pure services and models
-- [ ] Add PostgreSQL integration tests for vector queries and indexes (implemented; requires PostgreSQL/pgvector run)
+- [x] Add PostgreSQL integration tests for vector ranking, ownership, soft deletion, extension, and indexes
 
 ---
 
@@ -316,7 +306,7 @@ GET  /backups/{backup_id}
 | Backend        | FastAPI, SQLAlchemy 2, Pydantic v2 |
 | Database       | PostgreSQL, Alembic, Redis         |
 | Queue          | Celery                             |
-| Storage        | MinIO / local storage              |
+| Storage        | Local filesystem                   |
 | AI             | OpenAI API                         |
 | Integrations   | Google Drive API                   |
 | Frontend       | Bootstrap 5 + vanilla JavaScript   |
@@ -329,26 +319,29 @@ GET  /backups/{backup_id}
 
 - User
 - Document
-- DocumentExtraction
 - ProcessingJob
 - OpenAIUsageLog
 - BackupJob
 - AuditLog
+- GoogleDriveConnection
+- DocumentChunk
+- DocumentIndexJob
+- KnowledgeConversation / KnowledgeMessage / KnowledgeMessageSource
 
 ---
 
 ## Document Endpoints
 
 ```text
-POST   /documents/upload
-GET    /documents
-GET    /documents/search
-GET    /documents/{document_id}
-DELETE /documents/{document_id}
-POST   /documents/{document_id}/reprocess
-PATCH  /documents/{document_id}/extraction
-POST   /documents/{document_id}/confirm
-GET    /documents/{document_id}/download-url
+POST   /api/v1/documents/upload
+GET    /api/v1/documents
+GET    /api/v1/documents/{document_id}
+GET    /api/v1/documents/{document_id}/result
+DELETE /api/v1/documents/{document_id}
+POST   /api/v1/documents/{document_id}/reprocess
+PATCH  /api/v1/documents/{document_id}/extraction
+POST   /api/v1/documents/{document_id}/confirm
+GET    /api/v1/documents/{document_id}/download-url
 ```
 
 ---
@@ -402,20 +395,18 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 
 ## Testing Focus
 
-- [ ] Upload valid document
-- [ ] Reject invalid file type
-- [ ] Reject oversized file
-- [ ] Prevent access to another user's document
-- [ ] Create ProcessingJob after upload
-- [ ] Mark document as failed when extraction fails
-- [ ] Skip OpenAI calls in confidential mode
-- [ ] Validate AI JSON response with Pydantic
-- [ ] Save OpenAI usage log
+- [x] Upload valid document
+- [x] Reject invalid file type
+- [x] Reject oversized file
+- [x] Create ProcessingJob
+- [x] Mark document as failed when extraction fails
+- [x] Skip OpenAI calls in confidential mode
+- [x] Save OpenAI usage log
 - [x] Apply manual correction
 - [x] Create Google Drive backup
 - [x] Exclude sensitive fields from backup
-- [ ] Search by document type
-- [ ] Search by deadline / due date
+- [x] Search by document type
+- [x] Search by deadline / due date
 
 ---
 
@@ -439,12 +430,12 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 - Database records
 - File metadata
 - Extraction results
+- Extracted document `raw_text` inside the encrypted recovery archive
 - Processing history
 - Backup metadata
 
 **Excluded:**
 - Original uploaded PDF / image files
-- Extracted document `raw_text`
 - Password hashes
 - OAuth tokens
 - Refresh tokens
@@ -462,3 +453,79 @@ Only local text extraction is allowed. AI extraction is skipped and marked as un
 - `medical_referral`
 - `car_document`
 - `unknown`
+
+---
+
+## Unfinished and Follow-up Work
+
+This section is the single source of truth for work that is not complete. Items
+were reconciled with the code and test suite on 2026-07-15.
+
+### Fixed in the current hardening pass
+
+- JWT access-token purpose validation, preventing document and OAuth JWTs from
+  authenticating API or web sessions.
+- Signed preview/download URLs are rejected after a document is soft-deleted.
+- Codespaces login no longer pre-fills local test credentials.
+- Baseline browser security headers and a Content Security Policy.
+- One-sentence validation for Knowledge questions.
+- Bounded recovery restore upload, gzip expansion, document count, and per-document
+  extracted text size.
+- Pytest discovery is limited to `tests/`.
+
+### Security — high priority
+
+- [ ] Add CSRF protection to every cookie-authenticated state-changing HTML form
+  (logout, document changes/deletion, conversations, backups, and Drive disconnect).
+- [ ] Encrypt Google Drive refresh tokens at rest and define key rotation.
+- [ ] Add shared Redis-backed rate limits for login, registration, uploads,
+  semantic search, and Q&A; add per-user OpenAI usage/cost quotas.
+- [ ] Harden deployment defaults: require a non-placeholder 32+ byte
+  `APP_SECRET_KEY`, remove `--reload` outside local development, and do not expose
+  PostgreSQL/Redis with default credentials in a deployment configuration.
+- [ ] Self-host Bootstrap or pin the CDN asset with integrity metadata.
+
+### Backup and restore hardening
+
+- [ ] Validate restore payloads with a versioned Pydantic schema and handle DB
+  constraint/data errors as a clean rollback plus a user-facing 422 response.
+- [ ] Put legacy plaintext JSON/gzip restore behind an explicit migration mode or
+  add authenticity/integrity verification; normal restore should require an
+  encrypted recovery archive.
+- [ ] Track a recovery-key identifier per backup and support downloading the raw
+  encrypted archive, so backups made before key rotation remain usable through
+  DocsFlow with their old key.
+- [ ] Decide and document the recovery-key trust model: the current server can
+  decrypt the stored per-user key with `BACKUP_MASTER_KEY`, so the UI must not
+  imply that DocsFlow is technically unable to recover it.
+
+### Reliability and functional gaps
+
+- [ ] Handle Celery enqueue failures for document upload/reprocess: persist a
+  failed job/document state and offer retry instead of leaving a pending job with
+  no task ID after the document transaction has committed.
+- [ ] Replace the process-local upload limiter with the shared limiter above so
+  multiple API workers cannot bypass it.
+- [ ] Catch concurrent registration conflicts and return 409 instead of a DB 500.
+- [ ] Keep paragraph boundaries where possible during document chunking.
+- [ ] Add a separate local embedding and local LLM design before supporting
+  confidential documents in RAG.
+- [ ] Improve client-side form validation and loading states.
+- [ ] Add browser end-to-end tests.
+- [ ] Add presigned upload URLs if direct upload to object storage is introduced.
+
+### Verification and missing regression tests
+
+- [ ] Run the existing PostgreSQL/pgvector integration suite and confirm semantic
+  ranking, owner isolation, soft-delete filtering, extension, and vector indexes.
+- [ ] Add explicit cross-user tests for document detail/result and signed-file
+  access.
+- [ ] Add a negative test proving malformed AI structured output is rejected by
+  Pydantic and does not persist partial extraction/usage data.
+- [ ] Add tests for CSRF rejection, auth/Q&A rate limits, encrypted OAuth token
+  storage, and bounded backup restore/decompression.
+
+### Documentation cleanup
+
+- [ ] Remove stale README claims that both processing modes are local-only and
+  that scanned-PDF OCR fallback is not implemented.

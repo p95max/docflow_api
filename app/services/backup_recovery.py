@@ -1,4 +1,5 @@
 import gzip
+import io
 import json
 from dataclasses import dataclass
 from datetime import date
@@ -74,6 +75,8 @@ def restore_recovery_backup(
     recovery_key: str,
 ) -> RestoreResult:
     """Restore encrypted archives and previously downloaded JSON export formats."""
+    if len(encrypted_content) > settings.backup_restore_max_file_size_bytes:
+        raise RuntimeError("Recovery backup file exceeds the allowed size.")
     try:
         payload = json.loads(
             _decode_backup_json(
@@ -91,6 +94,8 @@ def restore_recovery_backup(
     records = payload.get("records")
     if not isinstance(records, dict) or not isinstance(records.get("documents"), list):
         raise RuntimeError("Recovery backup does not contain document records.")
+    if len(records["documents"]) > settings.backup_restore_max_documents:
+        raise RuntimeError("Recovery backup contains too many document records.")
 
     restored: list[Document] = []
     skipped = 0
@@ -98,6 +103,11 @@ def restore_recovery_backup(
         for record in records["documents"]:
             if not isinstance(record, dict):
                 continue
+            raw_text = record.get("raw_text")
+            if isinstance(raw_text, str) and (
+                len(raw_text) > settings.backup_restore_max_raw_text_chars
+            ):
+                raise RuntimeError("Recovery backup contains document text that is too large.")
             checksum = _text_or_none(record.get("checksum_sha256"))
             if checksum and db.scalar(
                 select(Document.id).where(
@@ -132,13 +142,25 @@ def _decode_backup_json(*, content: bytes, recovery_key: str) -> bytes:
         return content
     if content.startswith(b"\x1f\x8b"):
         # Compatibility with unencrypted .json.gz backups.
-        return gzip.decompress(content)
+        return _decompress_gzip_limited(content)
 
     decrypted_content = decrypt_recovery_archive(
         content=content,
         recovery_key=recovery_key,
     )
-    return gzip.decompress(decrypted_content)
+    return _decompress_gzip_limited(decrypted_content)
+
+
+def _decompress_gzip_limited(content: bytes) -> bytes:
+    max_size = settings.backup_restore_max_decompressed_size_bytes
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(content), mode="rb") as archive:
+            decompressed = archive.read(max_size + 1)
+    except OSError as exc:
+        raise RuntimeError("Recovery backup is invalid or corrupted.") from exc
+    if len(decompressed) > max_size:
+        raise RuntimeError("Recovery backup expands beyond the allowed size.")
+    return decompressed
 
 
 def _document_from_record(*, owner_id: int, record: dict[str, Any]) -> Document:

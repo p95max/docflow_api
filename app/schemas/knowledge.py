@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -62,6 +63,18 @@ class KnowledgeQuestionCreate(BaseModel):
         normalized = " ".join(value.split())
         if not normalized:
             raise ValueError("Question must not be blank")
+        without_common_abbreviations = re.sub(
+            r"\b(?:Mr|Mrs|Ms|Dr|Prof|Pty|Ltd|Inc|Corp|Co)\.",
+            "",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        sentence_endings = re.findall(
+            r"[.!?]+(?=\s|$)",
+            without_common_abbreviations,
+        )
+        if len(sentence_endings) > 1:
+            raise ValueError("Ask one sentence at a time")
         return normalized
 
 

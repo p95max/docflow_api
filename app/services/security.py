@@ -7,6 +7,7 @@ from app.core.config import settings
 
 
 JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_PURPOSE = "access"
 DOCUMENT_PREVIEW_TOKEN_PURPOSE = "document_preview"
 DOCUMENT_DOWNLOAD_TOKEN_PURPOSE = "document_download"
 
@@ -35,6 +36,7 @@ def create_access_token(subject: str) -> str:
 
     payload = {
         "sub": subject,
+        "purpose": ACCESS_TOKEN_PURPOSE,
         "exp": expires_at,
     }
 
@@ -47,11 +49,14 @@ def create_access_token(subject: str) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Decode and validate a JWT access token."""
-    return jwt.decode(
+    payload = jwt.decode(
         token,
         settings.app_secret_key,
         algorithms=[JWT_ALGORITHM],
     )
+    if payload.get("purpose") != ACCESS_TOKEN_PURPOSE:
+        raise jwt.InvalidTokenError("Invalid access token purpose.")
+    return payload
 
 
 def create_document_preview_token(

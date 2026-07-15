@@ -1,11 +1,16 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.models.user import User
 
 
 def test_login_page_is_server_rendered_without_javascript(
     client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "app_env", "local")
+    monkeypatch.setattr(settings, "init_test_user", True)
     response = client.get(
         "/login",
         headers={"host": "localhost:8000"},
@@ -19,6 +24,32 @@ def test_login_page_is_server_rendered_without_javascript(
     assert 'value="m@m.com"' in response.text
     assert 'value="12345678"' in response.text
     assert "<script" not in response.text
+
+
+def test_codespaces_login_does_not_prefill_test_credentials(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_env", "local")
+    monkeypatch.setattr(settings, "init_test_user", True)
+
+    response = client.get(
+        "/login",
+        headers={"host": "workspace-123.app.github.dev"},
+    )
+
+    assert response.status_code == 200
+    assert 'value="m@m.com"' not in response.text
+    assert 'value="12345678"' not in response.text
+
+
+def test_responses_include_baseline_security_headers(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "same-origin"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
 
 
 def test_protected_html_page_redirects_to_login(
