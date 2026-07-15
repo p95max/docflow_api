@@ -45,7 +45,10 @@
   {% endif %}
 
   {% if restore_result %}
-    <div class="alert alert-success" role="alert">{{ restore_result }}</div>
+    <div class="alert alert-success" role="alert">
+      {{ restore_result }} Original PDF, JPG and PNG files were not restored;
+      restored documents contain their extracted content and fields only.
+    </div>
   {% endif %}
 
   {% if recovery_key_once %}
@@ -169,8 +172,12 @@
     <div class="card-body">
       <h2 class="h6">Backup scope</h2>
       <p class="text-secondary mb-0">
-        Recovery backups include extracted document text and are uploaded to <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as encrypted <code>.json.gz.enc</code> files.
-        Original PDF, JPG and PNG files are not included.
+        Recovery backups preserve document records, extracted text and fields so
+        they can be restored after a database loss. They are uploaded to
+        <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as
+        encrypted <code>.json.gz.enc</code> files. Original PDF, JPG and PNG
+        files are not included, so restored documents have no preview or
+        original-file download.
       </p>
     </div>
   </div>
@@ -191,7 +198,7 @@
   <details class="card shadow-sm mb-4">
     <summary class="card-header cursor-pointer">Restore recovery backup</summary>
     <div class="card-body">
-      <p class="text-secondary">Restores document text without original PDF, JPG or PNG files. Standard documents are indexed again automatically.</p>
+      <p class="text-secondary">Restores document records, extracted text and fields without original PDF, JPG or PNG files. After recovery, previews and original-file downloads are unavailable. Standard documents are indexed again automatically.</p>
       <form method="post" action="/backups/restore" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="mb-3">

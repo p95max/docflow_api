@@ -285,6 +285,10 @@ def _render_document_detail(
         document=document,
         preview_url=_relative_url(document.file_preview_url),
         download_url=_relative_url(document.file_download_url),
+        recovery_data_only=(
+            document.file_preview_url is None
+            and document.file_size_bytes is None
+        ),
         error=error,
         status_code=status_code,
     )

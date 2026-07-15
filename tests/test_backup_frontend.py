@@ -209,6 +209,7 @@ def test_restore_recovery_backup_restores_text_and_queues_indexing(
 
     assert response.status_code == 200
     assert "Restored 1 document(s); skipped 0 duplicate(s)." in response.text
+    assert "Original PDF, JPG and PNG files were not restored" in response.text
     restored = db_session.query(Document).filter_by(owner_id=test_user.id).one()
     assert restored.original_filename == "invoice.pdf"
     assert restored.storage_key is None

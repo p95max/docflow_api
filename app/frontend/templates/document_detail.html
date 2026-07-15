@@ -55,6 +55,15 @@
   <div class="col-lg-7">
     {% if preview_url %}
       <iframe class="preview-frame" title="Document preview" src="{{ preview_url }}"></iframe>
+    {% elif recovery_data_only %}
+      <div class="alert alert-warning mb-0">
+        <h2 class="h6">Restored backup data only</h2>
+        <p class="mb-0">
+          This document was restored with its extracted text and fields, but its
+          original PDF, JPG or PNG file was not included in the recovery backup.
+          Preview and original-file download are unavailable.
+        </p>
+      </div>
     {% else %}
       <div class="alert alert-secondary">Preview is not available yet.</div>
     {% endif %}
