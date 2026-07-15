@@ -25,22 +25,34 @@ async def add_security_headers(request: Request, call_next):
     """Apply baseline browser protections to HTML and API responses."""
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "same-origin")
-    response.headers.setdefault(
-        "Content-Security-Policy",
-        (
-            "default-src 'self'; "
-            "base-uri 'self'; "
-            "form-action 'self'; "
-            "frame-ancestors 'none'; "
-            "object-src 'none'; "
-            "img-src 'self' data:; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "script-src 'self' 'unsafe-inline'; "
-            "connect-src 'self'"
-        ),
+    is_document_preview = (
+        request.url.path.startswith("/api/v1/documents/")
+        and request.url.path.endswith("/preview")
     )
+    if is_document_preview:
+        # Signed previews are embedded only by the document page on this origin.
+        # X-Frame-Options: DENY would otherwise block the PDF iframe entirely.
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
+        )
+    else:
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            (
+                "default-src 'self'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
+                "frame-ancestors 'none'; "
+                "object-src 'none'; "
+                "img-src 'self' data:; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline'; "
+                "connect-src 'self'"
+            ),
+        )
     return response
 
 

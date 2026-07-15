@@ -86,6 +86,10 @@ def test_get_document_result_returns_extraction_and_preview(
     assert preview_response.headers["content-disposition"].startswith(
         "inline;"
     )
+    assert "x-frame-options" not in preview_response.headers
+    assert "frame-ancestors 'self'" in preview_response.headers[
+        "content-security-policy"
+    ]
 
     download_url = urlsplit(payload["file_download_url"])
     download_response = client.get(
