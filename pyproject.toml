@@ -45,6 +45,15 @@ markers = [
     "postgres: requires TEST_POSTGRESQL_URL and a PostgreSQL server with pgvector",
 ]
 
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["app"]
+omit = ["app/frontend/templates/*"]
+
+[tool.coverage.report]
+show_missing = true
+
 [dependency-groups]
 e2e = [
     "playwright>=1.52,<2.0",
