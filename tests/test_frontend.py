@@ -1,9 +1,13 @@
+from http.cookies import SimpleCookie
+from time import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.models.user import User
-from app.web import CSRF_COOKIE_NAME
+from app.services.security import decode_access_token
+from app.web import CSRF_COOKIE_NAME, SESSION_COOKIE_NAME
 
 
 def test_login_page_is_server_rendered_without_javascript(
@@ -26,6 +30,7 @@ def test_login_page_is_server_rendered_without_javascript(
     assert '<form method="post" action="/login">' in response.text
     assert 'value="m@m.com"' in response.text
     assert 'value="12345678"' in response.text
+    assert 'name="remember_me"' in response.text
     assert "data-form-feedback" in response.text
     assert 'src="/assets/js/app.js"' not in response.text
 
@@ -114,6 +119,33 @@ def test_html_login_uses_http_only_cookie_and_renders_documents(
     assert "data-form-feedback" in documents_response.text
     assert "Ask Documents" in documents_response.text
     assert 'class="docsflow-ai-icon"' in documents_response.text
+
+
+def test_remember_me_uses_a_longer_persistent_session(
+    client: TestClient,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "remember_me_token_expire_days", 7)
+
+    login_response = client.post(
+        "/login",
+        data={
+            "email": test_user.email,
+            "password": "strong-password",
+            "remember_me": "true",
+        },
+        follow_redirects=False,
+    )
+
+    cookie = SimpleCookie()
+    cookie.load(login_response.headers["set-cookie"])
+    token = cookie[SESSION_COOKIE_NAME].value
+    payload = decode_access_token(token)
+
+    assert login_response.status_code == 303
+    assert "max-age=604800" in login_response.headers["set-cookie"].lower()
+    assert payload["exp"] >= int(time()) + (6 * 24 * 60 * 60)
 
 
 def test_frontend_css_is_served_and_javascript_bundle_is_removed(

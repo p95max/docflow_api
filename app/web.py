@@ -453,6 +453,7 @@ def login_page(
         name="login.html",
         email_value="m@m.com" if use_test_credentials else "",
         password_value="12345678" if use_test_credentials else "",
+        remember_me=False,
         registered=request.query_params.get("registered") == "1",
     )
 
@@ -467,6 +468,7 @@ def login_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    remember_me: bool = Form(False),
     db: Session = Depends(get_db),
 ) -> Response:
     try:
@@ -477,6 +479,7 @@ def login_submit(
             name="login.html",
             email_value=email,
             password_value="",
+            remember_me=remember_me,
             error=_exception_message(exc),
             status_code=exc.status_code,
         )
@@ -493,11 +496,19 @@ def login_submit(
             name="login.html",
             email_value=email,
             password_value="",
+            remember_me=remember_me,
             error="Incorrect email or password.",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    token = create_access_token(subject=str(user.id))
+    session_minutes = settings.access_token_expire_minutes
+    if remember_me:
+        session_minutes = settings.remember_me_token_expire_days * 24 * 60
+
+    token = create_access_token(
+        subject=str(user.id),
+        expires_in_minutes=session_minutes,
+    )
     response = RedirectResponse(
         url="/documents",
         status_code=status.HTTP_303_SEE_OTHER,
@@ -505,7 +516,7 @@ def login_submit(
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
-        max_age=settings.access_token_expire_minutes * 60,
+        max_age=session_minutes * 60,
         httponly=True,
         secure=request.url.scheme == "https",
         samesite="lax",

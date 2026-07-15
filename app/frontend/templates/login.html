@@ -21,6 +21,11 @@
         <label class="form-label" for="password">Password</label>
         <input class="form-control" id="password" name="password" type="password" required autocomplete="current-password" value="{{ password_value }}">
       </div>
+      <div class="form-check mb-4">
+        <input class="form-check-input" id="remember_me" name="remember_me" type="checkbox" value="true" {% if remember_me %}checked{% endif %}>
+        <label class="form-check-label" for="remember_me">Keep me signed in on this device</label>
+        <div class="form-text">Use this only on a personal or trusted device.</div>
+      </div>
       <button class="btn btn-primary w-100" type="submit">Log in</button>
     </form>
     <p class="small text-center mt-3 mb-0">No account? <a href="/register">Register</a></p>

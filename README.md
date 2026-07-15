@@ -677,6 +677,7 @@ file.
 | `APP_DEBUG` | `true` | Debug mode |
 | `APP_SECRET_KEY` | — | Random secret of at least 32 characters; placeholders are rejected outside local/test |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | JWT expiry |
+| `REMEMBER_ME_TOKEN_EXPIRE_DAYS` | `30` | Lifetime of the explicit “Keep me signed in” browser session; 1–90 days. |
 | `POSTGRES_PASSWORD` | — | Required PostgreSQL password used by Docker Compose |
 | `DATABASE_URL` | `postgresql+psycopg://...` | PostgreSQL connection |
 | `CORS_ORIGINS` | `["http://localhost:8000"]` | Allowed origins |

@@ -28,10 +28,15 @@ def verify_password(password: str, password_hash: str) -> bool:
     )
 
 
-def create_access_token(subject: str) -> str:
-    """Create a short-lived JWT access token."""
+def create_access_token(
+    subject: str,
+    *,
+    expires_in_minutes: int | None = None,
+) -> str:
+    """Create an access token with the configured or explicitly requested lifetime."""
+    lifetime_minutes = expires_in_minutes or settings.access_token_expire_minutes
     expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.access_token_expire_minutes,
+        minutes=lifetime_minutes,
     )
 
     payload = {

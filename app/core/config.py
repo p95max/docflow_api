@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_debug: bool = True
     app_secret_key: str = Field(min_length=32)
     access_token_expire_minutes: int = 30
+    remember_me_token_expire_days: int = Field(default=30, ge=1, le=90)
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
 
