@@ -158,6 +158,7 @@ def _serialize_document(document: Document) -> dict[str, Any]:
         "document_type": document.document_type,
         "ai_extracted_data": document.ai_extracted_data,
         "summary": document.summary,
+        "user_note": document.user_note,
         "amount": document.amount,
         "currency": document.currency,
         "deadline": document.deadline,

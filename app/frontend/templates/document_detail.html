@@ -79,15 +79,27 @@
           <dt class="col-sm-5 text-secondary">Sender</dt>
           <dd class="col-sm-7">{{ document.sender or "—" }}</dd>
           <dt class="col-sm-5 text-secondary">Document date</dt>
-          <dd class="col-sm-7">{{ document.document_date or "—" }}</dd>
+          <dd class="col-sm-7">
+            {% if document.document_date %}
+              {{ document.document_date }}
+            {% else %}
+              <span class="text-secondary fst-italic">Not specified in document</span>
+            {% endif %}
+          </dd>
           <dt class="col-sm-5 text-secondary">Deadline</dt>
-          <dd class="col-sm-7">{{ document.deadline or "—" }}</dd>
+          <dd class="col-sm-7">
+            {% if document.deadline %}
+              {{ document.deadline }}
+            {% else %}
+              <span class="text-secondary fst-italic">Not specified in document</span>
+            {% endif %}
+          </dd>
           <dt class="col-sm-5 text-secondary">Amount</dt>
           <dd class="col-sm-7">
             {% if document.amount is not none %}
               {{ document.amount }} {{ document.currency or "" }}
             {% else %}
-              —
+              <span class="text-secondary fst-italic">Not specified in document</span>
             {% endif %}
           </dd>
           <dt class="col-sm-5 text-secondary">Extraction</dt>

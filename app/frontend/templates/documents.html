@@ -141,7 +141,15 @@
               <td>
                 <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
               </td>
-              <td>{{ document.file_size_bytes|file_size }}</td>
+              <td>
+                {% if document.file_size_bytes is not none %}
+                  {{ document.file_size_bytes|file_size }}
+                {% else %}
+                  <span class="text-warning small" title="Restored backup data: the original file was not included">
+                    Backup data only
+                  </span>
+                {% endif %}
+              </td>
               <td>
                 <span class="badge {{ document.status|status_badge_class }}">{{ document.status.value }}</span>
               </td>

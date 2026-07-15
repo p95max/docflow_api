@@ -37,6 +37,7 @@ from app.schemas.document import (
     DocumentCorrection,
     DocumentFileUrl,
     DocumentListRead,
+    DocumentNoteUpdate,
     DocumentRead,
     DocumentResultRead,
 )
@@ -377,6 +378,42 @@ def correct_document_result(
         latest_job=latest_job,
         request=request,
     )
+
+
+@router.patch(
+    "/{document_id}/note",
+    response_model=DocumentRead,
+)
+def update_document_note(
+    document_id: int,
+    note: DocumentNoteUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DocumentRead:
+    """Save a user-owned note without changing extracted document fields."""
+    document = _get_owned_document(
+        db=db,
+        document_id=document_id,
+        current_user=current_user,
+    )
+    user_note = note.user_note.strip() if note.user_note else None
+
+    if document.user_note != user_note:
+        db.add(
+            AuditLog(
+                document_id=document.id,
+                user_id=current_user.id,
+                action="document_note_updated",
+                field_name="user_note",
+                old_value=document.user_note,
+                new_value=user_note,
+            )
+        )
+        document.user_note = user_note
+        db.commit()
+        db.refresh(document)
+
+    return DocumentRead.model_validate(document)
 
 
 @router.post(

@@ -28,6 +28,7 @@ class DocumentRead(BaseModel):
     ai_extraction_completed_at: datetime | None
 
     summary: str | None
+    user_note: str | None
     amount: float | None
     currency: str | None
     deadline: date | None
@@ -93,6 +94,10 @@ class DocumentCorrection(BaseModel):
         ge=0,
         le=1,
     )
+
+
+class DocumentNoteUpdate(BaseModel):
+    user_note: str | None = Field(default=None, max_length=5000)
 
 
 class DocumentResultRead(DocumentRead):

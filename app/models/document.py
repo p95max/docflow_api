@@ -137,6 +137,11 @@ class Document(Base):
         nullable=True,
     )
 
+    user_note: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
     amount: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=14, scale=2),
         index=True,

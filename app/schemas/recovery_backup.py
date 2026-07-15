@@ -24,6 +24,7 @@ class RecoveryDocumentV2(BaseModel):
     document_type: str | None = Field(default=None, max_length=50)
     ai_extracted_data: dict[str, Any] | None = None
     summary: str | None = None
+    user_note: str | None = Field(default=None, max_length=5000)
     amount: Decimal | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     deadline: date | None = None

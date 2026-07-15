@@ -191,6 +191,7 @@ def _document_from_record(*, owner_id: int, record: RecoveryDocumentV2) -> Docum
         document_type=record.document_type,
         ai_extracted_data=record.ai_extracted_data,
         summary=record.summary,
+        user_note=record.user_note,
         amount=record.amount,
         currency=record.currency,
         deadline=record.deadline,
