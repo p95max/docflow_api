@@ -223,6 +223,52 @@ def test_manual_correction_updates_effective_fields(
     assert document.ai_extracted_data == original_ai_data
 
 
+def test_document_note_is_optional_and_audited(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+
+    saved_response = client.patch(
+        f"/api/v1/documents/{document.id}/note",
+        headers=auth_headers,
+        json={"user_note": "Call the supplier next week."},
+    )
+    assert saved_response.status_code == status.HTTP_200_OK
+    assert saved_response.json()["user_note"] == "Call the supplier next week."
+
+    db_session.refresh(document)
+    assert document.user_note == "Call the supplier next week."
+
+    cleared_response = client.patch(
+        f"/api/v1/documents/{document.id}/note",
+        headers=auth_headers,
+        json={"user_note": "   "},
+    )
+    assert cleared_response.status_code == status.HTTP_200_OK
+    assert cleared_response.json()["user_note"] is None
+
+    audit_logs = list(
+        db_session.scalars(
+            select(AuditLog)
+            .where(
+                AuditLog.document_id == document.id,
+                AuditLog.action == "document_note_updated",
+            )
+            .order_by(AuditLog.id)
+        ).all()
+    )
+    assert [(log.old_value, log.new_value) for log in audit_logs] == [
+        (None, "Call the supplier next week."),
+        ("Call the supplier next week.", None),
+    ]
+
+
 def test_manual_correction_creates_audit_log_for_each_changed_field(
     client: TestClient,
     auth_headers: dict[str, str],

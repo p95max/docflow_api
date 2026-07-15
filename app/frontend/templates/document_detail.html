@@ -29,6 +29,9 @@
 {% if request.query_params.get("saved") == "1" %}
   <div class="alert alert-success">Changes saved.</div>
 {% endif %}
+{% if request.query_params.get("note_saved") == "1" %}
+  <div class="alert alert-success">Personal note saved.</div>
+{% endif %}
 {% if request.query_params.get("confirmed") == "1" %}
   <div class="alert alert-success">Extraction confirmed.</div>
 {% endif %}
@@ -115,6 +118,18 @@
           <hr>
           <p class="document-summary mb-0">{{ document.summary }}</p>
         {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h2 class="h5">Personal note <span class="small fw-normal text-secondary">(optional)</span></h2>
+        <p class="small text-secondary">Visible only in your DocsFlow account and included in recovery backups.</p>
+        <form method="post" action="/documents/{{ document.id }}/note">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <textarea class="form-control mb-3" id="user_note" name="user_note" rows="4" maxlength="5000" placeholder="Add a note for yourself...">{{ document.user_note or "" }}</textarea>
+          <button class="btn btn-outline-primary" type="submit">Save note</button>
+        </form>
       </div>
     </div>
 

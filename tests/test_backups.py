@@ -132,6 +132,7 @@ def test_recovery_backup_restores_document_text_and_queues_indexing(
         raw_text="Invoice 161126 is due in 30 days.",
         document_type="invoice",
         ai_extracted_data={"invoice_number": "161126"},
+        user_note="Confirm payment before the due date.",
     )
     db_session.add(source_document)
     db_session.commit()
@@ -162,6 +163,7 @@ def test_recovery_backup_restores_document_text_and_queues_indexing(
     assert restored.storage_key is None
     assert restored.raw_text == "Invoice 161126 is due in 30 days."
     assert restored.ai_extracted_data == {"invoice_number": "161126"}
+    assert restored.user_note == "Confirm payment before the due date."
     assert queued_document_ids == [restored.id]
 
     second_result = restore_recovery_backup(

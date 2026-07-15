@@ -34,6 +34,7 @@ from app.api.v1.routes_documents import (
     get_my_document as api_get_my_document,
     list_my_documents as api_list_my_documents,
     reprocess_document as api_reprocess_document,
+    update_document_note as api_update_document_note,
     upload_document as api_upload_document,
 )
 from app.core.config import settings
@@ -42,7 +43,7 @@ from app.models.user import User
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_index_job import DocumentIndexJobStatus
 from app.models.knowledge_message import KnowledgeMessageRole
-from app.schemas.document import DocumentCorrection
+from app.schemas.document import DocumentCorrection, DocumentNoteUpdate
 from app.schemas.knowledge import KnowledgeConversationCreate, KnowledgeQuestionCreate
 from app.services.document_search import DocumentSortField, SortDirection
 from app.services.document_index_jobs import enqueue_document_index_job
@@ -1134,6 +1135,56 @@ def correct_document_submit(
 
     return RedirectResponse(
         url=f"/documents/{document_id}?saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/documents/{document_id}/note",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def update_document_note_submit(
+    document_id: int,
+    request: Request,
+    user_note: str = Form(""),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+
+    if current_user is None:
+        return _redirect_to_login()
+
+    try:
+        api_update_document_note(
+            document_id=document_id,
+            note=DocumentNoteUpdate(user_note=_blank_to_none(user_note)),
+            db=db,
+            current_user=current_user,
+        )
+    except ValidationError as exc:
+        error = exc.errors()[0].get("msg", "Invalid note.")
+        return _render_document_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            document_id=document_id,
+            error=error,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    except HTTPException as exc:
+        return _render_document_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            document_id=document_id,
+            error=_exception_message(exc),
+            status_code=exc.status_code,
+        )
+
+    return RedirectResponse(
+        url=f"/documents/{document_id}?note_saved=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
