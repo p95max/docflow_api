@@ -1,12 +1,15 @@
 #!/bin/sh
 
-set -e
+set -eu
 
-echo "Running database migrations..."
+echo "Checking for pending database migrations..."
 
 attempt=1
 max_attempts=10
 
+# `upgrade head` is safe when the database is already current: Alembic exits
+# successfully without applying anything. New revisions copied or mounted into
+# the container are applied on every full container start before the API boots.
 until alembic upgrade head; do
   if [ "$attempt" -ge "$max_attempts" ]; then
     echo "Database migrations failed after $max_attempts attempts."
@@ -18,7 +21,7 @@ until alembic upgrade head; do
   sleep 3
 done
 
-echo "Database migrations completed."
+echo "Database schema is at the latest Alembic revision."
 echo "Encrypting Google Drive refresh tokens with the active key..."
 python -m scripts.rotate_google_drive_tokens
 echo "Initializing local test user..."

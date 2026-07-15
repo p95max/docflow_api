@@ -331,7 +331,12 @@ On every API start, the entrypoint script executes:
 alembic upgrade head
 ```
 
-If the database is empty, all migrations are applied before the FastAPI server starts. If the database is already up to date, Alembic exits without changes.
+If the database is empty, all migrations are applied before the FastAPI server
+starts. If the database is already up to date, Alembic exits without changes.
+The Celery worker waits for the API health check, so it cannot start against an
+older schema. A migration added to an already running development container is
+applied after a full container restart; Uvicorn hot reload alone does not rerun
+the entrypoint script.
 
 The migration startup script is located at:
 

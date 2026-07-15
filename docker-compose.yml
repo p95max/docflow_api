@@ -16,6 +16,12 @@ services:
       - .:/app
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       db:
         condition: service_healthy
@@ -38,6 +44,8 @@ services:
     volumes:
       - .:/app
     depends_on:
+      api:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:

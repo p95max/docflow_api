@@ -28,3 +28,7 @@ RUN poetry install --no-root
 COPY . .
 
 EXPOSE 8000
+
+# Keep the image safe to run without docker-compose as well. The startup script
+# applies all pending Alembic revisions before launching Uvicorn.
+CMD ["sh", "scripts/start-api.sh"]
