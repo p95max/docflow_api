@@ -2,11 +2,13 @@
 [![Coverage](https://codecov.io/gh/p95max/docflow_api/branch/master/graph/badge.svg)](https://codecov.io/gh/p95max/docflow_api)
 
 
-# DocsFlow API
+# DocsFlow
 
-DocsFlow API is a FastAPI-based backend service for uploading, storing and processing documents.
-
-Current MVP scope includes user authentication, document upload, local file storage, asynchronous processing with Celery, processing job tracking, and local text extraction for supported document types.
+DocsFlow is a server-rendered FastAPI application for personal document
+management. It uploads and processes documents asynchronously, extracts
+structured fields, supports a per-user Knowledge Base, and creates encrypted
+Google Drive recovery backups. FastAPI serves both the JSON API and the
+Bootstrap interface; there is no separate frontend service or build step.
 
 ## Tech Stack
 
@@ -18,7 +20,8 @@ Current MVP scope includes user authentication, document upload, local file stor
 | Queue | Celery, Redis |
 | PDF Extraction | PyMuPDF |
 | OCR | Tesseract |
-| Testing | Pytest |
+| Search / RAG | pgvector, OpenAI embeddings and responses |
+| Testing | Pytest, optional Playwright |
 | Infrastructure | Docker Compose v2 |
 
 ---
@@ -48,6 +51,15 @@ Current MVP scope includes user authentication, document upload, local file stor
 - Maximum file size limit
 - Per-user upload rate limiting
 - Duplicate document detection by SHA-256 checksum
+- Soft deletion: a deleted upload may be uploaded again
+- Per-document optional personal note (up to 5,000 characters)
+
+### Document Library
+
+The Documents page supports pagination, sorting, a collapsible filter panel,
+and search across filename and extracted text. Filters include document type,
+status, upload/document/deadline dates, amount, and action-required state.
+Documents and all associated API responses are isolated by owner.
 
 ### Processing Modes
 
@@ -98,9 +110,11 @@ Completed standard documents have a review lifecycle:
 | `corrected` | A user changed one or more extracted fields |
 | `confirmed` | A user confirmed the current extraction |
 
-Users can correct the amount, document date, document type, sender/vendor and
-other existing extraction fields. Every effective field change is stored as a
-separate immutable `AuditLog` row with the old and new value.
+Users can correct the amount, document date, document type, sender/vendor,
+summary, currency, deadline and confidence score. Every effective field change
+is stored as a separate immutable `AuditLog` row with the old and new value.
+Personal notes are optional, private to the account, audited, and included in
+recovery backups.
 
 ### Signed File URLs
 
@@ -120,8 +134,8 @@ separate frontend server or JavaScript build step is required.
 | `/register` | Create an account |
 | `/documents` | List the current user's documents |
 | `/documents/upload` | Upload a document and select confidential mode |
-| `/documents/{id}` | Preview, download, correct, and confirm extraction |
-| `/knowledge` | Ask questions about indexed documents and check indexing status |
+| `/documents/{id}` | Preview/download a file, edit extracted fields, add a note, confirm or delete |
+| `/knowledge` | Create conversations and ask concise questions about indexed documents |
 | `/backups` | Create encrypted Google Drive recovery backups and restore document data |
 
 The browser receives the short-lived access token in an HTTP-only cookie.
@@ -129,10 +143,15 @@ Bootstrap is pinned to version 5.3.8 and protected with the official SHA-384
 Subresource Integrity hash. Deployments may still vendor it under
 `app/frontend/assets/` if a network-independent interface is required.
 
+Server-rendered forms retain normal HTML validation and add a small progressive
+enhancement for invalid-field highlighting, loading labels, and double-submit
+protection. The application remains usable when JavaScript is unavailable.
+
 ### Knowledge Base / RAG
 
 The Knowledge Base indexes completed `standard` documents into page-aware
-chunks and answers questions only from the current user's retrieved chunks.
+paragraph-aware chunks and answers questions only from the current user's
+retrieved chunks. Questions are limited to one sentence and 300 characters.
 Each answer retains a snapshot of its source filename, page, snippet, and
 similarity score. `confidential` documents are never indexed or sent to OpenAI.
 The planned local-only embedding and LLM architecture required before enabling
@@ -164,10 +183,11 @@ python -m poetry run alembic upgrade head
 ### Recovery backups
 
 Backups on `/backups` are recovery archives: they contain document metadata,
-extracted text, and the structured extraction result, but not original PDF,
-JPG, or PNG files. Each archive is encrypted with a per-user **Recovery Key**
-before it is uploaded to Google Drive. The key is displayed once after it is
-generated; save it in a password manager or another secure location.
+extracted text, optional personal notes, and structured extraction results, but
+not original PDF, JPG, or PNG files. Each archive is encrypted with a per-user
+**Recovery Key** before it is uploaded to Google Drive. The key is displayed
+once after it is generated; save it in a password manager or another secure
+location.
 
 For the first backup, use this sequence:
 
@@ -205,8 +225,10 @@ decrypted or re-encrypted by DocsFlow.
 
 To recover after a database loss, recreate or sign in to the account, open
 `/backups`, select the encrypted `.json.gz.enc` archive, and enter its
-Recovery Key. Documents are restored without their original files; completed
-standard documents are automatically queued for Knowledge Base indexing.
+Recovery Key. Documents are restored without their original files, so preview
+and original-file download are unavailable; the UI labels these records as
+backup data only. Completed standard documents with extracted text are
+automatically queued for Knowledge Base indexing.
 Normal restore accepts only authenticated Fernet archives. To migrate an old
 unencrypted JSON or JSON.gz export, temporarily set
 `BACKUP_ALLOW_LEGACY_RESTORE=true`, explicitly select migration mode in the
@@ -240,6 +262,11 @@ Multiple previous keys may be supplied as a comma-separated list during a
 staged rotation. Keep all token-encryption keys in the secret store, never in
 source control.
 
+Google OAuth uses the restricted `drive.file` scope. On connection DocsFlow
+creates or reuses `/docflow_backup` (configurable with
+`GOOGLE_DRIVE_FOLDER_NAME`) in the connected Google Drive root, then stores
+only the archives created by DocsFlow in that folder.
+
 ---
 
 ## Project Structure
@@ -260,6 +287,9 @@ app/
     user.py
     document.py
     audit_log.py
+    document_chunk.py
+    backup_job.py
+    knowledge_conversation.py
     processing_job.py
   schemas/
   services/
@@ -267,13 +297,16 @@ app/
     storage.py
     processing_jobs.py
     text_extraction.py
+    backup_recovery.py
+    semantic_search.py
   tasks/
     documents.py
   worker.py
   main.py
   web.py
+  web_backups.py
   frontend/
-    index.html
+    templates/
     assets/
 
 alembic/
@@ -344,6 +377,9 @@ alembic upgrade head
 
 If the database is empty, all migrations are applied before the FastAPI server
 starts. If the database is already up to date, Alembic exits without changes.
+The entrypoint validates the environment first, retries a temporarily
+unavailable database up to ten times, rotates stored Google Drive tokens with
+the active encryption key, and optionally initializes the local test user.
 The Celery worker waits for the API health check, so it cannot start against an
 older schema. A migration added to an already running development container is
 applied after a full container restart; Uvicorn hot reload alone does not rerun
@@ -388,6 +424,13 @@ documents
 processing_jobs
 openai_usage_logs
 audit_logs
+document_chunks
+document_index_jobs
+knowledge_conversations
+knowledge_messages
+knowledge_message_sources
+google_drive_connections
+backup_jobs
 alembic_version
 ```
 
@@ -477,6 +520,10 @@ curl "http://localhost:8000/api/v1/documents?query=invoice&document_type=invoice
 curl http://localhost:8000/api/v1/documents/1 \
   -H "Authorization: Bearer $TOKEN"
 
+# Get the processing result, extracted text and signed file URLs
+curl http://localhost:8000/api/v1/documents/1/result \
+  -H "Authorization: Bearer $TOKEN"
+
 # Create a signed download URL for one document
 curl http://localhost:8000/api/v1/documents/1/download-url \
   -H "Authorization: Bearer $TOKEN"
@@ -504,6 +551,16 @@ curl -X PATCH http://localhost:8000/api/v1/documents/1/extraction \
 curl -X POST http://localhost:8000/api/v1/documents/1/confirm \
   -H "Authorization: Bearer $TOKEN"
 
+# Save or clear the optional personal note (use null to clear)
+curl -X PATCH http://localhost:8000/api/v1/documents/1/note \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"user_note": "Call the supplier next week."}'
+
+# Soft-delete a document; its original file is retained on local storage
+curl -X DELETE http://localhost:8000/api/v1/documents/1 \
+  -H "Authorization: Bearer $TOKEN"
+
 ```
 
 > Reprocessing is allowed only for documents with status `failed`.
@@ -512,7 +569,9 @@ curl -X POST http://localhost:8000/api/v1/documents/1/confirm \
 
 ## Check Extracted Text
 
-The public document response does not expose `raw_text`.
+The list and single-document endpoints do not expose `raw_text`. The owned
+`/api/v1/documents/{id}/result` response and the document detail page do expose
+it after processing, so keep API credentials and backups secure.
 
 For local development, inspect extracted text directly in PostgreSQL:
 
@@ -558,6 +617,13 @@ python -m poetry run playwright install chromium
 E2E_BASE_URL=http://localhost:8000 python -m poetry run pytest -m e2e -q
 ```
 
+In PowerShell, set the URL for the command this way:
+
+```powershell
+$env:E2E_BASE_URL = "http://localhost:8000"
+python -m poetry run pytest -m e2e -q
+```
+
 For Codespaces, set `E2E_BASE_URL` to the forwarded port URL when the browser
 cannot reach `localhost:8000` directly.
 
@@ -601,7 +667,9 @@ docker compose down -v
 
 ## Environment Variables
 
-Main settings are configured through `.env`.
+All settings are configured through `.env`; [`.env.example`](.env.example)
+contains the complete local-development template. Do not commit a real `.env`
+file.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -636,7 +704,7 @@ Main settings are configured through `.env`.
 | `DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS` | `90` | Hard task limit |
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
-| `BACKUP_MASTER_KEY` | â€” | Valid Fernet key used to protect stored per-user Recovery Keys |
+| `BACKUP_MASTER_KEY` | Not set | Valid Fernet key used to protect stored per-user Recovery Keys |
 | `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` | — | Active Fernet key used to encrypt Google Drive refresh tokens at rest |
 | `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS` | — | Comma-separated old Fernet keys used temporarily during key rotation |
 | `BACKUP_RESTORE_MAX_FILE_SIZE_MB` | `25` | Maximum uploaded recovery archive size |
@@ -644,6 +712,31 @@ Main settings are configured through `.env`.
 | `BACKUP_RESTORE_MAX_DOCUMENTS` | `2000` | Maximum documents accepted from one restore |
 | `BACKUP_RESTORE_MAX_RAW_TEXT_CHARS` | `2000000` | Maximum extracted text length per restored document |
 | `BACKUP_ALLOW_LEGACY_RESTORE` | `false` | Temporarily expose explicit migration mode for trusted unencrypted legacy exports |
+
+### Additional current settings
+
+| Variable | Default | Description |
+|---|---|---|
+| `INIT_TEST_USER` | `false` | Creates/updates the local test account; valid only with `APP_ENV=local`. |
+| `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` | `m@m.com` / `12345678` | Credentials for the optional local test account. |
+| `DOCUMENT_PREVIEW_TOKEN_EXPIRE_MINUTES` | `10` | Lifetime of signed preview and download URLs. |
+| `BACKUP_SOFT_TIME_LIMIT_SECONDS` / `BACKUP_HARD_TIME_LIMIT_SECONDS` | `120` / `180` | Backup task limits. |
+| `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` | Not set | OAuth client credentials for user-authorized Google Drive backups. |
+| `GOOGLE_DRIVE_REDIRECT_URI` | `http://localhost:8000/backups/google/callback` | Callback URI registered in Google Cloud. |
+| `GOOGLE_DRIVE_FOLDER_NAME` / `GOOGLE_DRIVE_TIMEOUT_SECONDS` | `docflow_backup` / `60` | Backup folder in Drive root and Google HTTP timeout. |
+| `GOOGLE_OAUTH_STATE_EXPIRE_MINUTES` | `10` | OAuth state lifetime. |
+| `GOOGLE_DRIVE_REFRESH_TOKEN` | Not set | Deprecated and ignored; each user connects Drive through OAuth. |
+| `OPENAI_API_KEY` | Not set | Required for standard AI extraction and enabled Knowledge Base operations. |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model for standard document extraction. |
+| `OPENAI_REQUEST_TIMEOUT_SECONDS` / `OPENAI_MAX_INPUT_CHARS` | `45` / `12000` | Standard extraction request limits. |
+| `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS` | `text-embedding-3-small` / `1536` | Knowledge Base embedding model and vector size. |
+| `OPENAI_RAG_MODEL` / `OPENAI_RAG_REASONING_EFFORT` | `gpt-5.6-terra` / `high` | Knowledge Base answer model and reasoning effort. |
+| `OPENAI_RAG_MAX_CONTEXT_CHARS` / `OPENAI_RAG_MAX_OUTPUT_TOKENS` | `24000` / `800` | RAG context and answer limits. |
+| `KNOWLEDGE_ENABLED` | `true` | Enables indexing plus Knowledge Base UI and API. |
+| `KNOWLEDGE_RETRIEVAL_LIMIT` / `KNOWLEDGE_MIN_SIMILARITY` | `8` / `0.25` | Maximum retrieved chunks and minimum similarity. |
+| `KNOWLEDGE_HISTORY_MESSAGE_LIMIT` / `KNOWLEDGE_HISTORY_TOKEN_BUDGET` | `8` / `1600` | Conversation-history limits. |
+| `DOCUMENT_INDEXING_SOFT_TIME_LIMIT_SECONDS` / `DOCUMENT_INDEXING_HARD_TIME_LIMIT_SECONDS` / `DOCUMENT_INDEXING_BATCH_SIZE` | `120` / `180` / `64` | Indexing task limits and embedding batch size. |
+| `DOCUMENT_CHUNK_SIZE_TOKENS` / `DOCUMENT_CHUNK_OVERLAP_TOKENS` | `700` / `100` | Paragraph-aware chunk size and overlap. |
 
 ---
 
@@ -674,13 +767,11 @@ Processing flow for standard documents:
 
 ```text
 upload
-→ local text extraction
-→ AI document classification
-→ AI structured JSON extraction
-→ Pydantic validation
-→ save extracted JSON
-→ save OpenAI usage log
-→ mark document as completed
+-> local text extraction
+-> AI structured JSON extraction (including document type)
+-> Pydantic validation
+-> save extracted JSON and OpenAI usage log
+-> mark document as completed
 ```
 
 > AI processing is executed only after local text extraction has completed successfully.
@@ -785,14 +876,16 @@ docker compose exec db psql -U docsflow -d docsflow \
 
 ## Current Limitations
 
-- `raw_text` is stored internally but not exposed through the public API
+- `raw_text` is available only to the document owner through the result endpoint; it is not included in list or single-document responses
 - Uploaded files are stored on the local filesystem
+- Recovery backups restore extracted content and metadata, but never the original PDF, JPG, or PNG file
 - Abuse limits require Redis; protected operations fail closed while Redis is unavailable
-- AI extraction is available only for `standard` mode — `confidential` documents are never sent to OpenAI
+- AI extraction is available only for `standard` mode; `confidential` documents are never sent to OpenAI
 - AI extraction depends on successful local text extraction
 - Extracted JSON schema is generic and will be refined in later MVP steps
 - Knowledge Base retrieval is available only for indexed `standard` documents
 - Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
+- Confidential RAG is intentionally not enabled until the documented local-only embedding and LLM design is implemented
 - standard-mode AI extraction requires `OPENAI_API_KEY`
 
 ## Contacts
