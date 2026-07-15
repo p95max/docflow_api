@@ -2,6 +2,11 @@
 
 set -eu
 
+echo "Validating application configuration..."
+# Configuration errors are deterministic and must fail immediately. Retrying
+# them as if PostgreSQL were still starting only hides the actionable error.
+python -c "from app.core.config import settings; print('Application configuration is valid.')"
+
 echo "Checking for pending database migrations..."
 
 attempt=1

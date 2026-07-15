@@ -293,6 +293,10 @@ Before the first start, replace `APP_SECRET_KEY` with a random value of at least
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
+Copy the generated value to `APP_SECRET_KEY` in `.env`. Placeholder values such
+as `change-me-in-production` are intentionally rejected, and the startup script
+stops before attempting database migrations when the configuration is invalid.
+
 For an existing PostgreSQL volume, setting a new Compose environment variable
 does not change the password already stored in PostgreSQL. Start once with the
 current password, change the `docsflow` role password, then update both
