@@ -200,6 +200,57 @@ table th {
   transform: rotate(180deg);
 }
 
+.backup-download-menu {
+  text-align: left;
+}
+
+.backup-download-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.backup-download-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.backup-download-menu > summary::after {
+  display: inline-block;
+  margin-left: 0.4rem;
+  content: "\25BE";
+  transition: transform 0.15s ease-in-out;
+}
+
+.backup-download-menu[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.backup-download-options {
+  display: grid;
+  width: min(19rem, 75vw);
+  margin-top: 0.35rem;
+  margin-left: auto;
+  gap: 0.25rem;
+}
+
+.backup-download-option {
+  display: grid;
+  padding: 0.5rem 0.65rem;
+  color: var(--bs-body-color);
+  text-decoration: none;
+  border-radius: var(--bs-border-radius-sm);
+}
+
+.backup-download-option:hover,
+.backup-download-option:focus-visible {
+  color: var(--bs-body-color);
+  background: var(--bs-secondary-bg);
+}
+
+.backup-download-option small {
+  white-space: normal;
+}
+
 .source-card {
   background: var(--bs-tertiary-bg);
 }

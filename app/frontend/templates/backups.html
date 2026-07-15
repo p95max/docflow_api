@@ -262,10 +262,21 @@
                 <td class="text-end" data-backup-actions>
                   <div class="d-inline-flex gap-2">
                     {% if job.status.value == "completed" and job.drive_file_id %}
-                      <a class="btn btn-sm btn-outline-primary" href="/backups/{{ job.id }}/download" title="Readable, decrypted and decompressed JSON">Decrypted JSON</a>
-                      {% if job.content_type == "application/vnd.docsflow.recovery+fernet" %}
-                        <a class="btn btn-sm btn-outline-secondary" href="/backups/{{ job.id }}/download/raw" title="Original encrypted archive; requires its Recovery Key">Encrypted archive</a>
-                      {% endif %}
+                      <details class="backup-download-menu">
+                        <summary class="btn btn-sm btn-outline-primary">Download</summary>
+                        <div class="backup-download-options border rounded shadow-sm bg-body-tertiary p-2">
+                          {% if job.content_type == "application/vnd.docsflow.recovery+fernet" %}
+                            <a class="backup-download-option" href="/backups/{{ job.id }}/download/raw">
+                              <span class="fw-semibold">Encrypted backup</span>
+                              <small class="text-secondary">.json.gz.enc · For recovery with its Recovery Key</small>
+                            </a>
+                          {% endif %}
+                          <a class="backup-download-option" href="/backups/{{ job.id }}/download">
+                            <span class="fw-semibold">Readable JSON export</span>
+                            <small class="text-secondary">.json · Decrypted data for viewing or export</small>
+                          </a>
+                        </div>
+                      </details>
                     {% endif %}
                     {% if job.status.value in ("pending", "running") %}
                       <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Backup is still running">Delete</button>
@@ -348,26 +359,49 @@
         form.append(csrf, button);
         return form;
       };
+      const createDownloadOption = ({ href, label, description }) => {
+        const link = document.createElement("a");
+        link.className = "backup-download-option";
+        link.href = href;
+        const title = document.createElement("span");
+        title.className = "fw-semibold";
+        title.textContent = label;
+        const help = document.createElement("small");
+        help.className = "text-secondary";
+        help.textContent = description;
+        link.append(title, help);
+        return link;
+      };
+      const createDownloadMenu = (backup) => {
+        const details = document.createElement("details");
+        details.className = "backup-download-menu";
+        const summary = document.createElement("summary");
+        summary.className = "btn btn-sm btn-outline-primary";
+        summary.textContent = "Download";
+        const options = document.createElement("div");
+        options.className = "backup-download-options border rounded shadow-sm bg-body-tertiary p-2";
+        if (backup.content_type === "application/vnd.docsflow.recovery+fernet") {
+          options.append(createDownloadOption({
+            href: `/backups/${backup.id}/download/raw`,
+            label: "Encrypted backup",
+            description: ".json.gz.enc · For recovery with its Recovery Key",
+          }));
+        }
+        options.append(createDownloadOption({
+          href: `/backups/${backup.id}/download`,
+          label: "Readable JSON export",
+          description: ".json · Decrypted data for viewing or export",
+        }));
+        details.append(summary, options);
+        return details;
+      };
       const updateActions = (row, backup) => {
         const actions = row.querySelector("[data-backup-actions]");
         if (!actions) return;
         const container = document.createElement("div");
         container.className = "d-inline-flex gap-2";
         if (backup.status === "completed" && backup.drive_file_id) {
-          const download = document.createElement("a");
-          download.className = "btn btn-sm btn-outline-primary";
-          download.href = `/backups/${backup.id}/download`;
-          download.title = "Readable, decrypted and decompressed JSON";
-          download.textContent = "Decrypted JSON";
-          container.append(download);
-          if (backup.content_type === "application/vnd.docsflow.recovery+fernet") {
-            const rawDownload = document.createElement("a");
-            rawDownload.className = "btn btn-sm btn-outline-secondary";
-            rawDownload.href = `/backups/${backup.id}/download/raw`;
-            rawDownload.title = "Original encrypted archive; requires its Recovery Key";
-            rawDownload.textContent = "Encrypted archive";
-            container.append(rawDownload);
-          }
+          container.append(createDownloadMenu(backup));
         }
         container.append(createDeleteForm(backup.id));
         actions.replaceChildren(container);
