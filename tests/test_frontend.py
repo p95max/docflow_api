@@ -20,6 +20,8 @@ def test_login_page_is_server_rendered_without_javascript(
     assert response.status_code == 200
     assert "DocsFlow" in response.text
     assert "bootstrap" in response.text.lower()
+    assert "sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" in response.text
+    assert 'crossorigin="anonymous"' in response.text
     assert 'data-bs-theme="dark"' in response.text
     assert '<form method="post" action="/login">' in response.text
     assert 'value="m@m.com"' in response.text

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import CurrentUser
 from app.db.session import get_db
 from app.schemas.user import UserCreate, UserRead
+from app.services.rate_limits import enforce_registration_rate_limit
 from app.services.users import create_user, get_user_by_email
 
 router = APIRouter()
@@ -16,9 +17,11 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def register(
+    request: Request,
     payload: UserCreate,
     db: Session = Depends(get_db),
 ) -> UserRead:
+    enforce_registration_rate_limit(request=request, email=str(payload.email))
     existing_user = get_user_by_email(db, payload.email)
 
     if existing_user is not None:

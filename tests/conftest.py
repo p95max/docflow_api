@@ -14,6 +14,8 @@ os.environ["CORS_ORIGINS"] = '["http://testserver"]'
 os.environ["UPLOAD_MAX_FILE_SIZE_MB"] = "1"
 os.environ["UPLOAD_RATE_LIMIT_REQUESTS"] = "100"
 os.environ["UPLOAD_RATE_LIMIT_WINDOW_SECONDS"] = "60"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+os.environ["RATE_LIMIT_REDIS_URL"] = "redis://redis:6379/2"
 os.environ["LOCAL_STORAGE_PATH"] = "storage-test"
 
 os.environ["CELERY_BROKER_URL"] = "memory://"
@@ -64,7 +66,6 @@ from app.models.user import User  # noqa: F401, E402
 
 from app.main import app  # noqa: E402
 from app.services.security import create_access_token  # noqa: E402
-from app.services.uploads import _upload_rate_limit_state  # noqa: E402
 from app.services.users import create_user  # noqa: E402
 from app.web import CSRF_COOKIE_NAME  # noqa: E402
 
@@ -106,8 +107,6 @@ def client(
     monkeypatch.setattr(settings, "upload_rate_limit_requests", 100)
     monkeypatch.setattr(settings, "upload_rate_limit_window_seconds", 60)
 
-    _upload_rate_limit_state.clear()
-
     def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
@@ -120,7 +119,6 @@ def client(
         yield test_client
 
     app.dependency_overrides.clear()
-    _upload_rate_limit_state.clear()
 
 
 @pytest.fixture

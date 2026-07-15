@@ -11,6 +11,7 @@ from app.models.document_index_job import DocumentIndexJob, DocumentIndexJobStat
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.services.document_chunking import build_document_chunk_drafts
 from app.services.embeddings import create_embeddings
+from app.services.rate_limits import enforce_openai_usage_quota
 from app.services.text_extraction import (
     ExtractedTextPage,
     extract_text_pages_from_document,
@@ -63,6 +64,7 @@ def index_document_task(self, index_job_id: int) -> None:
                 db.commit()
                 return
 
+            enforce_openai_usage_quota(db=db, owner_id=document.owner_id)
             embedding_result = create_embeddings(
                 texts=[draft.content for draft in drafts]
             )
@@ -96,6 +98,7 @@ def index_document_task(self, index_job_id: int) -> None:
             db.add(
                 OpenAIUsageLog(
                     document_id=document.id,
+                    owner_id=document.owner_id,
                     operation="document_embedding",
                     model=settings.openai_embedding_model,
                     input_tokens=embedding_result.input_tokens,

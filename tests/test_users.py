@@ -1,5 +1,6 @@
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,15 @@ def test_registration_race_returns_conflict(
 
     with pytest.raises(HTTPException) as exc_info:
         routes_users.register(
+            request=Request(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/api/v1/users/register",
+                    "headers": [],
+                    "client": ("127.0.0.1", 12345),
+                }
+            ),
             payload=UserCreate(
                 email="race@example.com",
                 password="strong-password",

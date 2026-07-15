@@ -19,6 +19,10 @@ from app.services.knowledge_conversations import (
     get_owned_conversation,
     list_conversations,
 )
+from app.services.rate_limits import (
+    enforce_knowledge_question_rate_limit,
+    enforce_semantic_search_rate_limit,
+)
 from app.services.semantic_search import search_document_chunks
 
 
@@ -40,6 +44,7 @@ def semantic_search(
     current_user: CurrentUser,
 ) -> SemanticSearchResponse:
     _require_knowledge_enabled()
+    enforce_semantic_search_rate_limit(user_id=current_user.id)
     try:
         results = search_document_chunks(
             db=db,
@@ -146,6 +151,7 @@ def ask_knowledge_question(
     current_user: CurrentUser,
 ) -> KnowledgeAnswerResponse:
     _require_knowledge_enabled()
+    enforce_knowledge_question_rate_limit(user_id=current_user.id)
     try:
         user_message, assistant_message = answer_conversation_question(
             db=db,

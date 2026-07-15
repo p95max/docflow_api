@@ -13,6 +13,7 @@ from app.models.knowledge_message_source import KnowledgeMessageSource
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.schemas.knowledge import SemanticSearchResult
 from app.services.openai_client import create_openai_client, extract_openai_usage
+from app.services.rate_limits import enforce_openai_usage_quota
 from app.services.semantic_search import search_document_chunks
 from app.services.structured_knowledge_queries import answer_structured_question
 
@@ -169,6 +170,7 @@ def answer_conversation_question(
                 sources=[],
             )
 
+        enforce_openai_usage_quota(db=db, owner_id=owner_id)
         response = create_openai_client().responses.parse(
             model=settings.openai_rag_model,
             reasoning={"effort": settings.openai_rag_reasoning_effort},

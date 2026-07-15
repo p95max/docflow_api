@@ -26,4 +26,8 @@ python -m scripts.init_test_user
 
 echo "Starting API server..."
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+if [ "${APP_ENV:-local}" = "local" ]; then
+  exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+fi
+
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "${WEB_CONCURRENCY:-2}"

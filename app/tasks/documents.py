@@ -17,6 +17,7 @@ from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.local_document_classification import classify_document_type
+from app.services.rate_limits import enforce_openai_usage_quota
 from app.services.text_extraction import extract_text_from_document
 from app.worker import celery_app
 
@@ -64,6 +65,7 @@ def process_document_task(self, job_id: int) -> None:
                 if local_document_type != "other":
                     document.document_type = local_document_type
             else:
+                enforce_openai_usage_quota(db=db, owner_id=document.owner_id)
                 ai_result = run_standard_ai_processing(
                     raw_text=extracted_text,
                     original_filename=document.original_filename,
@@ -225,6 +227,7 @@ def _apply_standard_ai_processing_result(
     db.add(
         OpenAIUsageLog(
             document_id=document.id,
+            owner_id=document.owner_id,
             operation="document_ai_extraction",
             model=ai_result.model,
             response_id=ai_result.response_id,

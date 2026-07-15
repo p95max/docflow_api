@@ -5,6 +5,7 @@ from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_chunk import DocumentChunk
 from app.schemas.knowledge import SemanticSearchResult
 from app.services.embeddings import create_embeddings
+from app.services.rate_limits import enforce_openai_usage_quota
 
 
 def search_document_chunks(
@@ -25,6 +26,7 @@ def search_document_chunks(
     if allowed_document_ids == []:
         return []
 
+    enforce_openai_usage_quota(db=db, owner_id=owner_id)
     query_embedding = create_embeddings(texts=[query]).vectors[0]
     distance = DocumentChunk.embedding.cosine_distance(query_embedding).label("distance")
     conditions = [

@@ -478,17 +478,17 @@ Items were reconciled with the code and test suite on 2026-07-15.
   are migrated on startup, and active/previous-key rotation is documented.
 - [x] Regression tests verify encrypted OAuth token storage, legacy-token migration,
   and re-encryption with a rotated key.
+- [x] Shared Redis-backed limits protect login, registration, uploads, semantic
+  search, and Q&A; per-user OpenAI operation/token quotas bound usage and spend.
+- [x] Deployment defaults require a 32+ character non-placeholder production
+  secret, disable debug/test-user settings and reload outside local development,
+  require a PostgreSQL password, and keep PostgreSQL/Redis off host ports.
+- [x] Bootstrap 5.3.8 is pinned with the official SHA-384 integrity hash and
+  anonymous CORS mode.
+- [x] Regression tests cover auth/Q&A rate limiting, quota enforcement, Redis
+  failure behavior, and production configuration validation.
 
 ### Unfinished and Follow-up Work
-
-### Security — high priority
-
-- [ ] Add shared Redis-backed rate limits for login, registration, uploads,
-  semantic search, and Q&A; add per-user OpenAI usage/cost quotas.
-- [ ] Harden deployment defaults: require a non-placeholder 32+ byte
-  `APP_SECRET_KEY`, remove `--reload` outside local development, and do not expose
-  PostgreSQL/Redis with default credentials in a deployment configuration.
-- [ ] Self-host Bootstrap or pin the CDN asset with integrity metadata.
 
 ### Backup and restore hardening
 
@@ -506,8 +506,6 @@ Items were reconciled with the code and test suite on 2026-07-15.
 
 ### Reliability and functional gaps
 
-- [ ] Replace the process-local upload limiter with the shared limiter above so
-  multiple API workers cannot bypass it.
 - [ ] Keep paragraph boundaries where possible during document chunking.
 - [ ] Add a separate local embedding and local LLM design before supporting
   confidential documents in RAG.
@@ -523,4 +521,3 @@ Items were reconciled with the code and test suite on 2026-07-15.
   access.
 - [ ] Add a negative test proving malformed AI structured output is rejected by
   Pydantic and does not persist partial extraction/usage data.
-- [ ] Add tests for auth/Q&A rate limits.

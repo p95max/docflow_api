@@ -1,13 +1,12 @@
 import hashlib
-from collections import defaultdict, deque
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
 from app.models.user import User
+from app.services.rate_limits import enforce_upload_rate_limit as enforce_shared_upload_rate_limit
 
 ALLOWED_UPLOAD_MIME_TYPES = {
     "application/pdf": "pdf",
@@ -16,9 +15,6 @@ ALLOWED_UPLOAD_MIME_TYPES = {
 }
 
 UPLOAD_CHUNK_SIZE = 1024 * 1024
-
-_upload_rate_limit_state: dict[int, deque[datetime]] = defaultdict(deque)
-
 
 @dataclass(frozen=True)
 class ValidatedUpload:
@@ -31,21 +27,8 @@ class ValidatedUpload:
 
 
 def enforce_upload_rate_limit(current_user: User) -> None:
-    """Apply a simple in-memory per-user rate limit for document uploads."""
-    now = datetime.now(UTC)
-    window = timedelta(seconds=settings.upload_rate_limit_window_seconds)
-    bucket = _upload_rate_limit_state[current_user.id]
-
-    while bucket and bucket[0] <= now - window:
-        bucket.popleft()
-
-    if len(bucket) >= settings.upload_rate_limit_requests:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Upload rate limit exceeded. Please try again later.",
-        )
-
-    bucket.append(now)
+    """Apply the shared Redis-backed per-user upload limit."""
+    enforce_shared_upload_rate_limit(user_id=current_user.id)
 
 
 async def read_and_validate_upload_file(upload_file: UploadFile) -> ValidatedUpload:

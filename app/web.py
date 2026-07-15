@@ -55,6 +55,11 @@ from app.services.knowledge_conversations import (
 )
 from app.schemas.user import UserCreate
 from app.services.security import create_access_token, decode_access_token
+from app.services.rate_limits import (
+    enforce_knowledge_question_rate_limit,
+    enforce_login_rate_limit,
+    enforce_registration_rate_limit,
+)
 from app.services.uploads import enforce_upload_rate_limit
 from app.services.users import (
     authenticate_user,
@@ -459,6 +464,18 @@ def login_submit(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ) -> Response:
+    try:
+        enforce_login_rate_limit(request=request, email=email)
+    except HTTPException as exc:
+        return _template_response(
+            request=request,
+            name="login.html",
+            email_value=email,
+            password_value="",
+            error=_exception_message(exc),
+            status_code=exc.status_code,
+        )
+
     user = authenticate_user(
         db=db,
         email=email,
@@ -539,6 +556,17 @@ def register_submit(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ) -> Response:
+    try:
+        enforce_registration_rate_limit(request=request, email=email)
+    except HTTPException as exc:
+        return _template_response(
+            request=request,
+            name="register.html",
+            email_value=email,
+            error=_exception_message(exc),
+            status_code=exc.status_code,
+        )
+
     try:
         payload = UserCreate(
             email=email,
@@ -747,6 +775,7 @@ def ask_knowledge_question_submit(
 
     try:
         payload = KnowledgeQuestionCreate(question=question)
+        enforce_knowledge_question_rate_limit(user_id=current_user.id)
         answer_conversation_question(
             db=db,
             owner_id=current_user.id,
@@ -762,6 +791,16 @@ def ask_knowledge_question_submit(
             question_value=question,
             error=exc.errors()[0].get("msg", "Invalid question."),
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    except HTTPException as exc:
+        return _render_knowledge_conversation(
+            request=request,
+            db=db,
+            current_user=current_user,
+            conversation_id=conversation_id,
+            question_value=question,
+            error=_exception_message(exc),
+            status_code=exc.status_code,
         )
     except LookupError as exc:
         return _render_knowledge_conversation(

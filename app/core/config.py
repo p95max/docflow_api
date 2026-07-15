@@ -1,14 +1,14 @@
 import json
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_env: str = "local"
     app_debug: bool = True
-    app_secret_key: str = Field(min_length=16)
+    app_secret_key: str = Field(min_length=32)
     access_token_expire_minutes: int = 30
     database_url: str
     cors_origins: list[str] = ["http://localhost:8000"]
@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     upload_max_file_size_mb: int = 10
     upload_rate_limit_requests: int = 10
     upload_rate_limit_window_seconds: int = 60
+
+    rate_limit_enabled: bool = True
+    rate_limit_redis_url: str = "redis://redis:6379/2"
+    login_rate_limit_requests: int = Field(default=10, ge=1)
+    login_rate_limit_window_seconds: int = Field(default=300, ge=1)
+    registration_rate_limit_requests: int = Field(default=5, ge=1)
+    registration_rate_limit_window_seconds: int = Field(default=3600, ge=1)
+    semantic_search_rate_limit_requests: int = Field(default=30, ge=1)
+    semantic_search_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    knowledge_question_rate_limit_requests: int = Field(default=10, ge=1)
+    knowledge_question_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    openai_daily_request_quota: int = Field(default=200, ge=1)
+    openai_daily_token_quota: int = Field(default=500_000, ge=1)
 
     local_storage_path: str = "storage"
 
@@ -109,6 +122,20 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in parsed if str(origin).strip()]
 
         return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def validate_deployment_security(self) -> "Settings":
+        if self.app_env.casefold() not in {"local", "test"}:
+            if self.app_debug:
+                raise ValueError("APP_DEBUG must be false outside local development")
+            if self.init_test_user:
+                raise ValueError("INIT_TEST_USER must be false outside local development")
+            normalized_secret = self.app_secret_key.casefold()
+            if "change-me" in normalized_secret or "development" in normalized_secret:
+                raise ValueError(
+                    "APP_SECRET_KEY must not use a placeholder outside local development"
+                )
+        return self
 
 
 settings = Settings()

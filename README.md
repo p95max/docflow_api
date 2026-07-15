@@ -121,9 +121,9 @@ separate frontend server or JavaScript build step is required.
 | `/backups` | Create encrypted Google Drive recovery backups and restore document data |
 
 The browser receives the short-lived access token in an HTTP-only cookie.
-Bootstrap is loaded from its CDN; production
-deployments may vendor the Bootstrap files under `app/frontend/assets/` if a
-network-independent interface is required.
+Bootstrap is pinned to version 5.3.8 and protected with the official SHA-384
+Subresource Integrity hash. Deployments may still vendor it under
+`app/frontend/assets/` if a network-independent interface is required.
 
 ### Knowledge Base / RAG
 
@@ -271,6 +271,20 @@ Create a local environment file:
 ```bash
 cp .env.example .env
 ```
+
+Before the first start, replace `APP_SECRET_KEY` with a random value of at least
+32 characters and set `POSTGRES_PASSWORD`; the password embedded in
+`DATABASE_URL` must match it. For example, generate an application secret with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+For an existing PostgreSQL volume, setting a new Compose environment variable
+does not change the password already stored in PostgreSQL. Start once with the
+current password, change the `docsflow` role password, then update both
+`POSTGRES_PASSWORD` and `DATABASE_URL`. PostgreSQL and Redis are reachable only
+inside the Compose network; use `docker compose exec` for administrative access.
 
 Start the stack:
 
@@ -499,9 +513,8 @@ docker compose run --rm api pytest tests/test_processing_jobs.py
 docker compose run --rm api pytest tests/test_text_extraction.py
 
 # Run real PostgreSQL + pgvector integration tests
-docker compose run --rm \
-  -e TEST_POSTGRESQL_URL=postgresql+psycopg://docsflow:docsflow@db:5432/docsflow \
-  api pytest -m postgres -q
+docker compose run --rm api sh -c \
+  'TEST_POSTGRESQL_URL="$DATABASE_URL" pytest -m postgres -q'
 ```
 
 ### Windows (local Poetry environment)
@@ -550,13 +563,26 @@ Main settings are configured through `.env`.
 |---|---|---|
 | `APP_ENV` | `local` | Environment name |
 | `APP_DEBUG` | `true` | Debug mode |
-| `APP_SECRET_KEY` | — | Change in production |
+| `APP_SECRET_KEY` | — | Random secret of at least 32 characters; placeholders are rejected outside local/test |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | JWT expiry |
+| `POSTGRES_PASSWORD` | — | Required PostgreSQL password used by Docker Compose |
 | `DATABASE_URL` | `postgresql+psycopg://...` | PostgreSQL connection |
 | `CORS_ORIGINS` | `["http://localhost:8000"]` | Allowed origins |
 | `UPLOAD_MAX_FILE_SIZE_MB` | `10` | Max upload size |
 | `UPLOAD_RATE_LIMIT_REQUESTS` | `10` | Rate limit count |
 | `UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate limit window |
+| `RATE_LIMIT_ENABLED` | `true` | Enable fail-closed shared limits and OpenAI quotas |
+| `RATE_LIMIT_REDIS_URL` | `redis://redis:6379/2` | Dedicated Redis database for shared counters |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `10` | Per-account login attempts per window; the IP guard is 10x broader |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `300` | Login limit window |
+| `REGISTRATION_RATE_LIMIT_REQUESTS` | `5` | Per-principal registration attempts per window |
+| `REGISTRATION_RATE_LIMIT_WINDOW_SECONDS` | `3600` | Registration limit window |
+| `SEMANTIC_SEARCH_RATE_LIMIT_REQUESTS` | `30` | Semantic searches per user/window |
+| `SEMANTIC_SEARCH_RATE_LIMIT_WINDOW_SECONDS` | `60` | Semantic search window |
+| `KNOWLEDGE_QUESTION_RATE_LIMIT_REQUESTS` | `10` | Document-chat questions per user/window |
+| `KNOWLEDGE_QUESTION_RATE_LIMIT_WINDOW_SECONDS` | `60` | Document-chat question window |
+| `OPENAI_DAILY_REQUEST_QUOTA` | `200` | Maximum OpenAI-backed operations per user/24 hours |
+| `OPENAI_DAILY_TOKEN_QUOTA` | `500000` | Maximum recorded OpenAI tokens per user/24 hours |
 | `LOCAL_STORAGE_PATH` | `storage` | Local file storage path |
 | `LOCAL_OCR_LANGUAGES` | `eng+deu` | Tesseract languages |
 | `CELERY_BROKER_URL` | `redis://redis:6379/0` | Celery broker |
@@ -573,6 +599,25 @@ Main settings are configured through `.env`.
 | `BACKUP_RESTORE_MAX_DECOMPRESSED_SIZE_MB` | `100` | Maximum JSON size after gzip decompression |
 | `BACKUP_RESTORE_MAX_DOCUMENTS` | `2000` | Maximum documents accepted from one restore |
 | `BACKUP_RESTORE_MAX_RAW_TEXT_CHARS` | `2000000` | Maximum extracted text length per restored document |
+
+---
+
+### Shared abuse limits and OpenAI cost guard
+
+Login, registration, uploads, semantic search, and document-chat questions use
+atomic Redis counters shared by all API processes. Redis failure returns `503`
+for protected operations instead of silently bypassing the limits. Login and
+registration use both a client-IP key and a normalized account/email key.
+
+Before every OpenAI-backed operation, DocsFlow also checks a per-user 24-hour
+operation counter and the rolling token usage persisted in
+`openai_usage_logs`. The token quota provides a configurable spend ceiling; it
+is a safety control, not an accounting or billing report. Set
+`RATE_LIMIT_ENABLED=false` only in isolated tests.
+
+Outside local development, set `APP_ENV=production`, `APP_DEBUG=false`, and
+`INIT_TEST_USER=false`. Production startup uses `WEB_CONCURRENCY` workers and
+never enables Uvicorn reload.
 
 ---
 
@@ -697,7 +742,7 @@ docker compose exec db psql -U docsflow -d docsflow \
 
 - `raw_text` is stored internally but not exposed through the public API
 - Uploaded files are stored on the local filesystem
-- Upload rate limiting is in-memory and not shared between multiple API instances
+- Abuse limits require Redis; protected operations fail closed while Redis is unavailable
 - AI extraction is available only for `standard` mode — `confidential` documents are never sent to OpenAI
 - AI extraction depends on successful local text extraction
 - Extracted JSON schema is generic and will be refined in later MVP steps

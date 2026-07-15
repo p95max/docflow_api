@@ -11,7 +11,7 @@ from app.api.v1 import routes_documents
 from app.core.config import settings
 from app.models import ProcessingJob
 from app.models.document import Document
-from app.services.uploads import _upload_rate_limit_state
+import app.services.rate_limits as rate_limits
 
 PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 PDF_BYTES_SECOND = b"%PDF-1.4\n2 0 obj\n<<>>\nendobj\n%%EOF\n"
@@ -286,9 +286,18 @@ def test_upload_rate_limit_returns_429(
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class FakeRedis:
+        count = 0
+
+        def eval(self, *_: object) -> list[int]:
+            self.count += 1
+            return [self.count, 60]
+
+    fake_redis = FakeRedis()
+    monkeypatch.setattr(settings, "rate_limit_enabled", True)
     monkeypatch.setattr(settings, "upload_rate_limit_requests", 1)
     monkeypatch.setattr(settings, "upload_rate_limit_window_seconds", 60)
-    _upload_rate_limit_state.clear()
+    monkeypatch.setattr(rate_limits, "_redis_client", lambda: fake_redis)
 
     first_response = client.post(
         "/api/v1/documents/upload",
