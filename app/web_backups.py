@@ -44,7 +44,12 @@ from app.services.google_drive_oauth import (
     save_google_drive_connection,
     validate_google_drive_oauth_state,
 )
-from app.web import _get_web_current_user, _redirect_to_login, _template_response
+from app.web import (
+    _get_web_current_user,
+    _redirect_to_login,
+    _template_response,
+    require_csrf,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(include_in_schema=False)
