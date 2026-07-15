@@ -515,7 +515,7 @@ Items were reconciled with the code and test suite on 2026-07-15.
 
 - [ ] Run the existing PostgreSQL/pgvector integration suite and confirm semantic
   ranking, owner isolation, soft-delete filtering, extension, and vector indexes.
-- [ ] Add explicit cross-user tests for document detail/result and signed-file
-  access.
-- [ ] Add a negative test proving malformed AI structured output is rejected by
-  Pydantic and does not persist partial extraction/usage data.
+- [x] Explicit cross-user regression coverage protects document detail/result,
+  jobs, signed download URLs, and signed preview/download file access.
+- [x] A malformed AI structured output test proves Pydantic rejects invalid
+  fields and does not persist partial extraction or OpenAI usage data.

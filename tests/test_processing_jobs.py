@@ -1,6 +1,6 @@
 import hashlib
 from pathlib import Path
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 from datetime import date
 from decimal import Decimal
 
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.api.v1.routes_documents as routes_documents
+import app.services.ai_processing as ai_processing
 import app.services.processing_jobs as processing_jobs_service
 import app.tasks.documents as document_tasks
 from app.core.config import settings
@@ -919,4 +920,81 @@ def test_process_document_task_rolls_back_partial_extraction_result_on_error(
     assert document.sender is None
     assert document.confidence_score is None
 
+    assert usage_logs == []
+
+
+def test_malformed_ai_output_is_rejected_without_persisting_partial_results(
+    db_session: Session,
+    test_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pydantic validation failures must leave no extraction or usage records."""
+    monkeypatch.setattr(settings, "local_storage_path", str(tmp_path / "storage"))
+    _patch_task_session(monkeypatch=monkeypatch, db_session=db_session)
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        lambda document: "Invoice number 161126. Total USD 950.00.",
+    )
+
+    malformed_output = {
+        "document_type": "not-a-supported-document-type",
+        "summary": "Invoice",
+        "sender": "Vendor",
+        "recipient": None,
+        "document_date": "2016-11-26",
+        "due_date": None,
+        "total_amount": 950.0,
+        "currency": "USD",
+        "invoice_number": "161126",
+        "reference_number": None,
+        "requires_action": True,
+        "action_deadline": None,
+        "confidence_score": 1.5,
+        "notes": None,
+    }
+
+    class FakeResponses:
+        def parse(self, **_: object) -> SimpleNamespace:
+            return SimpleNamespace(output_parsed=malformed_output)
+
+    monkeypatch.setattr(
+        ai_processing,
+        "create_openai_client",
+        lambda: SimpleNamespace(responses=FakeResponses()),
+    )
+
+    document = _create_document_with_file(
+        db=db_session,
+        user=test_user,
+        content=PDF_BYTES,
+        processing_mode=ProcessingMode.standard,
+    )
+    job = create_processing_job(db=db_session, document=document)
+    job.max_retries = 0
+    db_session.commit()
+
+    result = process_document_task.apply(args=(job.id,), throw=False)
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+    usage_logs = list(
+        db_session.scalars(
+            select(OpenAIUsageLog).where(
+                OpenAIUsageLog.document_id == document.id
+            )
+        ).all()
+    )
+
+    assert result.failed()
+    assert document.status == DocumentStatus.failed
+    assert job.status == ProcessingJobStatus.failed
+    assert "document_type" in (job.error_message or "")
+    assert document.raw_text is None
+    assert document.ai_extracted_data is None
+    assert document.document_type is None
+    assert document.summary is None
+    assert document.amount is None
+    assert document.currency is None
     assert usage_logs == []

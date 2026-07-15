@@ -21,8 +21,13 @@ from app.models.processing_job import (
     ProcessingOperationType,
 )
 from app.models.user import User
-from app.services.security import create_document_preview_token
+from app.services.security import (
+    create_access_token,
+    create_document_download_token,
+    create_document_preview_token,
+)
 from app.services.storage import save_document_file
+from app.services.users import create_user
 
 
 PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
@@ -132,6 +137,80 @@ def test_get_download_url_returns_signed_attachment_url(
     assert download_response.headers["content-disposition"].startswith(
         "attachment;"
     )
+
+
+def test_document_reads_and_signed_file_links_are_isolated_by_owner(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+    test_user: User,
+) -> None:
+    """Neither authenticated routes nor signed tokens can cross documents/users."""
+    document, _ = _create_document_result(
+        db=db_session,
+        user=test_user,
+    )
+    other_user = create_user(
+        db=db_session,
+        email="other-document-owner@example.com",
+        password="strong-password",
+    )
+    other_document, _ = _create_document_result(
+        db=db_session,
+        user=other_user,
+    )
+    other_headers = {
+        "Authorization": (
+            f"Bearer {create_access_token(subject=str(other_user.id))}"
+        ),
+    }
+
+    for path in (
+        f"/api/v1/documents/{document.id}",
+        f"/api/v1/documents/{document.id}/result",
+        f"/api/v1/documents/{document.id}/download-url",
+        f"/api/v1/documents/{document.id}/jobs",
+    ):
+        response = client.get(path, headers=other_headers)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json() == {"detail": "Document not found"}
+
+    preview_token, _ = create_document_preview_token(
+        document_id=document.id,
+        owner_id=test_user.id,
+    )
+    download_token, _ = create_document_download_token(
+        document_id=document.id,
+        owner_id=test_user.id,
+    )
+    forged_owner_token, _ = create_document_preview_token(
+        document_id=document.id,
+        owner_id=other_user.id,
+    )
+
+    preview_response = client.get(
+        f"/api/v1/documents/{other_document.id}/preview",
+        params={"token": preview_token},
+    )
+    download_response = client.get(
+        f"/api/v1/documents/{other_document.id}/download",
+        params={"token": download_token},
+    )
+    forged_owner_response = client.get(
+        f"/api/v1/documents/{document.id}/preview",
+        params={"token": forged_owner_token},
+    )
+
+    assert preview_response.status_code == status.HTTP_404_NOT_FOUND
+    assert download_response.status_code == status.HTTP_404_NOT_FOUND
+    assert forged_owner_response.status_code == status.HTTP_404_NOT_FOUND
+
+    # The owner's own authenticated route remains usable; this guards against
+    # accidentally applying an over-broad ownership filter.
+    assert client.get(
+        f"/api/v1/documents/{document.id}/result",
+        headers=auth_headers,
+    ).status_code == status.HTTP_200_OK
 
 
 def test_download_rejects_preview_token(
