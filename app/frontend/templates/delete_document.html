@@ -11,6 +11,7 @@
         <p class="text-secondary">The database record, processing history and locally stored file will be removed. This action cannot be undone.</p>
         <div class="d-flex gap-2">
           <form method="post" action="/documents/{{ document.id }}/delete">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-danger" type="submit">Delete permanently</button>
           </form>
           <a class="btn btn-outline-secondary" href="/documents/{{ document.id }}">Cancel</a>

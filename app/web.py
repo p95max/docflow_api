@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.routes_document_deletion import (
@@ -450,6 +451,7 @@ def login_page(
     "/login",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def login_submit(
     request: Request,
@@ -490,7 +492,7 @@ def login_submit(
     return response
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(require_csrf)])
 def logout() -> RedirectResponse:
     response = RedirectResponse(
         url="/login",
@@ -529,6 +531,7 @@ def register_page(
     "/register",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def register_submit(
     request: Request,
@@ -563,11 +566,21 @@ def register_submit(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    create_user(
-        db=db,
-        email=str(payload.email),
-        password=payload.password,
-    )
+    try:
+        create_user(
+            db=db,
+            email=str(payload.email),
+            password=payload.password,
+        )
+    except IntegrityError:
+        db.rollback()
+        return _template_response(
+            request=request,
+            name="register.html",
+            email_value=email,
+            error="Email already registered.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
 
     return RedirectResponse(
         url="/login?registered=1",
@@ -604,6 +617,7 @@ def knowledge_page(
     "/knowledge/conversations",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def create_knowledge_conversation_submit(
     request: Request,
@@ -646,6 +660,7 @@ def create_knowledge_conversation_submit(
     "/knowledge/conversations/{conversation_id}/delete",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def delete_knowledge_conversation_submit(
     conversation_id: int,
@@ -713,6 +728,7 @@ def knowledge_conversation_page(
     "/knowledge/conversations/{conversation_id}/messages",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def ask_knowledge_question_submit(
     conversation_id: int,
@@ -778,6 +794,7 @@ def ask_knowledge_question_submit(
     "/knowledge/documents/{document_id}/reindex",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def reindex_knowledge_document_submit(
     document_id: int,
@@ -946,6 +963,7 @@ def upload_page(
     "/documents/upload",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 async def upload_submit(
     request: Request,
@@ -1010,6 +1028,7 @@ def document_detail_page(
     "/documents/{document_id}/correct",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def correct_document_submit(
     document_id: int,
@@ -1080,6 +1099,7 @@ def correct_document_submit(
     "/documents/{document_id}/confirm",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def confirm_document_submit(
     document_id: int,
@@ -1118,6 +1138,7 @@ def confirm_document_submit(
     "/documents/{document_id}/reprocess",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def reprocess_document_submit(
     document_id: int,
@@ -1193,6 +1214,7 @@ def delete_document_confirmation(
     "/documents/{document_id}/delete",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def delete_document_submit(
     document_id: int,

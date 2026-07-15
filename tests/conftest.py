@@ -65,6 +65,7 @@ from app.main import app  # noqa: E402
 from app.services.security import create_access_token  # noqa: E402
 from app.services.uploads import _upload_rate_limit_state  # noqa: E402
 from app.services.users import create_user  # noqa: E402
+from app.web import CSRF_COOKIE_NAME  # noqa: E402
 
 
 @pytest.fixture
@@ -112,6 +113,9 @@ def client(
     app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(app) as test_client:
+        csrf_token = "test-csrf-token-with-sufficient-entropy"
+        test_client.cookies.set(CSRF_COOKIE_NAME, csrf_token)
+        test_client.headers["X-CSRF-Token"] = csrf_token
         yield test_client
 
     app.dependency_overrides.clear()

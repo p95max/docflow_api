@@ -471,12 +471,13 @@ were reconciled with the code and test suite on 2026-07-15.
 - One-sentence validation for Knowledge questions.
 - Bounded recovery restore upload, gzip expansion, document count, and per-document
   extracted text size.
+- CSRF protection for all cookie-authenticated HTML POST forms.
+- Celery enqueue failures now persist failed processing job/document state.
+- Concurrent duplicate registration returns 409 instead of a database 500.
 - Pytest discovery is limited to `tests/`.
 
 ### Security — high priority
 
-- [ ] Add CSRF protection to every cookie-authenticated state-changing HTML form
-  (logout, document changes/deletion, conversations, backups, and Drive disconnect).
 - [ ] Encrypt Google Drive refresh tokens at rest and define key rotation.
 - [ ] Add shared Redis-backed rate limits for login, registration, uploads,
   semantic search, and Q&A; add per-user OpenAI usage/cost quotas.
@@ -501,12 +502,8 @@ were reconciled with the code and test suite on 2026-07-15.
 
 ### Reliability and functional gaps
 
-- [ ] Handle Celery enqueue failures for document upload/reprocess: persist a
-  failed job/document state and offer retry instead of leaving a pending job with
-  no task ID after the document transaction has committed.
 - [ ] Replace the process-local upload limiter with the shared limiter above so
   multiple API workers cannot bypass it.
-- [ ] Catch concurrent registration conflicts and return 409 instead of a DB 500.
 - [ ] Keep paragraph boundaries where possible during document chunking.
 - [ ] Add a separate local embedding and local LLM design before supporting
   confidential documents in RAG.
@@ -522,10 +519,4 @@ were reconciled with the code and test suite on 2026-07-15.
   access.
 - [ ] Add a negative test proving malformed AI structured output is rejected by
   Pydantic and does not persist partial extraction/usage data.
-- [ ] Add tests for CSRF rejection, auth/Q&A rate limits, encrypted OAuth token
-  storage, and bounded backup restore/decompression.
-
-### Documentation cleanup
-
-- [ ] Remove stale README claims that both processing modes are local-only and
-  that scanned-PDF OCR fallback is not implemented.
+- [ ] Add tests for auth/Q&A rate limits and encrypted OAuth token storage.

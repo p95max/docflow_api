@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.models.user import User
+from app.web import CSRF_COOKIE_NAME
 
 
 def test_login_page_is_server_rendered_without_javascript(
@@ -50,6 +51,27 @@ def test_responses_include_baseline_security_headers(client: TestClient) -> None
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "same-origin"
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+
+
+def test_login_form_contains_matching_csrf_token(client: TestClient) -> None:
+    response = client.get("/login")
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+
+    assert csrf_token
+    assert f'name="csrf_token" value="{csrf_token}"' in response.text
+
+
+def test_html_post_rejects_missing_csrf_token(client: TestClient) -> None:
+    del client.headers["X-CSRF-Token"]
+    client.cookies.delete(CSRF_COOKIE_NAME)
+
+    response = client.post(
+        "/login",
+        data={"email": "user@example.com", "password": "strong-password"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Invalid CSRF token."}
 
 
 def test_protected_html_page_redirects_to_login(

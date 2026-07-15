@@ -54,7 +54,8 @@ Each uploaded document has one processing mode:
 | `standard` | Default processing |
 | `confidential` | Guarantees no external AI or third-party API is used |
 
-> In the current MVP, both modes use local processing only.
+Standard mode performs local text extraction and then uses OpenAI for structured
+extraction. Confidential mode remains fully local and never calls external AI.
 
 ### Asynchronous Processing
 
@@ -81,7 +82,7 @@ Processing includes:
 
 Extracted text is stored in `documents.raw_text`.
 
-> **Limitation:** scanned PDFs without a text layer are not OCR-processed yet. OCR fallback for scanned PDF pages should be implemented as a separate improvement.
+Scanned PDF pages without a text layer use the local Tesseract OCR fallback.
 
 ### Manual Extraction Review
 
@@ -538,6 +539,10 @@ Main settings are configured through `.env`.
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
 | `BACKUP_MASTER_KEY` | â€” | Valid Fernet key used to protect stored per-user Recovery Keys |
+| `BACKUP_RESTORE_MAX_FILE_SIZE_MB` | `25` | Maximum uploaded recovery archive size |
+| `BACKUP_RESTORE_MAX_DECOMPRESSED_SIZE_MB` | `100` | Maximum JSON size after gzip decompression |
+| `BACKUP_RESTORE_MAX_DOCUMENTS` | `2000` | Maximum documents accepted from one restore |
+| `BACKUP_RESTORE_MAX_RAW_TEXT_CHARS` | `2000000` | Maximum extracted text length per restored document |
 
 ---
 
@@ -661,17 +666,14 @@ docker compose exec db psql -U docsflow -d docsflow \
 ## Current Limitations
 
 - `raw_text` is stored internally but not exposed through the public API
-- Scanned PDF OCR fallback is not implemented yet
 - Uploaded files are stored on the local filesystem
 - Upload rate limiting is in-memory and not shared between multiple API instances
 - AI extraction is available only for `standard` mode — `confidential` documents are never sent to OpenAI
 - AI extraction depends on successful local text extraction
-- Scanned PDFs without a text layer require OCR fallback before AI extraction can work well
 - Extracted JSON schema is generic and will be refined in later MVP steps
 - Knowledge Base retrieval is available only for indexed `standard` documents
 - Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
 - standard-mode AI extraction requires `OPENAI_API_KEY`
-- scanned PDF files without a text layer may produce empty `raw_text` until OCR fallback is implemented
 
 ## Contacts
 

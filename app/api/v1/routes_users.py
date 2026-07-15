@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import CurrentUser
@@ -26,11 +27,18 @@ def register(
             detail="Email already registered",
         )
 
-    return create_user(
-        db=db,
-        email=payload.email,
-        password=payload.password,
-    )
+    try:
+        return create_user(
+            db=db,
+            email=payload.email,
+            password=payload.password,
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        ) from None
 
 
 @router.get("/me", response_model=UserRead)

@@ -167,6 +167,40 @@ def test_enqueue_processing_job_stores_celery_task_id(
     assert updated_job.celery_task_id == "fake-celery-task-id"
 
 
+def test_enqueue_processing_failure_marks_job_and_document_failed(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = Document(
+        owner_id=test_user.id,
+        original_filename="queue-failure.pdf",
+        status=DocumentStatus.uploaded,
+        processing_mode=ProcessingMode.standard,
+    )
+    db_session.add(document)
+    db_session.flush()
+    job = create_processing_job(db=db_session, document=document)
+    db_session.commit()
+
+    def fail_delay(_: int) -> None:
+        raise RuntimeError("broker unavailable")
+
+    monkeypatch.setattr(
+        processing_jobs_service.process_document_task,
+        "delay",
+        fail_delay,
+    )
+
+    updated_job = enqueue_processing_job(db=db_session, job=job)
+    db_session.refresh(document)
+
+    assert updated_job.status == ProcessingJobStatus.failed
+    assert updated_job.finished_at is not None
+    assert "broker unavailable" in (updated_job.error_message or "")
+    assert document.status == DocumentStatus.failed
+
+
 def test_process_document_task_completes_document_and_job(
     db_session: Session,
     test_user: User,

@@ -26,6 +26,7 @@
         <div class="card-body">
           <h2 class="h5">New conversation</h2>
           <form method="post" action="/knowledge/conversations">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <label class="form-label" for="title">Title <span class="text-secondary">(optional)</span></label>
             <input class="form-control" id="title" name="title" maxlength="120" value="{{ title_value }}" placeholder="Invoices, contracts, deadlines">
             <button class="btn btn-primary mt-3" type="submit">Start conversation</button>
@@ -44,6 +45,7 @@
                   <small class="text-secondary">Updated {{ conversation.updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
                 </a>
                 <form method="post" action="/knowledge/conversations/{{ conversation.id }}/delete">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button class="btn btn-sm btn-outline-danger conversation-delete-button" type="submit" aria-label="Delete conversation" title="Delete conversation">
                     <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
                       <path d="M5.5 5.5v6m2.5-6v6m2.5-6v6M3.5 3.5h9m-6-2h3l.5 2h3v1h-11v-1h3l.5-2Zm-1 2 1 9h9l1-9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
@@ -106,6 +108,7 @@
                           <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Indexing…</button>
                         {% else %}
                           <form method="post" action="/knowledge/documents/{{ document.id }}/reindex">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button class="btn btn-sm btn-outline-primary" type="submit">Reindex</button>
                           </form>
                         {% endif %}

@@ -251,6 +251,7 @@ def google_drive_oauth_callback(
 @router.post(
     "/backups/google/disconnect",
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def disconnect_google_drive(
     request: Request,
@@ -278,6 +279,7 @@ def disconnect_google_drive(
     "/backups/run",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def run_backup_submit(
     request: Request,
@@ -328,7 +330,12 @@ def run_backup_submit(
     )
 
 
-@router.post("/backups/recovery-key", response_class=HTMLResponse, response_model=None)
+@router.post(
+    "/backups/recovery-key",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
 def generate_backup_recovery_key(
     request: Request,
     db: Session = Depends(get_db),
@@ -366,6 +373,7 @@ def generate_backup_recovery_key(
     "/backups/recovery-key/reset",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def reset_backup_recovery_key(
     request: Request,
@@ -392,7 +400,12 @@ def reset_backup_recovery_key(
     )
 
 
-@router.post("/backups/restore", response_class=HTMLResponse, response_model=None)
+@router.post(
+    "/backups/restore",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
 async def restore_backup_submit(
     request: Request,
     recovery_key: str = Form(...),
@@ -483,6 +496,7 @@ def get_backup_status(
     "/backups/{backup_id}/delete",
     response_class=HTMLResponse,
     response_model=None,
+    dependencies=[Depends(require_csrf)],
 )
 def delete_backup_submit(
     backup_id: int,

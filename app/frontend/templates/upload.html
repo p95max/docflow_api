@@ -12,6 +12,7 @@
           <div class="alert alert-danger">{{ error }}</div>
         {% endif %}
         <form method="post" action="/documents/upload" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <div class="mb-3">
             <label class="form-label" for="file">File</label>
             <input class="form-control" id="file" name="file" type="file" accept="application/pdf,image/jpeg,image/png" required>
