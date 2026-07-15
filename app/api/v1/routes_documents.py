@@ -730,6 +730,7 @@ def _get_duplicate_document(
     stmt = select(Document).where(
         Document.owner_id == owner_id,
         Document.checksum_sha256 == checksum_sha256,
+        Document.deleted_at.is_(None),
     )
 
     return db.scalar(stmt)

@@ -1,4 +1,5 @@
 import hashlib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from app.api.v1 import routes_documents
 from app.core.config import settings
 from app.models import ProcessingJob
 from app.models.document import Document
+from app.models.user import User
 import app.services.rate_limits as rate_limits
 
 PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
@@ -166,6 +168,67 @@ def test_upload_rejects_duplicate_document_for_same_user(
     )
 
     assert documents_count == 1
+
+
+def test_upload_allows_same_file_after_original_is_deleted(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+) -> None:
+    first_response = client.post(
+        "/api/v1/documents/upload",
+        headers=auth_headers,
+        data={"confidential": "false"},
+        files={"file": ("invoice.pdf", PDF_BYTES, "application/pdf")},
+    )
+    assert first_response.status_code == status.HTTP_201_CREATED
+
+    first_document_id = first_response.json()["id"]
+    deleted_response = client.delete(
+        f"/api/v1/documents/{first_document_id}",
+        headers=auth_headers,
+    )
+    assert deleted_response.status_code == status.HTTP_204_NO_CONTENT
+
+    second_response = client.post(
+        "/api/v1/documents/upload",
+        headers=auth_headers,
+        data={"confidential": "false"},
+        files={"file": ("invoice.pdf", PDF_BYTES, "application/pdf")},
+    )
+    assert second_response.status_code == status.HTTP_201_CREATED
+    assert second_response.json()["id"] != first_document_id
+
+    documents = db_session.scalars(
+        select(Document).order_by(Document.id),
+    ).all()
+    assert len(documents) == 2
+    assert documents[0].deleted_at is not None
+    assert documents[1].deleted_at is None
+
+
+def test_duplicate_lookup_ignores_soft_deleted_documents(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    owner_id = test_user.id
+    checksum = hashlib.sha256(PDF_BYTES).hexdigest()
+    document = Document(
+        owner_id=owner_id,
+        original_filename="deleted-invoice.pdf",
+        checksum_sha256=checksum,
+    )
+    db_session.add(document)
+    db_session.commit()
+
+    document.deleted_at = datetime.now(UTC)
+    db_session.commit()
+
+    assert routes_documents._get_duplicate_document(
+        db=db_session,
+        owner_id=owner_id,
+        checksum_sha256=checksum,
+    ) is None
 
 
 def test_upload_rejects_unsupported_mime_type(

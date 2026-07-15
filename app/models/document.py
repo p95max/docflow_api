@@ -55,6 +55,9 @@ class Document(Base):
             postgresql_where=text(
                 "checksum_sha256 IS NOT NULL AND deleted_at IS NULL"
             ),
+            sqlite_where=text(
+                "checksum_sha256 IS NOT NULL AND deleted_at IS NULL"
+            ),
         ),
         CheckConstraint(
             (
