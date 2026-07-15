@@ -53,7 +53,7 @@ def test_knowledge_page_is_server_rendered_and_lists_indexing_status(
     assert "Unavailable: confidential document" in response.text
     assert 'action="/knowledge/documents/' in response.text
     assert 'aria-label="Delete conversation"' not in response.text
-    assert "<script" not in response.text
+    assert '<script data-form-feedback>' in response.text
 
 
 def test_knowledge_conversation_page_has_short_question_form(
@@ -77,7 +77,8 @@ def test_knowledge_conversation_page_has_short_question_form(
     assert "Which invoices are due this month?" in response.text
     assert "Ask a concise question" in response.text
     assert f'action="/knowledge/conversations/{conversation.id}/delete"' in response.text
-    assert "<script" not in response.text
+    assert 'data-loading-label="Asking…"' in response.text
+    assert '<script data-form-feedback>' in response.text
 
 
 def test_knowledge_conversation_can_be_deleted_from_conversation_list(
