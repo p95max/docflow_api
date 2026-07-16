@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast as type_cast
 
 from sqlalchemy import String, asc, cast, desc, func, or_, select
 from sqlalchemy.orm import Session
@@ -20,6 +20,26 @@ DocumentSortField = Literal[
     "file_size_bytes",
 ]
 SortDirection = Literal["asc", "desc"]
+
+_DOCUMENT_SORT_FIELDS = frozenset(
+    {
+        "created_at",
+        "document_date",
+        "deadline",
+        "amount",
+        "original_filename",
+        "document_type",
+        "status",
+        "file_size_bytes",
+    }
+)
+
+
+def normalize_document_sort_field(value: str) -> DocumentSortField:
+    """Use the default for obsolete or unsupported query-string sort fields."""
+    if value in _DOCUMENT_SORT_FIELDS:
+        return type_cast(DocumentSortField, value)
+    return "created_at"
 
 
 @dataclass(frozen=True)
@@ -97,7 +117,8 @@ def search_documents(
             )
         )
 
-    ordering_column = getattr(Document, filters.sort_by)
+    sort_by = normalize_document_sort_field(filters.sort_by)
+    ordering_column = getattr(Document, sort_by)
     ordering = (
         asc(ordering_column)
         if filters.sort_direction == "asc"

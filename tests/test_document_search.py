@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.user import User
-from app.services.document_search import DocumentSearchFilters, search_documents
+from app.services.document_search import (
+    DocumentSearchFilters,
+    normalize_document_sort_field,
+    search_documents,
+)
 from app.services.users import create_user
 
 
@@ -197,3 +201,7 @@ def test_search_sorts_by_file_size(
         ),
     )
     assert [document.id for document in by_size] == [large.id, small.id]
+
+
+def test_obsolete_document_id_sort_falls_back_to_upload_date() -> None:
+    assert normalize_document_sort_field("id") == "created_at"

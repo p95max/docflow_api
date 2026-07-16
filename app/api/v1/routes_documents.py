@@ -43,8 +43,8 @@ from app.schemas.document import (
 )
 from app.services.document_search import (
     DocumentSearchFilters,
-    DocumentSortField,
     SortDirection,
+    normalize_document_sort_field,
     search_documents,
 )
 from app.schemas.processing_job import ProcessingJobRead
@@ -215,9 +215,10 @@ def list_my_documents(
     requires_action: bool | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
-    sort_by: DocumentSortField = "created_at",
+    sort_by: str = Query(default="created_at", max_length=50),
     sort_direction: SortDirection = "desc",
 ) -> DocumentListRead:
+    sort_by = normalize_document_sort_field(sort_by)
     documents, total = search_documents(
         db=db,
         owner_id=current_user.id,

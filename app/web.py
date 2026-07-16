@@ -45,7 +45,7 @@ from app.models.document_index_job import DocumentIndexJobStatus
 from app.models.knowledge_message import KnowledgeMessageRole
 from app.schemas.document import DocumentCorrection, DocumentNoteUpdate
 from app.schemas.knowledge import KnowledgeConversationCreate, KnowledgeQuestionCreate
-from app.services.document_search import DocumentSortField, SortDirection
+from app.services.document_search import SortDirection, normalize_document_sort_field
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.knowledge_conversations import (
     answer_conversation_question,
@@ -1037,7 +1037,7 @@ def documents_page(
     requires_action: bool | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    sort_by: DocumentSortField = "created_at",
+    sort_by: str = Query(default="created_at", max_length=50),
     sort_direction: SortDirection = "desc",
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1045,6 +1045,7 @@ def documents_page(
     if current_user is None:
         return _redirect_to_login()
 
+    sort_by = normalize_document_sort_field(sort_by)
     result = api_list_my_documents(
         db=db,
         current_user=current_user,
