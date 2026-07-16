@@ -215,9 +215,10 @@ table td, table th { vertical-align: middle; }
 .docsflow-ai-menu-trigger { display: inline-flex; gap: 0.38rem; align-items: center; }
 .docsflow-ai-menu-chevron { margin-left: 0.1rem; font-size: 0.95rem; line-height: 0.7; transition: transform 0.16s ease; }
 .docsflow-ai-menu[open] .docsflow-ai-menu-chevron { transform: rotate(180deg); }
-.docsflow-ai-menu-panel { position: absolute; z-index: 20; top: calc(100% + 0.55rem); left: 0; display: grid; min-width: 16.5rem; padding: 0.4rem; background: #162235; border: 1px solid #405574; border-radius: 12px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38); }
-.docsflow-ai-menu-item { display: flex; gap: 0.7rem; width: 100%; padding: 0.7rem; color: var(--docsflow-ink); text-align: left; text-decoration: none; background: transparent; border: 0; border-radius: 8px; }
+.docsflow-ai-menu-panel { position: absolute; z-index: 30; top: calc(100% + 0.55rem); left: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; gap: 0.2rem; width: 17.5rem; padding: 0.4rem; background: #162235; border: 1px solid #405574; border-radius: 12px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38); }
+.docsflow-ai-menu-item { display: flex; grid-column: 1; gap: 0.7rem; width: 100%; padding: 0.7rem; align-items: flex-start; color: var(--docsflow-ink); text-align: left; text-decoration: none; background: transparent; border: 0; border-radius: 8px; }
 .docsflow-ai-menu-item:hover { color: var(--docsflow-ink); background: rgba(119, 227, 189, 0.09); }
+.docsflow-ai-menu-item > span:last-child { display: block; min-width: 0; }
 .docsflow-ai-menu-item strong, .docsflow-ai-menu-item small { display: block; }
 .docsflow-ai-menu-item strong { font-size: 0.8rem; }
 .docsflow-ai-menu-item small { margin-top: 0.14rem; color: var(--docsflow-muted); font-size: 0.7rem; }
