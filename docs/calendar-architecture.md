@@ -37,6 +37,7 @@ document, or retain an event after its document is no longer available.
 ## Delivery boundary for this decision
 
 This decision intentionally adds no calendar UI, API, projections, reminders,
-or Google Calendar synchronization. The `CalendarEvent` persistence model is
-introduced in MVP 1; the remaining capabilities are implemented in subsequent
-MVP sections.
+or external-calendar OAuth synchronization. Calendar interoperability is
+provided through standard `.ics` export only. The `CalendarEvent` persistence
+model is introduced in MVP 1; the remaining capabilities are implemented in
+subsequent MVP sections.

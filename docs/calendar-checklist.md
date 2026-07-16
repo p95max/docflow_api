@@ -394,6 +394,9 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 - [ ] Add `GET /api/v1/calendar/events/{id}.ics`
 - [ ] Add `GET /api/v1/calendar/feed.ics`
+- [ ] Add an `Add to Google Calendar` button that downloads a single-event `.ics` file
+- [ ] Keep `.ics` export provider-neutral: Google Calendar, Apple Calendar, and Outlook can import it
+- [ ] Do not add Google Calendar OAuth, account connections, or direct synchronization
 - [ ] Use `VALUE=DATE` for date-only events
 - [ ] Use UTC or `TZID` for datetime events
 - [ ] Use a stable `UID`
@@ -406,44 +409,6 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 - [ ] Protect the private feed with a dedicated secret token
 - [ ] Add feed token revocation and regeneration
 - [ ] Do not place the access JWT in the calendar subscription URL
-
----
-
-# MVP 10 — Google Calendar Integration
-
-## 17. OAuth and Scopes
-
-- [ ] Do not automatically reuse the Google Drive token
-- [ ] Add separate Google Calendar OAuth consent
-- [ ] Request the minimum required scope
-- [ ] Store the Calendar connection separately
-- [ ] Encrypt refresh tokens
-- [ ] Support token rotation
-- [ ] Add disconnect functionality
-- [ ] Remove local external links on disconnect without deleting user events
-
-## 18. Synchronization
-
-- [ ] Start with one-way sync: DocsFlow → Google Calendar
-- [ ] Do not implement two-way synchronization in the first release
-- [ ] Create `external_calendar_links`
-- [ ] Add fields:
-  - [ ] `event_id`
-  - [ ] `provider`
-  - [ ] `external_calendar_id`
-  - [ ] `external_event_id`
-  - [ ] `external_etag`
-  - [ ] `last_synced_at`
-  - [ ] `sync_status`
-  - [ ] `sync_error`
-- [ ] Add event creation
-- [ ] Add event update
-- [ ] Add event deletion or cancellation
-- [ ] Use idempotency
-- [ ] Handle 401 and 403 responses
-- [ ] Handle events deleted in Google Calendar
-- [ ] Add a manual `Sync now` button
-- [ ] Add a retry queue
 
 ---
 
@@ -462,7 +427,6 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
   - [ ] Event cancelled
   - [ ] Reminder created
   - [ ] Reminder sent
-  - [ ] External synchronization
 - [ ] Do not store secret tokens in the audit log
 - [ ] Limit the size of old/new JSON values
 
@@ -491,7 +455,6 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
   - [ ] Calendar events
   - [ ] Event reminders
   - [ ] Notifications
-  - [ ] External calendar links without secrets
 - [ ] Add record counts
 - [ ] Add a strict restore schema
 - [ ] Restore document-to-event relationships
@@ -565,7 +528,6 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
   - [ ] `suggestions_confirmed`
   - [ ] `reminders_sent`
   - [ ] `reminders_failed`
-  - [ ] `sync_failures`
 - [ ] Add structured logs with `owner_id`, `document_id`, and `event_id`
 - [ ] Do not log full OCR text
 - [ ] Add a Celery Beat health check
@@ -616,15 +578,6 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 - [ ] Single-event ICS
 - [ ] Private ICS feed
 - [ ] Feed token revocation and regeneration
-
-## Phase 6 — Google Calendar
-
-- [ ] Separate OAuth flow
-- [ ] One-way synchronization
-- [ ] Synchronization status
-- [ ] Retry handling
-
----
 
 # Definition of Done for the First Calendar Release
 
