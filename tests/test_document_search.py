@@ -179,7 +179,7 @@ def test_search_hides_soft_deleted_and_other_users_documents(
     assert [document.id for document in documents] == [visible.id]
 
 
-def test_search_sorts_by_document_id_and_file_size(
+def test_search_sorts_by_file_size(
     db_session: Session,
     test_user: User,
 ) -> None:
@@ -196,11 +196,4 @@ def test_search_sorts_by_document_id_and_file_size(
             sort_direction="desc",
         ),
     )
-    by_id, _ = search_documents(
-        db=db_session,
-        owner_id=test_user.id,
-        filters=DocumentSearchFilters(sort_by="id", sort_direction="asc"),
-    )
-
     assert [document.id for document in by_size] == [large.id, small.id]
-    assert [document.id for document in by_id] == [small.id, large.id]

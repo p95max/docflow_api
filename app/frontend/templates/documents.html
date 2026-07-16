@@ -115,7 +115,7 @@
     <div class="col-md-3">
       <label class="form-label" for="sort_by">Sort by</label>
       <select class="form-select" id="sort_by" name="sort_by">
-        {% for value, label in [('created_at', 'Upload date'), ('id', 'Document ID'), ('original_filename', 'Name'), ('file_size_bytes', 'File size'), ('status', 'Status'), ('document_type', 'Type'), ('document_date', 'Document date'), ('deadline', 'Deadline'), ('amount', 'Amount')] %}
+        {% for value, label in [('created_at', 'Upload date'), ('original_filename', 'Name'), ('file_size_bytes', 'File size'), ('status', 'Status'), ('document_type', 'Type'), ('document_date', 'Document date'), ('deadline', 'Deadline'), ('amount', 'Amount')] %}
           <option value="{{ value }}" {% if filters.sort_by == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
@@ -147,7 +147,7 @@
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>
-            <th scope="col" class="text-secondary">{{ sortable_header('#', 'id') }}</th>
+            <th scope="col" class="text-secondary">#</th>
             <th scope="col">{{ sortable_header('Document', 'original_filename') }}</th>
             <th scope="col">{{ sortable_header('Size', 'file_size_bytes') }}</th>
             <th scope="col">{{ sortable_header('Status', 'status') }}</th>
@@ -181,7 +181,7 @@
               <td>{{ document.document_type or "—" }}</td>
               <td class="text-nowrap">{{ document.created_at|berlin_datetime }}</td>
               <td class="text-end">
-                <a class="btn btn-sm btn-outline-danger" href="/documents/{{ document.id }}/delete">Delete</a>
+                <a class="btn btn-sm btn-outline-danger" href="/documents/{{ document.id }}/delete" title="Delete document" aria-label="Delete document">🗑️<span class="visually-hidden">Delete document</span></a>
               </td>
             </tr>
           {% endfor %}

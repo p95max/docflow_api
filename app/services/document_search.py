@@ -10,7 +10,6 @@ from app.models.document import Document, DocumentStatus
 
 
 DocumentSortField = Literal[
-    "id",
     "created_at",
     "document_date",
     "deadline",
