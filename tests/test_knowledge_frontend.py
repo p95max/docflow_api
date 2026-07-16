@@ -110,7 +110,7 @@ def test_knowledge_conversation_can_be_deleted_from_conversation_list(
 def test_knowledge_message_timestamp_uses_berlin_time() -> None:
     timestamp = datetime(2026, 7, 14, 8, 43, tzinfo=timezone.utc)
 
-    assert web._format_berlin_datetime(timestamp) == "10:43:00 — 14-07-2026"
+    assert web._format_berlin_datetime(timestamp) == "10:43 14-07-2026"
     assert web._format_berlin_date(timestamp) == "14-07-2026"
     assert web._format_berlin_time(timestamp) == "10:43"
 
