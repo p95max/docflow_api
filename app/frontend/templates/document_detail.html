@@ -134,6 +134,7 @@
         </dl>
         {% if document.summary %}
           <hr>
+          <p class="small fw-bold text-secondary text-uppercase mb-1">Summary</p>
           <p class="document-summary mb-0">{{ document.summary }}</p>
         {% endif %}
         {% if document.validation_errors or document.validation_warnings or document.validation_evidence or (document.validation_candidates and document.validation_flags) %}
@@ -222,7 +223,7 @@
     </details>
 
     {% if document.can_correct %}
-      <details class="card shadow-sm mt-4"{% if document.validation_status == "needs_review" %} open{% endif %}>
+      <details class="card shadow-sm mt-4">
         <summary class="card-header cursor-pointer">Correct extraction</summary>
         <div class="card-body">
           <form method="post" action="/documents/{{ document.id }}/correct">
