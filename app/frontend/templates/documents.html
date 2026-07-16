@@ -63,6 +63,7 @@
         {% endfor %}
       </select>
     </div>
+    <div class="w-100"></div>
     <div class="col-md-3">
       <label class="form-label" for="uploaded_from">Uploaded from</label>
       <input class="form-control" id="uploaded_from" name="uploaded_from" type="date" value="{{ filters.uploaded_from }}">
@@ -79,11 +80,12 @@
       <label class="form-label" for="document_date_to">Document date to</label>
       <input class="form-control" id="document_date_to" name="document_date_to" type="date" value="{{ filters.document_date_to }}">
     </div>
-    <div class="col-md-2">
+    <div class="w-100"></div>
+    <div class="col-md-3">
       <label class="form-label" for="amount_min">Amount from</label>
       <input class="form-control" id="amount_min" name="amount_min" type="number" min="0" step="0.01" value="{{ filters.amount_min }}">
     </div>
-    <div class="col-md-2">
+    <div class="col-md-3">
       <label class="form-label" for="amount_max">Amount to</label>
       <input class="form-control" id="amount_max" name="amount_max" type="number" min="0" step="0.01" value="{{ filters.amount_max }}">
     </div>
@@ -95,7 +97,8 @@
       <label class="form-label" for="deadline_to">Deadline to</label>
       <input class="form-control" id="deadline_to" name="deadline_to" type="date" value="{{ filters.deadline_to }}">
     </div>
-    <div class="col-md-3">
+    <div class="w-100"></div>
+    <div class="col-md-4">
       <label class="form-label" for="sort_by">Sort by</label>
       <select class="form-select" id="sort_by" name="sort_by">
         {% for value, label in [('created_at', 'Upload date'), ('document_date', 'Document date'), ('deadline', 'Deadline'), ('amount', 'Amount'), ('original_filename', 'Name'), ('document_type', 'Type'), ('status', 'Status')] %}
@@ -103,14 +106,14 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-md-2">
+    <div class="col-md-3">
       <label class="form-label" for="sort_direction">Order</label>
       <select class="form-select" id="sort_direction" name="sort_direction">
         <option value="desc" {% if filters.sort_direction == 'desc' %}selected{% endif %}>Newest first</option>
         <option value="asc" {% if filters.sort_direction == 'asc' %}selected{% endif %}>Oldest first</option>
       </select>
     </div>
-    <div class="col-md-7 d-flex align-items-end gap-2">
+    <div class="col-md-5 d-flex align-items-end gap-2">
       <button class="btn btn-primary" type="submit">Apply filters</button>
       <a class="btn btn-outline-secondary" href="/documents">Clear</a>
     </div>
