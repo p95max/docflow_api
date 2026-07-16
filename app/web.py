@@ -119,11 +119,11 @@ def _to_berlin_timezone(value: datetime) -> datetime:
 
 
 def _format_berlin_datetime(value: datetime) -> str:
-    return _to_berlin_timezone(value).strftime("%Y-%m-%d %H:%M")
+    return _to_berlin_timezone(value).strftime("%H:%M:%S — %d-%m-%Y")
 
 
 def _format_berlin_date(value: datetime) -> str:
-    return _to_berlin_timezone(value).strftime("%d %B %Y")
+    return _to_berlin_timezone(value).strftime("%d-%m-%Y")
 
 
 def _format_berlin_time(value: datetime) -> str:

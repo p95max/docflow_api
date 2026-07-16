@@ -155,7 +155,7 @@
                 <span class="badge {{ document.status|status_badge_class }}">{{ document.status.value }}</span>
               </td>
               <td>{{ document.document_type or "—" }}</td>
-              <td>{{ document.created_at.strftime("%b %d, %Y") }}</td>
+              <td class="text-nowrap">{{ document.created_at|berlin_datetime }}</td>
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-danger" href="/documents/{{ document.id }}/delete">Delete</a>
               </td>
