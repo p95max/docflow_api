@@ -40,6 +40,9 @@ class DocumentRead(BaseModel):
     validation_warnings: list[str] | None
     validation_score: float | None
     validation_evidence: dict[str, Any] | None
+    validation_candidates: dict[str, Any] | None
+    validation_flags: list[str] | None
+    ocr_quality_score: float | None
 
     extraction_status: ExtractionStatus
     extraction_confirmed_at: datetime | None

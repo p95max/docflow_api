@@ -122,6 +122,10 @@
               {% endif %}
             </dd>
           {% endif %}
+          {% if document.ocr_quality_score is not none %}
+            <dt class="col-sm-5 text-secondary">OCR quality</dt>
+            <dd class="col-sm-7">{{ document.ocr_quality_score|round(0)|int }}/100</dd>
+          {% endif %}
         </dl>
         {% if document.validation_errors or document.validation_warnings %}
           <hr>
@@ -146,6 +150,27 @@
               </div>
             {% endfor %}
           </dl>
+        {% endif %}
+        {% if document.validation_candidates and document.validation_flags %}
+          <details class="mt-3">
+            <summary class="small fw-bold">Review detected candidates</summary>
+            {% if document.validation_candidates.amounts %}
+              <p class="small text-secondary mb-1 mt-2">Amounts</p>
+              <ul class="small mb-2">
+                {% for candidate in document.validation_candidates.amounts %}
+                  <li>{{ candidate.value }} {{ candidate.currency or "" }} <span class="text-secondary">({{ candidate.label }})</span></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {% if document.validation_candidates.dates %}
+              <p class="small text-secondary mb-1">Dates</p>
+              <ul class="small mb-0">
+                {% for candidate in document.validation_candidates.dates %}
+                  <li>{{ candidate.value }} <span class="text-secondary">({{ candidate.label|replace('_', ' ') }})</span></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </details>
         {% endif %}
         {% if document.summary %}
           <hr>

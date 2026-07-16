@@ -199,6 +199,21 @@ class Document(Base):
         nullable=True,
     )
 
+    validation_candidates: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    validation_flags: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    ocr_quality_score: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
     ai_extraction_model: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,

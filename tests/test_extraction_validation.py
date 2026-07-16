@@ -113,3 +113,47 @@ def test_validation_rejects_evidence_from_another_page() -> None:
     assert result.status == "needs_review"
     assert "Amount evidence does not match" in " ".join(result.errors)
     assert "amount" not in result.evidence
+
+
+def test_validation_stores_candidates_and_marks_equally_plausible_values() -> None:
+    result = validate_ai_extraction(
+        extraction=_extraction(),
+        raw_text="""
+            Invoice date: 2026-07-01
+            Invoice date: 2026-07-02
+            Due date: 2026-07-31
+            Total: 100.00 EUR
+            Total: 120.00 EUR
+        """,
+        today=date(2026, 7, 15),
+    )
+
+    assert set(result.ambiguity_flags) == {
+        "multiple_amount_candidates",
+        "multiple_date_candidates",
+    }
+    assert {candidate.label for candidate in result.amount_candidates} == {"total"}
+    assert {candidate.value for candidate in result.amount_candidates} == {100.0, 120.0}
+    assert {candidate.label for candidate in result.date_candidates} >= {
+        "issue_date",
+        "deadline",
+    }
+    assert "Multiple plausible total amounts" in " ".join(result.warnings)
+
+
+def test_validation_low_ocr_quality_requires_review() -> None:
+    result = validate_ai_extraction(
+        extraction=_extraction(
+            total_amount=None,
+            currency=None,
+            document_date=None,
+            due_date=None,
+            sender=None,
+        ),
+        raw_text="\n".join(["x"] * 12),
+        today=date(2026, 7, 15),
+    )
+
+    assert result.ocr_quality_score < 80
+    assert result.status == "needs_review"
+    assert "OCR text quality is low" in " ".join(result.warnings)

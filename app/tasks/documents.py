@@ -247,6 +247,18 @@ def _apply_standard_ai_processing_result(
         }
         or None
     )
+    document.validation_candidates = {
+        "amounts": [
+            candidate.model_dump(mode="json")
+            for candidate in validation_result.amount_candidates
+        ],
+        "dates": [
+            candidate.model_dump(mode="json")
+            for candidate in validation_result.date_candidates
+        ],
+    }
+    document.validation_flags = validation_result.ambiguity_flags or None
+    document.ocr_quality_score = validation_result.ocr_quality_score
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None
     document.manual_corrections = None
@@ -287,6 +299,9 @@ def _reset_document_processing_result(document: Document) -> None:
     document.validation_warnings = None
     document.validation_score = None
     document.validation_evidence = None
+    document.validation_candidates = None
+    document.validation_flags = None
+    document.ocr_quality_score = None
 
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None

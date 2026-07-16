@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +45,8 @@ _GERMAN_MONTHS = {
     "november": 11,
     "dezember": 12,
 }
+_CURRENCY_PATTERN = re.compile(r"\b(EUR|USD|GBP|CHF|PLN|SEK|NOK|DKK)\b", re.IGNORECASE)
+_ISO_DATE_PATTERN = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 
 
 class ExtractionValidationResult(BaseModel):
@@ -57,6 +59,26 @@ class ExtractionValidationResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     score: float = Field(ge=0, le=100)
     evidence: dict[str, FieldEvidence] = Field(default_factory=dict)
+    amount_candidates: list["AmountCandidate"] = Field(default_factory=list)
+    date_candidates: list["DateCandidate"] = Field(default_factory=list)
+    ambiguity_flags: list[str] = Field(default_factory=list)
+    ocr_quality_score: float = Field(ge=0, le=100)
+
+
+class AmountCandidate(BaseModel):
+    value: float = Field(gt=0)
+    currency: str | None = None
+    label: Literal["total", "tax", "net", "outstanding", "other"]
+
+
+class DateCandidate(BaseModel):
+    value: str
+    label: Literal["issue_date", "deadline", "service_date", "other"]
+
+
+def _add_once(messages: list[str], message: str) -> None:
+    if message not in messages:
+        messages.append(message)
 
 
 def validate_ai_extraction(
@@ -128,10 +150,33 @@ def validate_ai_extraction(
         errors=errors,
     )
 
-    score = max(0.0, 100.0 - len(errors) * 25.0 - len(warnings) * 10.0)
+    amount_candidates = _extract_amount_candidates(source)
+    date_candidates = _extract_date_candidates(source)
+    ambiguity_flags = _detect_ambiguity(
+        amount_candidates=amount_candidates,
+        date_candidates=date_candidates,
+    )
+    for flag in ambiguity_flags:
+        _add_once(warnings, _ambiguity_message(flag))
+
+    ocr_quality_score = _calculate_ocr_quality_score(source)
+    if ocr_quality_score < 80:
+        _add_once(
+            warnings,
+            "OCR text quality is low; review critical extracted fields.",
+        )
+
+    score = max(
+        0.0,
+        100.0
+        - len(errors) * 20.0
+        - len(warnings) * 8.0
+        - len(ambiguity_flags) * 12.0
+        - max(0.0, 80.0 - ocr_quality_score) * 0.25,
+    )
     status = (
         VALIDATION_NEEDS_REVIEW
-        if errors
+        if errors or ambiguity_flags or ocr_quality_score < 80
         else VALIDATION_WARNING
         if warnings
         else VALIDATION_VALID
@@ -142,6 +187,10 @@ def validate_ai_extraction(
         warnings=warnings,
         score=score,
         evidence=accepted_evidence,
+        amount_candidates=amount_candidates,
+        date_candidates=date_candidates,
+        ambiguity_flags=ambiguity_flags,
+        ocr_quality_score=ocr_quality_score,
     )
 
 
@@ -306,3 +355,136 @@ def _validate_currency_amount_link(
 
     if not _amount_is_grounded(extraction.total_amount, currency_evidence.quote):
         errors.append("Currency evidence must include the grounded total amount.")
+
+
+def _extract_amount_candidates(source: str) -> list[AmountCandidate]:
+    candidates: list[AmountCandidate] = []
+    seen: set[tuple[Decimal, str | None, str]] = set()
+    for match in _AMOUNT_CANDIDATE_PATTERN.finditer(source):
+        value = _parse_amount_candidate(match.group(0))
+        if value is None or value <= 0:
+            continue
+        context = _line_context(source, start=match.start(), end=match.end())
+        currency_match = _CURRENCY_PATTERN.search(context)
+        currency = currency_match.group(1).upper() if currency_match else None
+        label = _amount_label(context)
+        key = (value, currency, label)
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(
+            AmountCandidate(value=float(value), currency=currency, label=label)
+        )
+    return candidates
+
+
+def _amount_label(context: str) -> Literal["total", "tax", "net", "outstanding", "other"]:
+    normalized = context.casefold()
+    if any(term in normalized for term in ("total", "gesamtbetrag", "endbetrag", "summe")):
+        return "total"
+    if any(term in normalized for term in ("vat", "tax", "mwst", "steuer")):
+        return "tax"
+    if any(term in normalized for term in ("subtotal", "net", "zwischensumme")):
+        return "net"
+    if any(term in normalized for term in ("outstanding", "amount due", "fällig", "offen", "zu zahlen")):
+        return "outstanding"
+    return "other"
+
+
+def _extract_date_candidates(source: str) -> list[DateCandidate]:
+    candidates: list[DateCandidate] = []
+    seen: set[tuple[date, str]] = set()
+    parsed_candidates: list[tuple[date, int, int]] = []
+
+    for match in _ISO_DATE_PATTERN.finditer(source):
+        parsed = _safe_date(year=match.group(1), month=match.group(2), day=match.group(3))
+        if parsed:
+            parsed_candidates.append((parsed, match.start(), match.end()))
+    for match in _LOCALE_DATE_PATTERN.finditer(source):
+        parsed = _safe_date(year=match.group(3), month=match.group(2), day=match.group(1))
+        if parsed:
+            parsed_candidates.append((parsed, match.start(), match.end()))
+    for match in _GERMAN_MONTH_PATTERN.finditer(source):
+        parsed = _safe_date(
+            year=match.group(3),
+            month=str(_GERMAN_MONTHS[match.group(2).casefold()]),
+            day=match.group(1),
+        )
+        if parsed:
+            parsed_candidates.append((parsed, match.start(), match.end()))
+
+    for parsed, start, end in parsed_candidates:
+        label = _date_label(_line_context(source, start=start, end=end))
+        key = (parsed, label)
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(DateCandidate(value=parsed.isoformat(), label=label))
+    return candidates
+
+
+def _date_label(context: str) -> Literal["issue_date", "deadline", "service_date", "other"]:
+    normalized = context.casefold()
+    if any(term in normalized for term in ("due", "deadline", "zahlbar", "fällig", "frist")):
+        return "deadline"
+    if any(term in normalized for term in ("service", "leistung", "period")):
+        return "service_date"
+    if any(term in normalized for term in ("invoice date", "document date", "rechnungsdatum", "dated")):
+        return "issue_date"
+    return "other"
+
+
+def _line_context(source: str, *, start: int, end: int) -> str:
+    """Use the candidate's own line to avoid labels bleeding from nearby fields."""
+    line_start = source.rfind("\n", 0, start) + 1
+    line_end = source.find("\n", end)
+    if line_end == -1:
+        line_end = len(source)
+    return source[line_start:line_end]
+
+
+def _detect_ambiguity(
+    *,
+    amount_candidates: list[AmountCandidate],
+    date_candidates: list[DateCandidate],
+) -> list[str]:
+    flags: list[str] = []
+    for label in ("total", "outstanding"):
+        values = {candidate.value for candidate in amount_candidates if candidate.label == label}
+        if len(values) > 1:
+            flags.append("multiple_amount_candidates")
+            break
+    for label in ("issue_date", "deadline"):
+        values = {candidate.value for candidate in date_candidates if candidate.label == label}
+        if len(values) > 1:
+            flags.append("multiple_date_candidates")
+            break
+    return flags
+
+
+def _ambiguity_message(flag: str) -> str:
+    return {
+        "multiple_amount_candidates": "Multiple plausible total amounts were found; review the selected amount.",
+        "multiple_date_candidates": "Multiple plausible dates were found; review the selected dates.",
+    }[flag]
+
+
+def _calculate_ocr_quality_score(source: str) -> float:
+    if not source:
+        return 0.0
+    non_whitespace = [character for character in source if not character.isspace()]
+    if not non_whitespace:
+        return 0.0
+
+    suspicious_characters = sum(
+        character == "\ufffd" or (not character.isprintable())
+        for character in non_whitespace
+    )
+    nonempty_lines = [line for line in source.splitlines() if line.strip()]
+    short_lines = sum(1 for line in nonempty_lines if len(line.strip()) == 1)
+    suspicious_ratio = suspicious_characters / len(non_whitespace)
+    fragmented_ratio = short_lines / max(1, len(nonempty_lines))
+    return round(
+        max(0.0, 100.0 - suspicious_ratio * 300.0 - fragmented_ratio * 35.0),
+        2,
+    )

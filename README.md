@@ -812,6 +812,10 @@ For amount, currency, sender and dates, the AI also returns a short source
 quote and one-based page number. DocsFlow checks that quote against locally
 extracted page text before storing it as verified evidence.
 
+The validation layer also stores labelled amount/date candidates, flags only
+competing totals or deadlines, and records a deterministic OCR-quality score.
+Those signals affect the score and can move an extraction to `needs_review`.
+
 **Storage fields:**
 
 | Field | Table |

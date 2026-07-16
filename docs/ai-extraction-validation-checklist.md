@@ -33,12 +33,12 @@ replaces, manual confirmation of an extraction.
 
 ### Quality and ambiguity
 
-- [ ] Store all amount/date candidates and their labels (total, tax, net;
+- [x] Store all amount/date candidates and their labels (total, tax, net;
   issue date, deadline).
-- [ ] Mark equally plausible candidates as `multiple_amount_candidates` or
+- [x] Mark equally plausible candidates as `multiple_amount_candidates` or
   `multiple_date_candidates`.
-- [ ] Calculate OCR quality and require review for low-quality scans.
-- [ ] Weight schema, grounding, OCR and ambiguity in the validation score.
+- [x] Calculate OCR quality and require review for low-quality scans.
+- [x] Weight schema, grounding, OCR and ambiguity in the validation score.
 
 ### Review and fallback
 
