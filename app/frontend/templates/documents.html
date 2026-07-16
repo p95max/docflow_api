@@ -15,6 +15,17 @@
 {% endif %}
 
 {% set filters_active = filters.query or filters.document_type or filters.status or filters.uploaded_from or filters.uploaded_to or filters.document_date_from or filters.document_date_to or filters.amount_min or filters.amount_max or filters.deadline_from or filters.deadline_to or filters.requires_action is not none or filters.page_size != 25 or filters.sort_by != 'created_at' or filters.sort_direction != 'desc' %}
+{% macro sortable_header(label, field) -%}
+  {% set is_active = filters.sort_by == field %}
+  {% set next_direction = 'asc' if not is_active or filters.sort_direction == 'desc' else 'desc' %}
+  <a class="table-sort-link{% if is_active %} is-active{% endif %}" href="/documents?{% if document_sort_query %}{{ document_sort_query }}&amp;{% endif %}sort_by={{ field }}&amp;sort_direction={{ next_direction }}">
+    <span>{{ label }}</span>
+    {% if is_active %}
+      <span class="table-sort-indicator" aria-hidden="true">{% if filters.sort_direction == 'asc' %}&uarr;{% else %}&darr;{% endif %}</span>
+      <span class="visually-hidden">Sorted {{ filters.sort_direction }}ending</span>
+    {% endif %}
+  </a>
+{%- endmacro %}
 <details class="card shadow-sm mb-4 documents-filters">
   <summary class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span class="fw-semibold">Filters</span>
@@ -104,7 +115,7 @@
     <div class="col-md-3">
       <label class="form-label" for="sort_by">Sort by</label>
       <select class="form-select" id="sort_by" name="sort_by">
-        {% for value, label in [('created_at', 'Upload date'), ('document_date', 'Document date'), ('deadline', 'Deadline'), ('amount', 'Amount'), ('original_filename', 'Name'), ('document_type', 'Type'), ('status', 'Status')] %}
+        {% for value, label in [('created_at', 'Upload date'), ('id', 'Document ID'), ('original_filename', 'Name'), ('file_size_bytes', 'File size'), ('status', 'Status'), ('document_type', 'Type'), ('document_date', 'Document date'), ('deadline', 'Deadline'), ('amount', 'Amount')] %}
           <option value="{{ value }}" {% if filters.sort_by == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
@@ -136,19 +147,19 @@
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>
-            <th scope="col" class="text-secondary">#</th>
-            <th>Document</th>
-            <th>Size</th>
-            <th>Status</th>
-            <th>Type</th>
-            <th>Uploaded</th>
+            <th scope="col" class="text-secondary">{{ sortable_header('#', 'id') }}</th>
+            <th scope="col">{{ sortable_header('Document', 'original_filename') }}</th>
+            <th scope="col">{{ sortable_header('Size', 'file_size_bytes') }}</th>
+            <th scope="col">{{ sortable_header('Status', 'status') }}</th>
+            <th scope="col">{{ sortable_header('Type', 'document_type') }}</th>
+            <th scope="col">{{ sortable_header('Uploaded', 'created_at') }}</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for document in documents %}
             <tr>
-              <td class="text-secondary text-nowrap">{{ (page - 1) * filters.page_size + loop.index }}</td>
+              <td class="text-secondary text-nowrap" title="Document ID">{{ document.id }}</td>
               <td>
                 <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
                 {% if document.processing_mode.value == "confidential" %}

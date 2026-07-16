@@ -10,6 +10,7 @@ from app.models.document import Document, DocumentStatus
 
 
 DocumentSortField = Literal[
+    "id",
     "created_at",
     "document_date",
     "deadline",
@@ -17,6 +18,7 @@ DocumentSortField = Literal[
     "original_filename",
     "document_type",
     "status",
+    "file_size_bytes",
 ]
 SortDirection = Literal["asc", "desc"]
 

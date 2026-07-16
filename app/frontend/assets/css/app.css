@@ -290,6 +290,9 @@ table td, table th { vertical-align: middle; }
 .documents-filters[open] .documents-filters-toggle::after, .backup-download-menu[open] > summary::after { transform: rotate(180deg); }
 .documents-filters[open] .documents-filters-show { display: none; }
 .documents-filters[open] .documents-filters-hide { display: inline; }
+.table-sort-link { display: inline-flex; gap: 0.3rem; align-items: center; color: inherit; text-decoration: none; }
+.table-sort-link:hover, .table-sort-link:focus-visible, .table-sort-link.is-active { color: var(--docsflow-blue); text-decoration: none; }
+.table-sort-indicator { color: var(--docsflow-accent); font-size: 0.8em; }
 
 .knowledge-message-content, .source-snippet { white-space: pre-wrap; overflow-wrap: anywhere; }
 .knowledge-message-list { width: 100%; margin-bottom: 1.5rem; }

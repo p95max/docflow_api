@@ -236,6 +236,16 @@ def _pagination_query(request: Request) -> str:
     return urlencode(params)
 
 
+def _document_sort_query(request: Request) -> str:
+    """Keep active document filters while a header click changes the sorting."""
+    params = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key not in {"page", "sort_by", "sort_direction"}
+    ]
+    return urlencode(params)
+
+
 def _get_web_current_user(
     request: Request,
     db: Session,
@@ -1083,6 +1093,7 @@ def documents_page(
         document_types=DOCUMENT_TYPES,
         document_statuses=DocumentStatus,
         pagination_query=_pagination_query(request),
+        document_sort_query=_document_sort_query(request),
         deleted=request.query_params.get("deleted") == "1",
     )
 

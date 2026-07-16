@@ -20,6 +20,7 @@ def _document(
     document_date: date | None = None,
     deadline: date | None = None,
     amount: Decimal | None = None,
+    file_size_bytes: int | None = None,
     created_at: datetime | None = None,
     deleted_at: datetime | None = None,
 ) -> Document:
@@ -34,6 +35,7 @@ def _document(
         document_date=document_date,
         deadline=deadline,
         amount=amount,
+        file_size_bytes=file_size_bytes,
         created_at=created_at or datetime.now(UTC),
         deleted_at=deleted_at,
     )
@@ -175,3 +177,30 @@ def test_search_hides_soft_deleted_and_other_users_documents(
 
     assert total == 1
     assert [document.id for document in documents] == [visible.id]
+
+
+def test_search_sorts_by_document_id_and_file_size(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    small = _document(test_user, name="small.pdf", file_size_bytes=10)
+    large = _document(test_user, name="large.pdf", file_size_bytes=500)
+    db_session.add_all([small, large])
+    db_session.commit()
+
+    by_size, _ = search_documents(
+        db=db_session,
+        owner_id=test_user.id,
+        filters=DocumentSearchFilters(
+            sort_by="file_size_bytes",
+            sort_direction="desc",
+        ),
+    )
+    by_id, _ = search_documents(
+        db=db_session,
+        owner_id=test_user.id,
+        filters=DocumentSearchFilters(sort_by="id", sort_direction="asc"),
+    )
+
+    assert [document.id for document in by_size] == [large.id, small.id]
+    assert [document.id for document in by_id] == [small.id, large.id]
