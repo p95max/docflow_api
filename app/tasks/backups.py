@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from datetime import UTC, datetime
 
 from celery.exceptions import SoftTimeLimitExceeded
@@ -14,9 +15,13 @@ from app.services.backup_recovery import (
     get_recovery_key,
     recovery_key_identifier,
 )
-from app.services.google_drive import upload_gzip_backup
+from app.services.backup_retention import prune_completed_backups
+from app.services.google_drive import delete_gzip_backup, upload_gzip_backup
 from app.services.google_drive_oauth import get_google_drive_connection
 from app.worker import celery_app
+
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(
@@ -80,6 +85,18 @@ def run_backup_task(self, backup_job_id: int) -> None:
             job.record_counts = archive.record_counts
             job.finished_at = datetime.now(UTC)
             job.error_message = None
+            db.flush()
+            _, retention_errors = prune_completed_backups(
+                db=db,
+                owner_id=job.owner_id,
+                keep=settings.backup_max_retained,
+                delete_remote_file=lambda file_id: delete_gzip_backup(
+                    file_id=file_id,
+                    refresh_token=connection.refresh_token,
+                ),
+            )
+            for retention_error in retention_errors:
+                logger.warning("Recovery backup retention skipped: %s", retention_error)
             db.commit()
 
         except SoftTimeLimitExceeded:

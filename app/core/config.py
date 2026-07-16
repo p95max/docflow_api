@@ -49,6 +49,7 @@ class Settings(BaseSettings):
 
     backup_soft_time_limit_seconds: int = 120
     backup_hard_time_limit_seconds: int = 180
+    backup_max_retained: int = Field(default=5, ge=1, le=100)
     backup_master_key: str | None = None
     backup_restore_max_file_size_mb: int = Field(default=25, ge=1)
     backup_restore_max_decompressed_size_mb: int = Field(default=100, ge=1)

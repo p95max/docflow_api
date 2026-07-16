@@ -67,6 +67,11 @@
     </div>
   {% endif %}
 
+  <details class="backup-setup mb-4">
+    <summary class="backup-setup-toggle">
+      <span><strong>Backup setup</strong><small>Recovery Key, Google Drive connection and new backup</small></span>
+    </summary>
+    <div class="backup-setup-content">
   <div class="card border-primary shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h6">Before your first backup</h2>
@@ -80,12 +85,6 @@
       </div>
     </div>
   </div>
-
-  <details class="backup-setup mb-4">
-    <summary class="backup-setup-toggle">
-      <span><strong>Backup setup</strong><small>Recovery Key, Google Drive connection and new backup</small></span>
-    </summary>
-    <div class="backup-setup-content">
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h6">1. Recovery Key</h2>
@@ -174,20 +173,6 @@
   </div>
     </div>
   </details>
-
-  <div class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h2 class="h6">Backup scope</h2>
-      <p class="text-secondary mb-0">
-        Recovery backups preserve document records, extracted text and fields so
-        they can be restored after a database loss. They are uploaded to
-        <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as
-        encrypted <code>.json.gz.enc</code> files. Original PDF, JPG and PNG
-        files are not included, so restored documents have no preview or
-        original-file download.
-      </p>
-    </div>
-  </div>
 
   <details class="card shadow-sm mb-4">
     <summary class="card-header cursor-pointer">Recovery backup risks and limits</summary>
@@ -320,6 +305,21 @@
       </p>
     </div>
   {% endif %}
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6">Backup scope</h2>
+      <p class="text-secondary mb-0">
+        Recovery backups preserve document records, extracted text and fields so
+        they can be restored after a database loss. They are uploaded to
+        <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as
+        encrypted <code>.json.gz.enc</code> files. Original PDF, JPG and PNG
+        files are not included, so restored documents have no preview or
+        original-file download. DocsFlow keeps the 5 newest completed recovery
+        archives and removes older ones automatically.
+      </p>
+    </div>
+  </div>
 
   <script>
     (() => {

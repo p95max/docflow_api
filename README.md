@@ -721,6 +721,7 @@ file.
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
 | `BACKUP_MASTER_KEY` | Not set | Valid Fernet key used to protect stored per-user Recovery Keys |
+| `BACKUP_MAX_RETAINED` | `5` | Maximum completed Google Drive recovery archives retained per user; the oldest is removed after a successful new backup. |
 | `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` | — | Active Fernet key used to encrypt Google Drive refresh tokens at rest |
 | `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS` | — | Comma-separated old Fernet keys used temporarily during key rotation |
 | `BACKUP_RESTORE_MAX_FILE_SIZE_MB` | `25` | Maximum uploaded recovery archive size |
