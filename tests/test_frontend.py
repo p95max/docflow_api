@@ -156,7 +156,8 @@ def test_frontend_css_is_served_and_javascript_bundle_is_removed(
 
     assert css_response.status_code == 200
     assert ".preview-frame" in css_response.text
-    assert ':root[data-bs-theme="dark"]' in css_response.text
+    assert "--docsflow-canvas" in css_response.text
+    assert ".docsflow-brand-mark" in css_response.text
     assert javascript_response.status_code == 404
 
 

@@ -66,7 +66,7 @@ def test_backup_page_prompts_user_to_connect_google_drive(
     response = client.get("/backups")
 
     assert response.status_code == 200
-    assert "Google Drive recovery backups" in response.text
+    assert "Google Drive backups" in response.text
     assert "Connect Google Drive" in response.text
     assert "server-encrypted copy" in response.text
     assert "cannot be recovered by DocsFlow" not in response.text
@@ -121,7 +121,7 @@ def test_backup_page_renders_and_creates_job(
 
     page_response = client.get("/backups")
     assert page_response.status_code == 200
-    assert "Google Drive recovery backups" in page_response.text
+    assert "Google Drive backups" in page_response.text
     assert '<form method="post" action="/backups/run">' in page_response.text
     assert "Disconnect Google Drive" in page_response.text
 
