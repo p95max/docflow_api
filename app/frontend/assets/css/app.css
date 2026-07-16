@@ -284,8 +284,11 @@ table td, table th { vertical-align: middle; }
 .documents-filters { overflow: hidden; }
 .documents-filters > summary { display: flex; cursor: pointer; list-style: none; }
 .documents-filters > summary::-webkit-details-marker, .backup-download-menu > summary::-webkit-details-marker { display: none; }
+.documents-filters-hide { display: none; }
 .documents-filters-toggle::after, .backup-download-menu > summary::after { display: inline-block; margin-left: 0.48rem; content: "▾"; transition: transform 0.15s ease-in-out; }
 .documents-filters[open] .documents-filters-toggle::after, .backup-download-menu[open] > summary::after { transform: rotate(180deg); }
+.documents-filters[open] .documents-filters-show { display: none; }
+.documents-filters[open] .documents-filters-hide { display: inline; }
 
 .knowledge-message-content, .source-snippet { white-space: pre-wrap; overflow-wrap: anywhere; }
 .knowledge-message-list { width: 100%; margin-bottom: 1.5rem; }
