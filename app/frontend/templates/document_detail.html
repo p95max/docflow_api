@@ -150,7 +150,9 @@
           <dl class="small mb-0">
             {% for field_name, evidence in document.validation_evidence.items() %}
               <div class="mb-2">
-                <dt class="text-secondary text-capitalize">{{ field_name|replace('_', ' ') }} · page {{ evidence.page_number }}</dt>
+                <dt class="text-secondary text-capitalize">
+                  {{ field_name|replace('_', ' ') }} · page {{ evidence.page_number }} · {{ evidence.evidence_type or "direct" }}
+                </dt>
                 <dd class="mb-0"><q>{{ evidence.quote }}</q></dd>
               </div>
             {% endfor %}
@@ -228,6 +230,8 @@
               <label class="form-label" for="summary">Summary</label>
               <textarea class="form-control" id="summary" name="summary" rows="4">{{ document.summary or "" }}</textarea>
             </div>
+            {% set amount_evidence = document.validation_evidence.amount if document.validation_evidence and document.validation_evidence.amount else none %}
+            {% set currency_evidence = document.validation_evidence.currency if document.validation_evidence and document.validation_evidence.currency else none %}
             <div class="row">
               <div class="col-md-7 mb-3">
                 <label class="form-label" for="amount">Amount</label>
@@ -236,13 +240,20 @@
               <div class="col-md-5 mb-3">
                 <label class="form-label" for="currency">Currency</label>
                 <input class="form-control" id="currency" name="currency" minlength="3" maxlength="3" value="{{ document.currency or '' }}">
-                {% if document.validation_evidence and document.validation_evidence.currency %}
-                  <p class="form-text mb-0">Evidence, page {{ document.validation_evidence.currency.page_number }}: <q>{{ document.validation_evidence.currency.quote }}</q></p>
-                {% endif %}
               </div>
             </div>
-            {% if document.validation_evidence and document.validation_evidence.amount %}
-              <p class="form-text mt-n2">Amount evidence, page {{ document.validation_evidence.amount.page_number }}: <q>{{ document.validation_evidence.amount.quote }}</q></p>
+            {% if amount_evidence and currency_evidence and amount_evidence.page_number == currency_evidence.page_number and amount_evidence.quote == currency_evidence.quote %}
+              <p class="form-text mt-n2">
+                Amount and currency evidence, page {{ amount_evidence.page_number }} · {{ currency_evidence.evidence_type or "direct" }}:
+                <q>{{ amount_evidence.quote }}</q>
+              </p>
+            {% else %}
+              {% if amount_evidence %}
+                <p class="form-text mt-n2">Amount evidence, page {{ amount_evidence.page_number }} · {{ amount_evidence.evidence_type or "direct" }}: <q>{{ amount_evidence.quote }}</q></p>
+              {% endif %}
+              {% if currency_evidence %}
+                <p class="form-text mt-n2">Currency evidence, page {{ currency_evidence.page_number }} · {{ currency_evidence.evidence_type or "direct" }}: <q>{{ currency_evidence.quote }}</q></p>
+              {% endif %}
             {% endif %}
             <div class="row">
               <div class="col-md-6 mb-3">
