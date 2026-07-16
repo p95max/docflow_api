@@ -1,7 +1,7 @@
 """add extraction validation candidates and OCR quality
 
-Revision ID: 0019_document_validation_quality
-Revises: 0018_document_validation_evidence
+Revision ID: 0019_validation_quality
+Revises: 0018_validation_evidence
 Create Date: 2026-07-16
 """
 
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision: str = "0019_document_validation_quality"
-down_revision: str | None = "0018_document_validation_evidence"
+revision: str = "0019_validation_quality"
+down_revision: str | None = "0018_validation_evidence"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

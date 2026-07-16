@@ -1,6 +1,6 @@
 """add deterministic AI extraction validation fields
 
-Revision ID: 0017_document_extraction_validation
+Revision ID: 0017_extraction_validation
 Revises: 0016_document_user_note
 Create Date: 2026-07-16
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision: str = "0017_document_extraction_validation"
+revision: str = "0017_extraction_validation"
 down_revision: str | None = "0016_document_user_note"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
