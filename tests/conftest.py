@@ -39,6 +39,7 @@ os.environ["GOOGLE_OAUTH_STATE_EXPIRE_MINUTES"] = "10"
 
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
+os.environ["OPENAI_RAG_MODEL"] = "gpt-5.4-mini"
 os.environ["OPENAI_REQUEST_TIMEOUT_SECONDS"] = "45"
 os.environ["OPENAI_MAX_INPUT_CHARS"] = "12000"
 
