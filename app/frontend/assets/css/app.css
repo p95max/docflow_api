@@ -73,17 +73,12 @@ a:hover { color: #c7d9ff; }
 .docsflow-brand:hover { color: #fff; }
 
 .docsflow-brand-mark {
-  display: grid;
+  display: block;
+  flex: 0 0 auto;
   width: 2rem;
   height: 2rem;
-  place-items: center;
-  color: #092119;
-  font-size: 0.62rem;
-  font-weight: 900;
-  letter-spacing: -0.08em;
-  background: linear-gradient(140deg, #aaf0d3, #55c8a1);
-  border-radius: 8px 12px 8px 12px;
-  box-shadow: 0 7px 22px rgba(72, 201, 157, 0.24);
+  border-radius: 9px;
+  box-shadow: 0 7px 22px rgba(56, 189, 248, 0.18);
 }
 
 .docsflow-nav-actions {
