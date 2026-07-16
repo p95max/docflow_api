@@ -45,24 +45,25 @@ _GERMAN_MONTHS = {
     "november": 11,
     "dezember": 12,
 }
-_CURRENCY_PATTERN = re.compile(r"\b(EUR|USD|GBP|CHF|PLN|SEK|NOK|DKK)\b", re.IGNORECASE)
+_CURRENCY_PATTERN = re.compile(
+    r"\b(EUR|USD|GBP|CHF|PLN|SEK|NOK|DKK)\b", re.IGNORECASE
+)
 _ISO_DATE_PATTERN = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
-
-
-class ExtractionValidationResult(BaseModel):
-    """Persistable outcome of deterministic post-processing validation."""
-
-    status: str = Field(
-        pattern=r"^(valid|warning|needs_review|failed)$",
-    )
-    errors: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
-    score: float = Field(ge=0, le=100)
-    evidence: dict[str, FieldEvidence] = Field(default_factory=dict)
-    amount_candidates: list["AmountCandidate"] = Field(default_factory=list)
-    date_candidates: list["DateCandidate"] = Field(default_factory=list)
-    ambiguity_flags: list[str] = Field(default_factory=list)
-    ocr_quality_score: float = Field(ge=0, le=100)
+_TEMPLATE_PLACEHOLDER_PATTERN = re.compile(r"\[[^\]\n]{2,80}\]")
+_TEMPLATE_EXAMPLE_VALUE_PATTERN = re.compile(
+    r"\b(?:muster(?:mann|frau|stadt|weg|straße|strasse)?|beispiel(?:name|stadt|straße|strasse|weg)?)\b",
+    re.IGNORECASE,
+)
+_TEMPLATE_MARKERS = (
+    "musterbrief",
+    "so verwenden sie diesen musterbrief",
+    "kopieren sie den text",
+    "ergänzen sie ihn mit ihren absenderangaben",
+    "ergaenzen sie ihn mit ihren absenderangaben",
+    "löschen sie die kursiven platzhalter",
+    "loeschen sie die kursiven platzhalter",
+    "bitte senden sie den brief nicht an",
+)
 
 
 class AmountCandidate(BaseModel):
@@ -74,6 +75,20 @@ class AmountCandidate(BaseModel):
 class DateCandidate(BaseModel):
     value: str
     label: Literal["issue_date", "deadline", "service_date", "other"]
+
+
+class ExtractionValidationResult(BaseModel):
+    """Persistable outcome of deterministic post-processing validation."""
+
+    status: str = Field(pattern=r"^(valid|warning|needs_review|failed)$")
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    score: float = Field(ge=0, le=100)
+    evidence: dict[str, FieldEvidence] = Field(default_factory=dict)
+    amount_candidates: list[AmountCandidate] = Field(default_factory=list)
+    date_candidates: list[DateCandidate] = Field(default_factory=list)
+    ambiguity_flags: list[str] = Field(default_factory=list)
+    ocr_quality_score: float = Field(ge=0, le=100)
 
 
 def _add_once(messages: list[str], message: str) -> None:
@@ -90,12 +105,23 @@ def validate_ai_extraction(
 ) -> ExtractionValidationResult:
     """Validate AI fields against source text and cross-field business rules.
 
-    The function deliberately does not overwrite model output. A result needing
-    review remains visible to the owner, together with the deterministic reason.
+    The validator never mutates model output. Template detection runs before
+    critical-field checks so sample values are not mistaken for real metadata.
     """
     errors: list[str] = []
     warnings: list[str] = []
     source = raw_text.strip()
+    is_template = _is_document_template(source)
+    sender_is_template_example = bool(
+        is_template
+        and extraction.sender
+        and _looks_like_template_example(extraction.sender)
+    )
+
+    if is_template:
+        warnings.append(
+            "Document template detected; sample values and placeholders must not be stored as real metadata."
+        )
 
     if extraction.total_amount is not None and not _amount_is_grounded(
         extraction.total_amount,
@@ -118,7 +144,9 @@ def validate_ai_extraction(
     ):
         errors.append("Action deadline is not confirmed by the extracted document text.")
 
-    if extraction.sender and not _text_value_is_grounded(extraction.sender, source):
+    if sender_is_template_example:
+        errors.append("Sender appears to be example data from a document template.")
+    elif extraction.sender and not _text_value_is_grounded(extraction.sender, source):
         warnings.append("Sender is not confirmed by the extracted document text.")
 
     if (extraction.total_amount is None) != (extraction.currency is None):
@@ -138,11 +166,13 @@ def validate_ai_extraction(
         if extraction.total_amount is None:
             warnings.append("Invoice has no total amount to review.")
 
+    skipped_evidence_fields = {"sender"} if sender_is_template_example else set()
     accepted_evidence = _validate_evidence(
         extraction=extraction,
         source=source,
         source_pages=source_pages,
         errors=errors,
+        skipped_fields=skipped_evidence_fields,
     )
     _validate_currency_amount_link(
         extraction=extraction,
@@ -194,6 +224,21 @@ def validate_ai_extraction(
     )
 
 
+def _is_document_template(source: str) -> bool:
+    """Detect instructional/sample documents before validating business fields."""
+    normalized = source.casefold()
+    if "musterbrief" in normalized:
+        return True
+
+    marker_count = sum(marker in normalized for marker in _TEMPLATE_MARKERS)
+    placeholder_count = len(_TEMPLATE_PLACEHOLDER_PATTERN.findall(source))
+    return marker_count >= 2 or (marker_count >= 1 and placeholder_count >= 2)
+
+
+def _looks_like_template_example(value: str) -> bool:
+    return _TEMPLATE_EXAMPLE_VALUE_PATTERN.search(value) is not None
+
+
 def _amount_is_grounded(amount: float, source: str) -> bool:
     expected = _parse_amount_candidate(str(amount))
     if expected is None:
@@ -209,7 +254,10 @@ def _parse_amount_candidate(value: str) -> Decimal | None:
     if "," in compact and "." in compact:
         decimal_separator = "," if compact.rfind(",") > compact.rfind(".") else "."
         thousands_separator = "." if decimal_separator == "," else ","
-        normalized = compact.replace(thousands_separator, "").replace(decimal_separator, ".")
+        normalized = compact.replace(thousands_separator, "").replace(
+            decimal_separator,
+            ".",
+        )
     elif "," in compact:
         normalized = compact.replace(",", ".")
     else:
@@ -255,10 +303,14 @@ def _safe_date(*, year: str, month: str, day: str) -> date | None:
         return None
 
 
+def _normalize_grounding_text(value: str) -> str:
+    return " ".join(re.sub(r"[^\w]+", " ", value.casefold()).split())
+
+
 def _text_value_is_grounded(value: str, source: str) -> bool:
-    normalized_value = " ".join(value.casefold().split())
-    normalized_source = " ".join(source.casefold().split())
-    return normalized_value in normalized_source
+    normalized_value = _normalize_grounding_text(value)
+    normalized_source = _normalize_grounding_text(source)
+    return bool(normalized_value) and normalized_value in normalized_source
 
 
 def _validate_evidence(
@@ -267,6 +319,7 @@ def _validate_evidence(
     source: str,
     source_pages: list["ExtractedTextPage"] | None,
     errors: list[str],
+    skipped_fields: set[str] | None = None,
 ) -> dict[str, FieldEvidence]:
     """Accept evidence only when its quote and page both match local text."""
     field_values: tuple[tuple[str, str | float | None], ...] = (
@@ -278,9 +331,10 @@ def _validate_evidence(
         ("sender", extraction.sender),
     )
     accepted: dict[str, FieldEvidence] = {}
+    skipped = skipped_fields or set()
 
     for field_name, field_value in field_values:
-        if field_value is None:
+        if field_value is None or field_name in skipped:
             continue
 
         evidence = getattr(extraction.evidence, field_name)
@@ -378,7 +432,9 @@ def _extract_amount_candidates(source: str) -> list[AmountCandidate]:
     return candidates
 
 
-def _amount_label(context: str) -> Literal["total", "tax", "net", "outstanding", "other"]:
+def _amount_label(
+    context: str,
+) -> Literal["total", "tax", "net", "outstanding", "other"]:
     normalized = context.casefold()
     if any(term in normalized for term in ("total", "gesamtbetrag", "endbetrag", "summe")):
         return "total"
@@ -386,7 +442,10 @@ def _amount_label(context: str) -> Literal["total", "tax", "net", "outstanding",
         return "tax"
     if any(term in normalized for term in ("subtotal", "net", "zwischensumme")):
         return "net"
-    if any(term in normalized for term in ("outstanding", "amount due", "fällig", "offen", "zu zahlen")):
+    if any(
+        term in normalized
+        for term in ("outstanding", "amount due", "fällig", "offen", "zu zahlen")
+    ):
         return "outstanding"
     return "other"
 
@@ -397,11 +456,19 @@ def _extract_date_candidates(source: str) -> list[DateCandidate]:
     parsed_candidates: list[tuple[date, int, int]] = []
 
     for match in _ISO_DATE_PATTERN.finditer(source):
-        parsed = _safe_date(year=match.group(1), month=match.group(2), day=match.group(3))
+        parsed = _safe_date(
+            year=match.group(1),
+            month=match.group(2),
+            day=match.group(3),
+        )
         if parsed:
             parsed_candidates.append((parsed, match.start(), match.end()))
     for match in _LOCALE_DATE_PATTERN.finditer(source):
-        parsed = _safe_date(year=match.group(3), month=match.group(2), day=match.group(1))
+        parsed = _safe_date(
+            year=match.group(3),
+            month=match.group(2),
+            day=match.group(1),
+        )
         if parsed:
             parsed_candidates.append((parsed, match.start(), match.end()))
     for match in _GERMAN_MONTH_PATTERN.finditer(source):
@@ -423,13 +490,18 @@ def _extract_date_candidates(source: str) -> list[DateCandidate]:
     return candidates
 
 
-def _date_label(context: str) -> Literal["issue_date", "deadline", "service_date", "other"]:
+def _date_label(
+    context: str,
+) -> Literal["issue_date", "deadline", "service_date", "other"]:
     normalized = context.casefold()
     if any(term in normalized for term in ("due", "deadline", "zahlbar", "fällig", "frist")):
         return "deadline"
     if any(term in normalized for term in ("service", "leistung", "period")):
         return "service_date"
-    if any(term in normalized for term in ("invoice date", "document date", "rechnungsdatum", "dated")):
+    if any(
+        term in normalized
+        for term in ("invoice date", "document date", "rechnungsdatum", "dated")
+    ):
         return "issue_date"
     return "other"
 
@@ -450,12 +522,20 @@ def _detect_ambiguity(
 ) -> list[str]:
     flags: list[str] = []
     for label in ("total", "outstanding"):
-        values = {candidate.value for candidate in amount_candidates if candidate.label == label}
+        values = {
+            candidate.value
+            for candidate in amount_candidates
+            if candidate.label == label
+        }
         if len(values) > 1:
             flags.append("multiple_amount_candidates")
             break
     for label in ("issue_date", "deadline"):
-        values = {candidate.value for candidate in date_candidates if candidate.label == label}
+        values = {
+            candidate.value
+            for candidate in date_candidates
+            if candidate.label == label
+        }
         if len(values) > 1:
             flags.append("multiple_date_candidates")
             break
