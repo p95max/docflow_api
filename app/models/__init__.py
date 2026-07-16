@@ -1,5 +1,6 @@
 from app.models.audit_log import AuditLog
 from app.models.backup_job import BackupJob
+from app.models.calendar_event import CalendarEvent
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_index_job import DocumentIndexJob
@@ -14,6 +15,7 @@ from app.models.user import User
 __all__ = [
     "AuditLog",
     "BackupJob",
+    "CalendarEvent",
     "Document",
     "DocumentChunk",
     "DocumentIndexJob",

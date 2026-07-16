@@ -281,3 +281,9 @@ class Document(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+    calendar_events = relationship(
+        "CalendarEvent",
+        back_populates="document",
+        passive_deletes=True,
+    )
