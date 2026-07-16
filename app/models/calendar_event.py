@@ -3,7 +3,23 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Float, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+    Uuid,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -40,9 +56,32 @@ class CalendarEvent(Base):
 
     __tablename__ = "calendar_events"
     __table_args__ = (
+        CheckConstraint(
+            "(all_day = true AND start_date IS NOT NULL AND start_at IS NULL) "
+            "OR (all_day = false AND start_at IS NOT NULL)",
+            name="ck_calendar_events_time_representation",
+        ),
+        CheckConstraint(
+            "end_date IS NULL OR (start_date IS NOT NULL AND end_date >= start_date)",
+            name="ck_calendar_events_date_range",
+        ),
+        CheckConstraint(
+            "end_at IS NULL OR (start_at IS NOT NULL AND end_at >= start_at)",
+            name="ck_calendar_events_datetime_range",
+        ),
         Index("ix_calendar_events_owner_start_date", "owner_id", "start_date"),
         Index("ix_calendar_events_owner_start_at", "owner_id", "start_at"),
         Index("ix_calendar_events_document_id", "document_id"),
+        Index("ix_calendar_events_owner_status", "owner_id", "status"),
+        Index("ix_calendar_events_owner_deleted_at", "owner_id", "deleted_at"),
+        Index(
+            "uq_calendar_events_owner_ai_source_key",
+            "owner_id",
+            "source_key",
+            unique=True,
+            postgresql_where=text("source = 'ai' AND source_key IS NOT NULL AND deleted_at IS NULL"),
+            sqlite_where=text("source = 'ai' AND source_key IS NOT NULL AND deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -117,6 +156,7 @@ class CalendarEvent(Base):
         String(255),
         default=lambda: f"{uuid.uuid4()}@docsflow",
         unique=True,
+        index=True,
         nullable=False,
     )
     sequence: Mapped[int] = mapped_column(

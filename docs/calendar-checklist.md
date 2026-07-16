@@ -54,7 +54,7 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 - [x] Add the `Document.calendar_events` relationship
 - [x] Add the `User.calendar_events` relationship
 - [x] Add `ondelete="CASCADE"` for the owner relationship
-- [ ] Define event behavior when a linked document is deleted:
+- [x] Define event behavior when a linked document is deleted:
   - [ ] Soft-delete the events together with the document
   - [x] Or preserve them as detached events
 - [x] Create an Alembic migration
@@ -84,23 +84,23 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 3. Database Constraints
 
-- [ ] Add a constraint for date-only events:
-  - [ ] `all_day = true`
-  - [ ] `start_date IS NOT NULL`
-  - [ ] `start_at IS NULL`
-- [ ] Add a constraint for datetime events:
-  - [ ] `all_day = false`
-  - [ ] `start_at IS NOT NULL`
-- [ ] Validate `end_date >= start_date`
-- [ ] Validate `end_at >= start_at`
-- [ ] Add a unique index for `ical_uid`
-- [ ] Add indexes:
-  - [ ] `(owner_id, start_date)`
-  - [ ] `(owner_id, start_at)`
-  - [ ] `(owner_id, status)`
-  - [ ] `(document_id)`
-  - [ ] `(owner_id, deleted_at)`
-- [ ] Prevent duplicate AI events through `source_key`
+- [x] Add a constraint for date-only events:
+  - [x] `all_day = true`
+  - [x] `start_date IS NOT NULL`
+  - [x] `start_at IS NULL`
+- [x] Add a constraint for datetime events:
+  - [x] `all_day = false`
+  - [x] `start_at IS NOT NULL`
+- [x] Validate `end_date >= start_date`
+- [x] Validate `end_at >= start_at`
+- [x] Add a unique index for `ical_uid`
+- [x] Add indexes:
+  - [x] `(owner_id, start_date)`
+  - [x] `(owner_id, start_at)`
+  - [x] `(owner_id, status)`
+  - [x] `(document_id)`
+  - [x] `(owner_id, deleted_at)`
+- [x] Prevent duplicate AI events through `source_key`
 
 ---
 
