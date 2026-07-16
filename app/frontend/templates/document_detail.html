@@ -113,7 +113,28 @@
               <span class="badge {{ document.extraction_status|status_badge_class }}">{{ document.extraction_status.value }}</span>
             {% endif %}
           </dd>
+          {% if document.validation_status %}
+            <dt class="col-sm-5 text-secondary">Validation</dt>
+            <dd class="col-sm-7">
+              <span class="badge {{ document.validation_status|status_badge_class }}">{{ document.validation_status|replace('_', ' ') }}</span>
+              {% if document.validation_score is not none %}
+                <span class="small text-secondary">{{ document.validation_score|round(0)|int }}/100</span>
+              {% endif %}
+            </dd>
+          {% endif %}
         </dl>
+        {% if document.validation_errors or document.validation_warnings %}
+          <hr>
+          <p class="small fw-bold mb-1">Validation notes</p>
+          <ul class="small mb-0">
+            {% for message in document.validation_errors or [] %}
+              <li class="text-warning">{{ message }}</li>
+            {% endfor %}
+            {% for message in document.validation_warnings or [] %}
+              <li class="text-secondary">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
         {% if document.summary %}
           <hr>
           <p class="document-summary mb-0">{{ document.summary }}</p>

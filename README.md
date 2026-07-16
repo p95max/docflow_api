@@ -788,7 +788,7 @@ Processing flow for standard documents:
 upload
 -> local text extraction
 -> AI structured JSON extraction (including document type)
--> Pydantic validation
+-> schema and deterministic validation (grounding + logic)
 -> save extracted JSON and OpenAI usage log
 -> mark document as completed
 ```
@@ -799,8 +799,14 @@ upload
 
 - Document type classification
 - Structured data extraction to JSON
-- Pydantic validation of the AI response
+- Strict Pydantic validation of the AI response
+- Deterministic validation against extracted text and cross-field rules
 - OpenAI token usage logging
+
+Validation stores a score, status, errors and warnings with the document. A
+`needs_review` result is kept for the user to correct or confirm; it is not
+silently discarded. The implementation roadmap is in
+[AI extraction validation checklist](docs/ai-extraction-validation-checklist.md).
 
 **Storage fields:**
 
@@ -810,6 +816,7 @@ upload
 | Document type | `documents.document_type` |
 | Model used | `documents.ai_extraction_model` |
 | Completion timestamp | `documents.ai_extraction_completed_at` |
+| Validation result | `documents.validation_*` |
 | Token usage | `openai_usage_logs` |
 
 ### Processing Modes

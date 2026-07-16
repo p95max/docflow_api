@@ -31,6 +31,10 @@ class RecoveryDocumentV2(BaseModel):
     document_date: date | None = None
     sender: str | None = Field(default=None, max_length=255)
     confidence_score: float | None = Field(default=None, ge=0, le=1)
+    validation_status: str | None = Field(default=None, max_length=20)
+    validation_errors: list[str] | None = None
+    validation_warnings: list[str] | None = None
+    validation_score: float | None = Field(default=None, ge=0, le=100)
     ai_extraction_model: str | None = Field(default=None, max_length=100)
     manual_corrections: dict[str, Any] | None = None
     manually_corrected_at: datetime | None = None

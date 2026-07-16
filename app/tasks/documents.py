@@ -16,6 +16,10 @@ from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
 from app.services.document_index_jobs import enqueue_document_index_job
+from app.services.extraction_validation import (
+    ExtractionValidationResult,
+    validate_ai_extraction,
+)
 from app.services.local_document_classification import classify_document_type
 from app.services.rate_limits import enforce_openai_usage_quota
 from app.services.text_extraction import extract_text_from_document
@@ -70,10 +74,15 @@ def process_document_task(self, job_id: int) -> None:
                     raw_text=extracted_text,
                     original_filename=document.original_filename,
                 )
+                validation_result = validate_ai_extraction(
+                    extraction=ai_result.extracted_data,
+                    raw_text=extracted_text,
+                )
                 _apply_standard_ai_processing_result(
                     db=db,
                     document=document,
                     ai_result=ai_result,
+                    validation_result=validation_result,
                 )
 
             document.status = DocumentStatus.completed
@@ -198,6 +207,7 @@ def _apply_standard_ai_processing_result(
     db: Session,
     document: Document,
     ai_result: StandardAIProcessingResult,
+    validation_result: ExtractionValidationResult,
 ) -> None:
     extracted_data = ai_result.extracted_data
 
@@ -219,6 +229,10 @@ def _apply_standard_ai_processing_result(
     )
     document.sender = extracted_data.sender
     document.confidence_score = extracted_data.confidence_score
+    document.validation_status = validation_result.status
+    document.validation_errors = validation_result.errors or None
+    document.validation_warnings = validation_result.warnings or None
+    document.validation_score = validation_result.score
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None
     document.manual_corrections = None
@@ -254,6 +268,10 @@ def _reset_document_processing_result(document: Document) -> None:
     document.document_date = None
     document.sender = None
     document.confidence_score = None
+    document.validation_status = None
+    document.validation_errors = None
+    document.validation_warnings = None
+    document.validation_score = None
 
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None

@@ -174,6 +174,26 @@ class Document(Base):
         nullable=True,
     )
 
+    validation_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    validation_errors: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    validation_warnings: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    validation_score: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
     ai_extraction_model: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,

@@ -35,6 +35,10 @@ class DocumentRead(BaseModel):
     document_date: date | None
     sender: str | None
     confidence_score: float | None
+    validation_status: str | None
+    validation_errors: list[str] | None
+    validation_warnings: list[str] | None
+    validation_score: float | None
 
     extraction_status: ExtractionStatus
     extraction_confirmed_at: datetime | None
