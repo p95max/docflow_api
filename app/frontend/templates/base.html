@@ -30,6 +30,13 @@
                 <span>Ask Documents</span>
               </span>
             {% endif %}
+            {% if ai_usage %}
+              <button class="btn btn-sm btn-outline-light ai-usage-button" type="button" data-dialog-open="ai-usage-modal" title="Open AI usage details">
+                <span class="ai-usage-button-label">AI</span>
+                <span class="ai-usage-model">{{ ai_usage.nav_model }}</span>
+                <span>{{ ai_usage.used_tokens|token_count }} / {{ ai_usage.limit_tokens|token_count }}</span>
+              </button>
+            {% endif %}
             <a class="btn btn-sm btn-outline-light" href="/backups">Backups</a>
             <a class="btn btn-sm btn-light" href="/documents/upload">Upload</a>
             <form method="post" action="/logout" class="m-0">
@@ -46,6 +53,48 @@
     <main class="container docsflow-main">
       {% block content %}{% endblock %}
     </main>
+    {% if current_user and ai_usage %}
+      <dialog class="ai-usage-dialog" id="ai-usage-modal" aria-labelledby="ai-usage-title">
+        <div class="ai-usage-dialog-header">
+          <div>
+            <p class="workspace-kicker">Last 24 hours</p>
+            <h2 id="ai-usage-title">AI usage</h2>
+          </div>
+          <form method="dialog">
+            <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="Close AI usage">Close</button>
+          </form>
+        </div>
+        <div class="ai-usage-stats">
+          <div><span>Tokens used</span><strong>{{ ai_usage.used_tokens|token_count }}</strong></div>
+          <div><span>Daily limit</span><strong>{{ ai_usage.limit_tokens|token_count }}</strong></div>
+          <div><span>Remaining</span><strong>{{ ai_usage.remaining_tokens|token_count }}</strong></div>
+        </div>
+        <div class="ai-usage-meter" aria-label="{{ ai_usage.percent_used|round(1) }} percent of the token limit used">
+          <span style="width: {{ ai_usage.percent_used }}%"></span>
+        </div>
+        <p class="ai-usage-caption">{{ ai_usage.recorded_operations }} recorded AI operation{% if ai_usage.recorded_operations != 1 %}s{% endif %} in the rolling 24-hour quota window.</p>
+        <div class="ai-usage-section">
+          <h3>Recorded usage by model</h3>
+          {% if ai_usage.models %}
+            <div class="ai-usage-model-list">
+              {% for model in ai_usage.models %}
+                <div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens · {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-secondary mb-0">No AI usage has been recorded in this window.</p>
+          {% endif %}
+        </div>
+        <div class="ai-usage-section">
+          <h3>Configured models</h3>
+          <dl class="ai-usage-configured-models">
+            {% for purpose, model in ai_usage.configured_models %}
+              <div><dt>{{ purpose }}</dt><dd><code>{{ model }}</code></dd></div>
+            {% endfor %}
+          </dl>
+        </div>
+      </dialog>
+    {% endif %}
     <script data-form-feedback>
       (() => {
         const controlSelector = "input, select, textarea";
@@ -72,6 +121,12 @@
           form.setAttribute("aria-busy", "true");
           submitter.disabled = true;
           submitter.textContent = submitter.dataset.loadingLabel || "Working…";
+        });
+        document.addEventListener("click", (event) => {
+          const opener = event.target.closest("[data-dialog-open]");
+          if (!opener) return;
+          const dialog = document.getElementById(opener.dataset.dialogOpen);
+          if (dialog instanceof HTMLDialogElement) dialog.showModal();
         });
       })();
     </script>

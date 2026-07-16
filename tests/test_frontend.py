@@ -119,6 +119,8 @@ def test_html_login_uses_http_only_cookie_and_renders_documents(
     assert "data-form-feedback" in documents_response.text
     assert "Ask Documents" in documents_response.text
     assert 'class="docsflow-ai-icon"' in documents_response.text
+    assert 'data-dialog-open="ai-usage-modal"' in documents_response.text
+    assert 'id="ai-usage-modal"' in documents_response.text
 
 
 def test_remember_me_uses_a_longer_persistent_session(

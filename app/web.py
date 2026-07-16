@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 import secrets
@@ -127,11 +127,77 @@ def _format_berlin_time(value: datetime) -> str:
     return _to_berlin_timezone(value).strftime("%H:%M")
 
 
+def _format_token_count(value: int) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}K"
+    return str(value)
+
+
+def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None:
+    """Build a small, owner-only usage view for the navigation dialog."""
+    if current_user is None:
+        return None
+
+    window_start = datetime.now(timezone.utc) - timedelta(days=1)
+    usage_by_model: dict[str, dict[str, int]] = {}
+    recorded_operations = 0
+    used_tokens = 0
+
+    for usage_log in current_user.openai_usage_logs:
+        created_at = usage_log.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        if created_at < window_start:
+            continue
+
+        token_count = usage_log.total_tokens
+        if token_count is None:
+            token_count = (usage_log.input_tokens or 0) + (usage_log.output_tokens or 0)
+
+        used_tokens += token_count
+        recorded_operations += 1
+        model_usage = usage_by_model.setdefault(
+            usage_log.model,
+            {"tokens": 0, "operations": 0},
+        )
+        model_usage["tokens"] += token_count
+        model_usage["operations"] += 1
+
+    models = [
+        {
+            "name": model,
+            "tokens": values["tokens"],
+            "operations": values["operations"],
+        }
+        for model, values in usage_by_model.items()
+    ]
+    models.sort(key=lambda model: (-int(model["tokens"]), str(model["name"])))
+
+    limit_tokens = settings.openai_daily_token_quota
+    return {
+        "used_tokens": used_tokens,
+        "limit_tokens": limit_tokens,
+        "remaining_tokens": max(limit_tokens - used_tokens, 0),
+        "percent_used": min((used_tokens / limit_tokens) * 100, 100),
+        "recorded_operations": recorded_operations,
+        "models": models,
+        "nav_model": str(models[0]["name"]) if models else settings.openai_rag_model,
+        "configured_models": (
+            ("Document extraction", settings.openai_model),
+            ("Ask Documents", settings.openai_rag_model),
+            ("Embeddings", settings.openai_embedding_model),
+        ),
+    }
+
+
 templates.env.filters["file_size"] = _format_file_size
 templates.env.filters["status_badge_class"] = _status_badge_class
 templates.env.filters["berlin_datetime"] = _format_berlin_datetime
 templates.env.filters["berlin_date"] = _format_berlin_date
 templates.env.filters["berlin_time"] = _format_berlin_time
+templates.env.filters["token_count"] = _format_token_count
 
 
 def _pagination_query(request: Request) -> str:
@@ -196,6 +262,7 @@ def _template_response(
             "document_types": DOCUMENT_TYPES,
             "knowledge_enabled": settings.knowledge_enabled,
             "csrf_token": csrf_token,
+            "ai_usage": _get_ai_usage_summary(current_user),
             **context,
         },
         status_code=status_code,

@@ -210,6 +210,30 @@ table td, table th { vertical-align: middle; }
 
 .docsflow-ai-nav { display: inline-flex; gap: 0.42rem; align-items: center; }
 .docsflow-ai-icon { display: inline-flex; width: 1.22rem; height: 1.22rem; align-items: center; justify-content: center; color: #092119; font-size: 0.56rem; font-weight: 900; line-height: 1; letter-spacing: -0.05em; background: linear-gradient(135deg, #b6f5da, #62ceac); border-radius: 5px 8px 5px 8px; }
+.ai-usage-button { display: inline-flex; gap: 0.38rem; align-items: center; }
+.ai-usage-button-label { display: inline-grid; width: 1.2rem; height: 1.2rem; place-items: center; color: #092119; font-size: 0.56rem; font-weight: 900; letter-spacing: -0.05em; background: #f7c86b; border-radius: 50%; }
+.ai-usage-model { max-width: 7.8rem; overflow: hidden; font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.ai-usage-dialog { width: min(38rem, calc(100vw - 2rem)); padding: 0; color: var(--docsflow-ink); background: #172131; border: 1px solid #415675; border-radius: 18px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56); }
+.ai-usage-dialog::backdrop { background: rgba(3, 7, 14, 0.72); backdrop-filter: blur(4px); }
+.ai-usage-dialog-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 1.45rem 1.5rem 1.1rem; border-bottom: 1px solid var(--docsflow-line); }
+.ai-usage-dialog-header .workspace-kicker { margin-bottom: 0.35rem; }
+.ai-usage-dialog h2 { margin: 0; font-size: 1.45rem; letter-spacing: -0.04em; }
+.ai-usage-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; padding: 1.25rem 1.5rem 0.85rem; }
+.ai-usage-stats > div { padding: 0.8rem; background: rgba(5, 12, 22, 0.42); border: 1px solid rgba(70, 91, 121, 0.58); border-radius: 10px; }
+.ai-usage-stats span { display: block; color: var(--docsflow-muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.ai-usage-stats strong { display: block; margin-top: 0.35rem; font-size: 1.1rem; }
+.ai-usage-meter { height: 0.55rem; margin: 0 1.5rem; overflow: hidden; background: #0c1420; border-radius: 999px; }
+.ai-usage-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--docsflow-accent), #f7c86b); border-radius: inherit; }
+.ai-usage-caption { margin: 0.75rem 1.5rem 1.2rem; color: var(--docsflow-muted); font-size: 0.8rem; }
+.ai-usage-section { padding: 1.1rem 1.5rem; border-top: 1px solid rgba(70, 91, 121, 0.45); }
+.ai-usage-section h3 { margin: 0 0 0.7rem; color: #b7c8e2; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+.ai-usage-model-list, .ai-usage-configured-models { display: grid; gap: 0.5rem; margin: 0; }
+.ai-usage-model-list > div, .ai-usage-configured-models > div { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: 0.6rem 0.7rem; background: rgba(7, 13, 23, 0.32); border-radius: 8px; }
+.ai-usage-model-list span, .ai-usage-configured-models dt { color: var(--docsflow-muted); font-size: 0.78rem; }
+.ai-usage-configured-models dt, .ai-usage-configured-models dd { margin: 0; }
+
+@media (max-width: 480px) { .ai-usage-stats { grid-template-columns: 1fr; } .ai-usage-model-list > div, .ai-usage-configured-models > div { align-items: flex-start; flex-direction: column; gap: 0.3rem; } }
 
 .auth-card { max-width: 30rem; margin: clamp(1.5rem, 8vh, 5.5rem) auto; }
 .auth-card .card-body { padding: clamp(1.5rem, 5vw, 2.6rem); }
@@ -285,6 +309,7 @@ form[aria-busy="true"] { opacity: 0.75; }
   .docsflow-nav-actions { width: 100%; }
   .docsflow-nav-actions .btn, .docsflow-nav-actions form { flex: 1 1 auto; }
   .docsflow-nav-actions .btn { justify-content: center; }
+  .ai-usage-model { display: none; }
   .preview-frame { min-height: 28rem; }
   .knowledge-message { max-width: 93%; }
   .workspace-page-head { align-items: flex-start; }
