@@ -31,7 +31,7 @@ def test_ai_usage_summary_counts_recent_owner_usage_by_model(
                 operation="old_usage",
                 model="gpt-4o-mini",
                 total_tokens=999,
-                created_at=datetime.now(UTC) - timedelta(days=2),
+                created_at=datetime.now(UTC) - timedelta(days=35),
             ),
         ]
     )
@@ -48,3 +48,5 @@ def test_ai_usage_summary_counts_recent_owner_usage_by_model(
         {"name": "gpt-5.6-terra", "tokens": 40, "operations": 1},
         {"name": "gpt-4o-mini", "tokens": 20, "operations": 1},
     ]
+    assert summary["monthly"]["used_tokens"] == 60
+    assert summary["monthly"]["recorded_operations"] == 2

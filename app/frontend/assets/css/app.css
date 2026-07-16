@@ -219,7 +219,11 @@ table td, table th { vertical-align: middle; }
 .ai-usage-dialog-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 1.45rem 1.5rem 1.1rem; border-bottom: 1px solid var(--docsflow-line); }
 .ai-usage-dialog-header .workspace-kicker { margin-bottom: 0.35rem; }
 .ai-usage-dialog h2 { margin: 0; font-size: 1.45rem; letter-spacing: -0.04em; }
+.ai-usage-tabs { display: flex; gap: 0.35rem; padding: 0.85rem 1.5rem 0; border-bottom: 1px solid rgba(70, 91, 121, 0.45); }
+.ai-usage-tab { padding: 0.5rem 0.7rem 0.6rem; color: var(--docsflow-muted); font-size: 0.78rem; font-weight: 800; background: transparent; border: 0; border-bottom: 2px solid transparent; }
+.ai-usage-tab:hover, .ai-usage-tab.is-active { color: var(--docsflow-ink); border-bottom-color: var(--docsflow-accent); }
 .ai-usage-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; padding: 1.25rem 1.5rem 0.85rem; }
+.ai-usage-month-stats { grid-template-columns: repeat(2, 1fr); }
 .ai-usage-stats > div { padding: 0.8rem; background: rgba(5, 12, 22, 0.42); border: 1px solid rgba(70, 91, 121, 0.58); border-radius: 10px; }
 .ai-usage-stats span { display: block; color: var(--docsflow-muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .ai-usage-stats strong { display: block; margin-top: 0.35rem; font-size: 1.1rem; }

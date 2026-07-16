@@ -141,39 +141,59 @@ def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None
         return None
 
     window_start = datetime.now(timezone.utc) - timedelta(days=1)
-    usage_by_model: dict[str, dict[str, int]] = {}
-    recorded_operations = 0
-    used_tokens = 0
+    now_berlin = datetime.now(BERLIN_TIMEZONE)
+    month_start = now_berlin.replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    ).astimezone(timezone.utc)
 
-    for usage_log in current_user.openai_usage_logs:
-        created_at = usage_log.created_at
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        if created_at < window_start:
-            continue
+    def summarize_since(start: datetime) -> dict[str, object]:
+        usage_by_model: dict[str, dict[str, int]] = {}
+        recorded_operations = 0
+        used_tokens = 0
 
-        token_count = usage_log.total_tokens
-        if token_count is None:
-            token_count = (usage_log.input_tokens or 0) + (usage_log.output_tokens or 0)
+        for usage_log in current_user.openai_usage_logs:
+            created_at = usage_log.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if created_at < start:
+                continue
 
-        used_tokens += token_count
-        recorded_operations += 1
-        model_usage = usage_by_model.setdefault(
-            usage_log.model,
-            {"tokens": 0, "operations": 0},
-        )
-        model_usage["tokens"] += token_count
-        model_usage["operations"] += 1
+            token_count = usage_log.total_tokens
+            if token_count is None:
+                token_count = (usage_log.input_tokens or 0) + (usage_log.output_tokens or 0)
 
-    models = [
-        {
-            "name": model,
-            "tokens": values["tokens"],
-            "operations": values["operations"],
+            used_tokens += token_count
+            recorded_operations += 1
+            model_usage = usage_by_model.setdefault(
+                usage_log.model,
+                {"tokens": 0, "operations": 0},
+            )
+            model_usage["tokens"] += token_count
+            model_usage["operations"] += 1
+
+        models = [
+            {
+                "name": model,
+                "tokens": values["tokens"],
+                "operations": values["operations"],
+            }
+            for model, values in usage_by_model.items()
+        ]
+        models.sort(key=lambda model: (-int(model["tokens"]), str(model["name"])))
+        return {
+            "used_tokens": used_tokens,
+            "recorded_operations": recorded_operations,
+            "models": models,
         }
-        for model, values in usage_by_model.items()
-    ]
-    models.sort(key=lambda model: (-int(model["tokens"]), str(model["name"])))
+
+    daily_usage = summarize_since(window_start)
+    monthly_usage = summarize_since(month_start)
+    used_tokens = int(daily_usage["used_tokens"])
+    models = daily_usage["models"]
 
     limit_tokens = settings.openai_daily_token_quota
     return {
@@ -181,9 +201,13 @@ def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None
         "limit_tokens": limit_tokens,
         "remaining_tokens": max(limit_tokens - used_tokens, 0),
         "percent_used": min((used_tokens / limit_tokens) * 100, 100),
-        "recorded_operations": recorded_operations,
+        "recorded_operations": daily_usage["recorded_operations"],
         "models": models,
         "nav_model": str(models[0]["name"]) if models else settings.openai_rag_model,
+        "monthly": {
+            **monthly_usage,
+            "label": now_berlin.strftime("%B %Y"),
+        },
         "configured_models": (
             ("Document extraction", settings.openai_model),
             ("Ask Documents", settings.openai_rag_model),

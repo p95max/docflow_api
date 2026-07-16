@@ -57,11 +57,16 @@
       <dialog class="ai-usage-dialog" id="ai-usage-modal" aria-labelledby="ai-usage-title">
         <div class="ai-usage-dialog-header">
           <div>
-            <p class="workspace-kicker">Last 24 hours</p>
+            <p class="workspace-kicker" data-ai-usage-period>Last 24 hours</p>
             <h2 id="ai-usage-title">AI usage</h2>
           </div>
           <button class="btn btn-sm btn-outline-secondary" type="button" data-dialog-close="ai-usage-modal" aria-label="Close AI usage">Close</button>
         </div>
+        <div class="ai-usage-tabs" role="tablist" aria-label="AI usage period">
+          <button class="ai-usage-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="ai-usage-day" id="ai-usage-day-tab" data-ai-usage-tab="ai-usage-day" data-ai-usage-period-label="Last 24 hours">24 hours</button>
+          <button class="ai-usage-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-usage-month" id="ai-usage-month-tab" data-ai-usage-tab="ai-usage-month" data-ai-usage-period-label="{{ ai_usage.monthly.label }}">This month</button>
+        </div>
+        <div id="ai-usage-day" role="tabpanel" aria-labelledby="ai-usage-day-tab" data-ai-usage-panel>
         <div class="ai-usage-stats">
           <div><span>Tokens used</span><strong>{{ ai_usage.used_tokens|token_count }}</strong></div>
           <div><span>Daily limit</span><strong>{{ ai_usage.limit_tokens|token_count }}</strong></div>
@@ -82,6 +87,26 @@
           {% else %}
             <p class="text-secondary mb-0">No AI usage has been recorded in this window.</p>
           {% endif %}
+        </div>
+        </div>
+        <div id="ai-usage-month" role="tabpanel" aria-labelledby="ai-usage-month-tab" data-ai-usage-panel hidden>
+          <div class="ai-usage-stats ai-usage-month-stats">
+            <div><span>Tokens used</span><strong>{{ ai_usage.monthly.used_tokens|token_count }}</strong></div>
+            <div><span>AI operations</span><strong>{{ ai_usage.monthly.recorded_operations }}</strong></div>
+          </div>
+          <p class="ai-usage-caption">Recorded usage from {{ ai_usage.monthly.label }}. This is a report, not a monthly quota.</p>
+          <div class="ai-usage-section">
+            <h3>Recorded usage by model</h3>
+            {% if ai_usage.monthly.models %}
+              <div class="ai-usage-model-list">
+                {% for model in ai_usage.monthly.models %}
+                  <div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens / {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="text-secondary mb-0">No AI usage has been recorded this month.</p>
+            {% endif %}
+          </div>
         </div>
         <div class="ai-usage-section">
           <h3>Configured models</h3>
@@ -131,6 +156,23 @@
           if (!closer) return;
           const dialog = document.getElementById(closer.dataset.dialogClose);
           if (dialog instanceof HTMLDialogElement) dialog.close();
+        });
+        document.addEventListener("click", (event) => {
+          const tab = event.target.closest("[data-ai-usage-tab]");
+          if (!tab) return;
+          const dialog = tab.closest("dialog");
+          const targetPanel = document.getElementById(tab.dataset.aiUsageTab);
+          if (!dialog || !targetPanel) return;
+          dialog.querySelectorAll("[data-ai-usage-tab]").forEach((item) => {
+            const active = item === tab;
+            item.classList.toggle("is-active", active);
+            item.setAttribute("aria-selected", String(active));
+          });
+          dialog.querySelectorAll("[data-ai-usage-panel]").forEach((panel) => {
+            panel.hidden = panel !== targetPanel;
+          });
+          const period = dialog.querySelector("[data-ai-usage-period]");
+          if (period) period.textContent = tab.dataset.aiUsagePeriodLabel;
         });
       })();
     </script>
