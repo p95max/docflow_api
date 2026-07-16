@@ -35,6 +35,27 @@ python -m scripts.init_test_user
 echo "Starting API server..."
 
 if [ "${APP_ENV:-local}" = "local" ]; then
+  watch_migrations() {
+    last_signature="$(find alembic/versions -type f -name '*.py' -printf '%T@:%s:%p\n' | sort | sha256sum | awk '{print $1}')"
+
+    while sleep 2; do
+      current_signature="$(find alembic/versions -type f -name '*.py' -printf '%T@:%s:%p\n' | sort | sha256sum | awk '{print $1}')"
+      [ "$current_signature" = "$last_signature" ] && continue
+
+      echo "Detected a migration change. Applying pending revisions..."
+      until alembic upgrade head; do
+        echo "Migration watcher retrying in 3 seconds..."
+        sleep 3
+      done
+      echo "Database schema is at the latest Alembic revision."
+      last_signature="$current_signature"
+    done
+  }
+
+  # Codespaces mounts the workspace into an already running container. A source
+  # edit only triggers Uvicorn reload, not this entrypoint, so watch revisions
+  # in local development and apply them without a manual container restart.
+  watch_migrations &
   exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 fi
 

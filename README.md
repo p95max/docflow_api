@@ -402,9 +402,9 @@ The entrypoint validates the environment first, retries a temporarily
 unavailable database up to ten times, rotates stored Google Drive tokens with
 the active encryption key, and optionally initializes the local test user.
 The Celery worker waits for the API health check, so it cannot start against an
-older schema. A migration added to an already running development container is
-applied after a full container restart; Uvicorn hot reload alone does not rerun
-the entrypoint script.
+older schema. In local development (including Codespaces), the entrypoint also
+watches `alembic/versions`: saving or adding a migration applies it within a
+few seconds. Production still applies migrations only during container startup.
 
 The migration startup script is located at:
 
