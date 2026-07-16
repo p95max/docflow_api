@@ -320,14 +320,14 @@ table td, table th { vertical-align: middle; }
 .backup-download-option small { white-space: normal; }
 
 .backup-setup { overflow: hidden; background: var(--docsflow-surface); border: 1px solid var(--docsflow-line); border-radius: 12px; }
-.backup-setup-toggle { display: flex; align-items: center; justify-content: space-between; padding: 0.95rem 1.1rem; cursor: pointer; list-style: none; }
+.backup-setup-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 0.65rem; padding: 0.95rem 1.1rem; cursor: pointer; list-style: none; }
 .backup-setup-toggle::-webkit-details-marker { display: none; }
 .backup-setup-toggle strong, .backup-setup-toggle small { display: block; }
 .backup-setup-toggle strong { font-size: 0.88rem; }
 .backup-setup-toggle small { margin-top: 0.18rem; color: var(--docsflow-muted); font-size: 0.74rem; }
-.backup-setup-toggle::after { color: var(--docsflow-muted); content: "▾"; transition: transform 0.15s ease; }
+.backup-setup-toggle::before { flex: 0 0 auto; color: var(--docsflow-muted); content: "▾"; transition: transform 0.15s ease; }
 .backup-setup[open] .backup-setup-toggle { border-bottom: 1px solid var(--docsflow-line); }
-.backup-setup[open] .backup-setup-toggle::after { transform: rotate(180deg); }
+.backup-setup[open] .backup-setup-toggle::before { transform: rotate(180deg); }
 .backup-setup-content { padding: 1rem 1rem 0; }
 
 form[aria-busy="true"] { opacity: 0.75; }
