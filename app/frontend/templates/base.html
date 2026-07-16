@@ -64,10 +64,7 @@
     {% if current_user and ai_usage %}
       <dialog class="ai-usage-dialog" id="ai-usage-modal" aria-labelledby="ai-usage-title">
         <div class="ai-usage-dialog-header">
-          <div>
-            <p class="workspace-kicker" data-ai-usage-period>Last 24 hours</p>
-            <h2 id="ai-usage-title">AI usage</h2>
-          </div>
+          <div><p class="workspace-kicker" data-ai-usage-period>Last 24 hours</p><h2 id="ai-usage-title">AI usage</h2></div>
           <button class="btn btn-sm btn-outline-secondary" type="button" data-dialog-close="ai-usage-modal" aria-label="Close AI usage">Close</button>
         </div>
         <div class="ai-usage-tabs" role="tablist" aria-label="AI usage period">
@@ -75,73 +72,47 @@
           <button class="ai-usage-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-usage-month" id="ai-usage-month-tab" data-ai-usage-tab="ai-usage-month" data-ai-usage-period-label="{{ ai_usage.monthly.label }}">This month</button>
         </div>
         <div id="ai-usage-day" role="tabpanel" aria-labelledby="ai-usage-day-tab" data-ai-usage-panel>
-        <div class="ai-usage-stats">
-          <div><span>Tokens used</span><strong>{{ ai_usage.used_tokens|token_count }}</strong></div>
-          <div><span>Daily limit</span><strong>{{ ai_usage.limit_tokens|token_count }}</strong></div>
-          <div><span>Remaining</span><strong>{{ ai_usage.remaining_tokens|token_count }}</strong></div>
-        </div>
-        <div class="ai-usage-meter" aria-label="{{ ai_usage.percent_used|round(1) }} percent of the token limit used">
-          <span style="width: {{ ai_usage.percent_used }}%"></span>
-        </div>
-        <p class="ai-usage-caption">{{ ai_usage.recorded_operations }} recorded AI operation{% if ai_usage.recorded_operations != 1 %}s{% endif %} in the rolling 24-hour quota window.</p>
-        <div class="ai-usage-section">
-          <h3>Recorded usage by model</h3>
-          {% if ai_usage.models %}
-            <div class="ai-usage-model-list">
-              {% for model in ai_usage.models %}
-                <div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens · {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="text-secondary mb-0">No AI usage has been recorded in this window.</p>
-          {% endif %}
-        </div>
-        </div>
-        <div id="ai-usage-month" role="tabpanel" aria-labelledby="ai-usage-month-tab" data-ai-usage-panel hidden>
-          <div class="ai-usage-stats ai-usage-month-stats">
-            <div><span>Tokens used</span><strong>{{ ai_usage.monthly.used_tokens|token_count }}</strong></div>
-            <div><span>AI operations</span><strong>{{ ai_usage.monthly.recorded_operations }}</strong></div>
+          <div class="ai-usage-stats">
+            <div><span>Tokens used</span><strong>{{ ai_usage.used_tokens|token_count }}</strong></div>
+            <div><span>Daily limit</span><strong>{{ ai_usage.limit_tokens|token_count }}</strong></div>
+            <div><span>Remaining</span><strong>{{ ai_usage.remaining_tokens|token_count }}</strong></div>
           </div>
-          <p class="ai-usage-caption">Recorded usage from {{ ai_usage.monthly.label }}. This is a report, not a monthly quota.</p>
+          <div class="ai-usage-meter" aria-label="{{ ai_usage.percent_used|round(1) }} percent of the token limit used"><span style="width: {{ ai_usage.percent_used }}%"></span></div>
+          <p class="ai-usage-caption">{{ ai_usage.recorded_operations }} recorded AI operation{% if ai_usage.recorded_operations != 1 %}s{% endif %} in the rolling 24-hour quota window.</p>
           <div class="ai-usage-section">
             <h3>Recorded usage by model</h3>
-            {% if ai_usage.monthly.models %}
-              <div class="ai-usage-model-list">
-                {% for model in ai_usage.monthly.models %}
-                  <div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens / {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <p class="text-secondary mb-0">No AI usage has been recorded this month.</p>
-            {% endif %}
+            {% if ai_usage.models %}
+              <div class="ai-usage-model-list">{% for model in ai_usage.models %}<div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens · {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>{% endfor %}</div>
+            {% else %}<p class="text-secondary mb-0">No AI usage has been recorded in this window.</p>{% endif %}
           </div>
         </div>
-        <div class="ai-usage-section">
-          <h3>Configured models</h3>
-          <dl class="ai-usage-configured-models">
-            {% for purpose, model in ai_usage.configured_models %}
-              <div><dt>{{ purpose }}</dt><dd><code>{{ model }}</code></dd></div>
-            {% endfor %}
-          </dl>
+        <div id="ai-usage-month" role="tabpanel" aria-labelledby="ai-usage-month-tab" data-ai-usage-panel hidden>
+          <div class="ai-usage-stats ai-usage-month-stats"><div><span>Tokens used</span><strong>{{ ai_usage.monthly.used_tokens|token_count }}</strong></div><div><span>AI operations</span><strong>{{ ai_usage.monthly.recorded_operations }}</strong></div></div>
+          <p class="ai-usage-caption">Recorded usage from {{ ai_usage.monthly.label }}. This is a report, not a monthly quota.</p>
+          <div class="ai-usage-section"><h3>Recorded usage by model</h3>{% if ai_usage.monthly.models %}<div class="ai-usage-model-list">{% for model in ai_usage.monthly.models %}<div><code>{{ model.name }}</code><span>{{ model.tokens|token_count }} tokens / {{ model.operations }} operation{% if model.operations != 1 %}s{% endif %}</span></div>{% endfor %}</div>{% else %}<p class="text-secondary mb-0">No AI usage has been recorded this month.</p>{% endif %}</div>
         </div>
+        <div class="ai-usage-section"><h3>Configured models</h3><dl class="ai-usage-configured-models">{% for purpose, model in ai_usage.configured_models %}<div><dt>{{ purpose }}</dt><dd><code>{{ model }}</code></dd></div>{% endfor %}</dl></div>
       </dialog>
     {% endif %}
     <script data-form-feedback>
       (() => {
         const controlSelector = "input, select, textarea";
         document.addEventListener("invalid", (event) => {
-          if (event.target.matches(controlSelector)) {
-            event.target.classList.add("is-invalid");
-          }
+          if (event.target.matches(controlSelector)) event.target.classList.add("is-invalid");
         }, true);
         document.addEventListener("input", (event) => {
-          if (event.target.matches(controlSelector) && event.target.checkValidity()) {
-            event.target.classList.remove("is-invalid");
-          }
+          if (event.target.matches(controlSelector) && event.target.checkValidity()) event.target.classList.remove("is-invalid");
         });
         document.addEventListener("submit", (event) => {
           const form = event.target;
           if (!(form instanceof HTMLFormElement) || !form.checkValidity()) return;
+          if (form.dataset.aiAnalysis === "confidential") {
+            const confirmed = window.confirm("This document is in confidential mode. Continuing will send the extracted document text to OpenAI for AI analysis and change this document to standard processing mode. Continue?");
+            if (!confirmed) {
+              event.preventDefault();
+              return;
+            }
+          }
           if (form.dataset.submitting === "true") {
             event.preventDefault();
             return;
@@ -179,12 +150,39 @@
             item.classList.toggle("is-active", active);
             item.setAttribute("aria-selected", String(active));
           });
-          dialog.querySelectorAll("[data-ai-usage-panel]").forEach((panel) => {
-            panel.hidden = panel !== targetPanel;
-          });
+          dialog.querySelectorAll("[data-ai-usage-panel]").forEach((panel) => { panel.hidden = panel !== targetPanel; });
           const period = dialog.querySelector("[data-ai-usage-period]");
           if (period) period.textContent = tab.dataset.aiUsagePeriodLabel;
         });
+
+        const match = window.location.pathname.match(/^\/documents\/(\d+)$/);
+        if (match && !document.querySelector("[data-ai-analysis-form]")) {
+          const card = document.querySelector(".col-lg-5 .card");
+          const statusBadge = Array.from(document.querySelectorAll("span.badge")).find((badge) => ["completed", "failed"].includes(badge.textContent.trim().toLowerCase()));
+          if (card && statusBadge) {
+            const confidential = Array.from(document.querySelectorAll("span.badge")).some((badge) => badge.textContent.trim().toLowerCase() === "confidential");
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = `/documents/${match[1]}/analyze-with-ai`;
+            form.className = "mt-3";
+            form.dataset.aiAnalysis = confidential ? "confidential" : "standard";
+            form.dataset.aiAnalysisForm = "true";
+            form.innerHTML = `<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn ${confidential ? "btn-danger" : "btn-outline-warning"}" type="submit" data-loading-label="Starting AI analysis…">${confidential ? "Analyze with AI" : "Re-analyze with AI"}</button>${confidential ? '<p class="small text-warning mt-2 mb-0">Warning: AI analysis will send the extracted document text to OpenAI and switch this document from confidential to standard mode.</p>' : ''}`;
+            card.insertAdjacentElement("afterend", form);
+          }
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("ai_analysis_started") === "1") {
+          const main = document.querySelector("main");
+          if (main && !document.querySelector("[data-ai-analysis-started]")) {
+            const alert = document.createElement("div");
+            alert.className = "alert alert-info";
+            alert.dataset.aiAnalysisStarted = "true";
+            alert.textContent = "AI analysis started. This page refreshes automatically.";
+            main.prepend(alert);
+          }
+        }
       })();
     </script>
   </body>
