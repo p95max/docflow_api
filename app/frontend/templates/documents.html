@@ -159,7 +159,7 @@
         <tbody>
           {% for document in documents %}
             <tr>
-              <td class="text-secondary text-nowrap" title="Document ID">{{ document.id }}</td>
+              <td class="text-secondary text-nowrap">{{ (page - 1) * filters.page_size + loop.index }}</td>
               <td>
                 <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
                 {% if document.processing_mode.value == "confidential" %}
