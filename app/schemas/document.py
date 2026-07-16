@@ -39,6 +39,7 @@ class DocumentRead(BaseModel):
     validation_errors: list[str] | None
     validation_warnings: list[str] | None
     validation_score: float | None
+    validation_evidence: dict[str, Any] | None
 
     extraction_status: ExtractionStatus
     extraction_confirmed_at: datetime | None

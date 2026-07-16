@@ -22,7 +22,10 @@ from app.services.extraction_validation import (
 )
 from app.services.local_document_classification import classify_document_type
 from app.services.rate_limits import enforce_openai_usage_quota
-from app.services.text_extraction import extract_text_from_document
+from app.services.text_extraction import (
+    extract_text_from_document,
+    extract_text_pages_from_document,
+)
 from app.worker import celery_app
 
 
@@ -74,9 +77,13 @@ def process_document_task(self, job_id: int) -> None:
                     raw_text=extracted_text,
                     original_filename=document.original_filename,
                 )
+                source_pages = None
+                if ai_result.extracted_data.evidence.model_dump(exclude_none=True):
+                    source_pages = extract_text_pages_from_document(document)
                 validation_result = validate_ai_extraction(
                     extraction=ai_result.extracted_data,
                     raw_text=extracted_text,
+                    source_pages=source_pages,
                 )
                 _apply_standard_ai_processing_result(
                     db=db,
@@ -233,6 +240,13 @@ def _apply_standard_ai_processing_result(
     document.validation_errors = validation_result.errors or None
     document.validation_warnings = validation_result.warnings or None
     document.validation_score = validation_result.score
+    document.validation_evidence = (
+        {
+            field_name: evidence.model_dump(mode="json")
+            for field_name, evidence in validation_result.evidence.items()
+        }
+        or None
+    )
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None
     document.manual_corrections = None
@@ -272,6 +286,7 @@ def _reset_document_processing_result(document: Document) -> None:
     document.validation_errors = None
     document.validation_warnings = None
     document.validation_score = None
+    document.validation_evidence = None
 
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None

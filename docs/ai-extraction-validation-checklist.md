@@ -24,12 +24,12 @@ replaces, manual confirmation of an extraction.
 
 ### Evidence and grounding
 
-- [ ] Extend the AI contract with per-field evidence snippets and page number.
-- [ ] Match normalized evidence, not only whole source fields.
-- [ ] Require evidence for amount, currency, sender and dates before accepting
+- [x] Extend the AI contract with per-field evidence snippets and page number.
+- [x] Match normalized evidence against the cited local page.
+- [x] Require evidence for amount, currency, sender and dates before accepting
   those values automatically.
-- [ ] Link a currency candidate to the grounded amount in nearby text.
-- [ ] Add locale-aware date candidates (`DD.MM.YYYY`, textual German dates).
+- [x] Link currency evidence to the grounded total amount.
+- [x] Add locale-aware date candidates (`DD.MM.YYYY`, textual German dates).
 
 ### Quality and ambiguity
 

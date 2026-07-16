@@ -135,6 +135,18 @@
             {% endfor %}
           </ul>
         {% endif %}
+        {% if document.validation_evidence %}
+          <hr>
+          <p class="small fw-bold mb-1">Verified evidence</p>
+          <dl class="small mb-0">
+            {% for field_name, evidence in document.validation_evidence.items() %}
+              <div class="mb-2">
+                <dt class="text-secondary text-capitalize">{{ field_name|replace('_', ' ') }} · page {{ evidence.page_number }}</dt>
+                <dd class="mb-0"><q>{{ evidence.quote }}</q></dd>
+              </div>
+            {% endfor %}
+          </dl>
+        {% endif %}
         {% if document.summary %}
           <hr>
           <p class="document-summary mb-0">{{ document.summary }}</p>

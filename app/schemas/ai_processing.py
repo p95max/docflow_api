@@ -76,6 +76,13 @@ class DocumentAIExtraction(BaseModel):
         max_length=2000,
         description="Important caveats or missing information."
     )
+    evidence: "DocumentExtractionEvidence" = Field(
+        default_factory=lambda: DocumentExtractionEvidence(),
+        description=(
+            "Source evidence for critical fields. Each quote must be copied "
+            "from the document and include its one-based page number."
+        ),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -88,3 +95,25 @@ class DocumentAIExtraction(BaseModel):
         if value is not None:
             date.fromisoformat(value)
         return value
+
+
+class FieldEvidence(BaseModel):
+    """A short, page-specific source excerpt returned by the AI model."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    quote: str = Field(min_length=1, max_length=500)
+    page_number: int = Field(ge=1)
+
+
+class DocumentExtractionEvidence(BaseModel):
+    """Evidence for fields that must be grounded in document text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: FieldEvidence | None = None
+    currency: FieldEvidence | None = None
+    document_date: FieldEvidence | None = None
+    due_date: FieldEvidence | None = None
+    action_deadline: FieldEvidence | None = None
+    sender: FieldEvidence | None = None

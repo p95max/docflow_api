@@ -808,6 +808,10 @@ Validation stores a score, status, errors and warnings with the document. A
 silently discarded. The implementation roadmap is in
 [AI extraction validation checklist](docs/ai-extraction-validation-checklist.md).
 
+For amount, currency, sender and dates, the AI also returns a short source
+quote and one-based page number. DocsFlow checks that quote against locally
+extracted page text before storing it as verified evidence.
+
 **Storage fields:**
 
 | Field | Table |

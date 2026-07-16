@@ -169,6 +169,7 @@ def _serialize_document(document: Document) -> dict[str, Any]:
         "validation_errors": document.validation_errors,
         "validation_warnings": document.validation_warnings,
         "validation_score": document.validation_score,
+        "validation_evidence": document.validation_evidence,
         "ai_extraction_model": document.ai_extraction_model,
         "manual_corrections": document.manual_corrections,
         "manually_corrected_at": document.manually_corrected_at,
