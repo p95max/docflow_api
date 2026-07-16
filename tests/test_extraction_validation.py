@@ -157,3 +157,49 @@ def test_validation_low_ocr_quality_requires_review() -> None:
     assert result.ocr_quality_score < 80
     assert result.status == "needs_review"
     assert "OCR text quality is low" in " ".join(result.warnings)
+
+
+def test_validation_detects_template_example_sender_before_grounding_checks() -> None:
+    source_text = """
+MUSTERBRIEF:
+WIDERSPRUCH GEGEN EINE RECHNUNG
+Absender:
+Michaela Muster
+Musterweg 1
+99999 Musterstadt
+Datum
+[Rechnungsnummer] vom [xx.xx.20xx] über [Kostenbetrag]
+Kopieren Sie den Text in ein Textverarbeitungsprogramm.
+Ergänzen Sie ihn mit Ihren Absenderangaben und löschen Sie die kursiven Platzhalter.
+So verwenden Sie diesen Musterbrief
+"""
+    result = validate_ai_extraction(
+        extraction=_extraction(
+            document_type="letter",
+            summary="Widerspruch gegen eine Rechnung",
+            sender="Michaela Muster, Musterweg 1, 99999 Musterstadt",
+            document_date=None,
+            due_date=None,
+            total_amount=None,
+            currency=None,
+            invoice_number=None,
+            requires_action=False,
+            evidence={
+                "sender": {
+                    "quote": "Michaela Muster\nMusterweg 1\n99999 Musterstadt",
+                    "page_number": 1,
+                }
+            },
+        ),
+        raw_text=source_text,
+        source_pages=[ExtractedTextPage(page_number=1, text=source_text)],
+        today=date(2026, 7, 16),
+    )
+
+    messages = " ".join(result.errors + result.warnings)
+    assert result.status == "needs_review"
+    assert "Document template detected" in messages
+    assert "Sender appears to be example data from a document template" in messages
+    assert "Sender is not confirmed" not in messages
+    assert "Sender evidence does not support" not in messages
+    assert "sender" not in result.evidence
