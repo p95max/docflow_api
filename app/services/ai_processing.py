@@ -32,6 +32,7 @@ def run_standard_ai_processing(
     *,
     raw_text: str,
     original_filename: str,
+    model: str | None = None,
 ) -> StandardAIProcessingResult:
     """Run AI classification and structured extraction for standard documents."""
     normalized_text = raw_text.strip()
@@ -41,8 +42,9 @@ def run_standard_ai_processing(
 
     client = create_openai_client()
 
+    selected_model = model or settings.openai_model
     response = client.responses.parse(
-        model=settings.openai_model,
+        model=selected_model,
         input=[
             {
                 "role": "system",
@@ -67,7 +69,7 @@ def run_standard_ai_processing(
     extracted_data = DocumentAIExtraction.model_validate(parsed)
 
     return StandardAIProcessingResult(
-        model=settings.openai_model,
+        model=selected_model,
         response_id=getattr(response, "id", None),
         extracted_data=extracted_data,
         usage=extract_openai_usage(response),

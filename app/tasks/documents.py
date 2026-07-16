@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.models.audit_log import AuditLog
 from app.models.document import (
     Document,
     DocumentStatus,
@@ -18,6 +19,7 @@ from app.services.ai_processing import StandardAIProcessingResult, run_standard_
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.extraction_validation import (
     ExtractionValidationResult,
+    VALIDATION_NEEDS_REVIEW,
     validate_ai_extraction,
 )
 from app.services.local_document_classification import classify_document_type
@@ -77,9 +79,10 @@ def process_document_task(self, job_id: int) -> None:
                     raw_text=extracted_text,
                     original_filename=document.original_filename,
                 )
-                source_pages = None
-                if ai_result.extracted_data.evidence.model_dump(exclude_none=True):
-                    source_pages = extract_text_pages_from_document(document)
+                source_pages = _source_pages_for_evidence(
+                    document=document,
+                    ai_result=ai_result,
+                )
                 validation_result = validate_ai_extraction(
                     extraction=ai_result.extracted_data,
                     raw_text=extracted_text,
@@ -90,6 +93,13 @@ def process_document_task(self, job_id: int) -> None:
                     document=document,
                     ai_result=ai_result,
                     validation_result=validation_result,
+                )
+                _run_validation_fallback_if_needed(
+                    db=db,
+                    document=document,
+                    raw_text=extracted_text,
+                    primary_validation=validation_result,
+                    source_pages=source_pages,
                 )
 
             document.status = DocumentStatus.completed
@@ -276,6 +286,122 @@ def _apply_standard_ai_processing_result(
             total_tokens=ai_result.usage.total_tokens,
         )
     )
+    db.add(
+        AuditLog(
+            document_id=document.id,
+            user_id=document.owner_id,
+            action="ai_extraction_completed",
+            field_name="ai_extracted_data",
+            old_value=None,
+            new_value={
+                "model": ai_result.model,
+                "response_id": ai_result.response_id,
+                "data": document.ai_extracted_data,
+                "validation": _serialize_validation_result(validation_result),
+            },
+        )
+    )
+
+
+def should_run_validation_fallback(
+    *,
+    validation_status: str,
+    primary_model: str,
+) -> bool:
+    fallback_model = (settings.openai_validation_fallback_model or "").strip()
+    return (
+        validation_status == VALIDATION_NEEDS_REVIEW
+        and bool(fallback_model)
+        and fallback_model != primary_model
+    )
+
+
+def _source_pages_for_evidence(
+    *,
+    document: Document,
+    ai_result: StandardAIProcessingResult,
+):
+    if not ai_result.extracted_data.evidence.model_dump(exclude_none=True):
+        return None
+    return extract_text_pages_from_document(document)
+
+
+def _run_validation_fallback_if_needed(
+    *,
+    db: Session,
+    document: Document,
+    raw_text: str,
+    primary_validation: ExtractionValidationResult,
+    source_pages,
+) -> None:
+    """Run one explicitly configured stronger-model pass without overwriting AI #1."""
+    if not should_run_validation_fallback(
+        validation_status=primary_validation.status,
+        primary_model=document.ai_extraction_model or settings.openai_model,
+    ):
+        return
+
+    fallback_model = settings.openai_validation_fallback_model
+    assert fallback_model is not None
+    try:
+        enforce_openai_usage_quota(db=db, owner_id=document.owner_id)
+        fallback_result = run_standard_ai_processing(
+            raw_text=raw_text,
+            original_filename=document.original_filename,
+            model=fallback_model,
+        )
+        fallback_pages = source_pages or _source_pages_for_evidence(
+            document=document,
+            ai_result=fallback_result,
+        )
+        fallback_validation = validate_ai_extraction(
+            extraction=fallback_result.extracted_data,
+            raw_text=raw_text,
+            source_pages=fallback_pages,
+        )
+        document.fallback_extraction = {
+            "status": "completed",
+            "model": fallback_result.model,
+            "response_id": fallback_result.response_id,
+            "data": fallback_result.extracted_data.model_dump(mode="json"),
+            "validation": _serialize_validation_result(fallback_validation),
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        db.add(
+            OpenAIUsageLog(
+                document_id=document.id,
+                owner_id=document.owner_id,
+                operation="document_ai_validation_fallback",
+                model=fallback_result.model,
+                response_id=fallback_result.response_id,
+                input_tokens=fallback_result.usage.input_tokens,
+                output_tokens=fallback_result.usage.output_tokens,
+                total_tokens=fallback_result.usage.total_tokens,
+            )
+        )
+        db.add(
+            AuditLog(
+                document_id=document.id,
+                user_id=document.owner_id,
+                action="ai_extraction_fallback_completed",
+                field_name="fallback_extraction",
+                old_value=None,
+                new_value=document.fallback_extraction,
+            )
+        )
+    except Exception as exc:
+        document.fallback_extraction = {
+            "status": "failed",
+            "model": fallback_model,
+            "error": str(exc)[:500],
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+
+
+def _serialize_validation_result(
+    validation_result: ExtractionValidationResult,
+) -> dict[str, object]:
+    return validation_result.model_dump(mode="json")
 
 
 def _reset_document_processing_result(document: Document) -> None:
@@ -302,6 +428,7 @@ def _reset_document_processing_result(document: Document) -> None:
     document.validation_candidates = None
     document.validation_flags = None
     document.ocr_quality_score = None
+    document.fallback_extraction = None
 
     document.extraction_status = ExtractionStatus.draft
     document.extraction_confirmed_at = None

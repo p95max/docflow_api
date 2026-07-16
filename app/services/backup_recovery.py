@@ -206,6 +206,7 @@ def _document_from_record(*, owner_id: int, record: RecoveryDocumentV2) -> Docum
         validation_candidates=record.validation_candidates,
         validation_flags=record.validation_flags,
         ocr_quality_score=record.ocr_quality_score,
+        fallback_extraction=record.fallback_extraction,
         ai_extraction_model=record.ai_extraction_model,
         manual_corrections=record.manual_corrections,
         extraction_status=record.extraction_status,

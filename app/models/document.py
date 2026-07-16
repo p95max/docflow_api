@@ -214,6 +214,11 @@ class Document(Base):
         nullable=True,
     )
 
+    fallback_extraction: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     ai_extraction_model: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,

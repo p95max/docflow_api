@@ -42,12 +42,12 @@ replaces, manual confirmation of an extraction.
 
 ### Review and fallback
 
-- [ ] Show field-level evidence next to editable extraction fields.
-- [ ] Make `needs_review` the default UI state for suspicious results and retain
+- [x] Show field-level evidence next to editable extraction fields.
+- [x] Make `needs_review` the default UI state for suspicious results and retain
   the original AI response in the audit trail.
-- [ ] Define a single bounded retry with a stronger model only for
+- [x] Define a single bounded retry with a stronger model only for
   `needs_review` results.
-- [ ] Compare first and fallback extraction without overwriting the first result
+- [x] Compare first and fallback extraction without overwriting the first result
   silently.
 
 ### Test and evaluation set

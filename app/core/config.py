@@ -70,6 +70,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openai_validation_fallback_model: str | None = None
     openai_request_timeout_seconds: int = 45
     openai_max_input_chars: int = 12000
     openai_embedding_model: str = "text-embedding-3-small"

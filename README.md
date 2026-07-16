@@ -744,6 +744,7 @@ file.
 | `GOOGLE_DRIVE_REFRESH_TOKEN` | Not set | Deprecated and ignored; each user connects Drive through OAuth. |
 | `OPENAI_API_KEY` | Not set | Required for standard AI extraction and enabled Knowledge Base operations. |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model for standard document extraction. |
+| `OPENAI_VALIDATION_FALLBACK_MODEL` | Not set | Optional stronger model for one separate retry of a `needs_review` extraction. |
 | `OPENAI_REQUEST_TIMEOUT_SECONDS` / `OPENAI_MAX_INPUT_CHARS` | `45` / `12000` | Standard extraction request limits. |
 | `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS` | `text-embedding-3-small` / `1536` | Knowledge Base embedding model and vector size. |
 | `OPENAI_RAG_MODEL` / `OPENAI_RAG_REASONING_EFFORT` | `gpt-5.6-terra` / `high` | Knowledge Base answer model and reasoning effort. |
@@ -838,11 +839,16 @@ Documents uploaded with `confidential=true` are processed locally only and never
 ```bash
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_VALIDATION_FALLBACK_MODEL=
 OPENAI_REQUEST_TIMEOUT_SECONDS=45
 OPENAI_MAX_INPUT_CHARS=12000
 ```
 
 > If `OPENAI_API_KEY` is missing, standard document processing will fail during the AI extraction step. Confidential documents do not require an OpenAI API key.
+
+`OPENAI_VALIDATION_FALLBACK_MODEL` is deliberately empty by default. When set
+(for example to `gpt-4o`), DocsFlow performs at most one additional AI pass only
+for a result marked `needs_review`; it never overwrites the original AI result.
 
 ### Example: Upload a Standard Document
 

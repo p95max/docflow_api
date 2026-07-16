@@ -173,6 +173,7 @@ def _serialize_document(document: Document) -> dict[str, Any]:
         "validation_candidates": document.validation_candidates,
         "validation_flags": document.validation_flags,
         "ocr_quality_score": document.ocr_quality_score,
+        "fallback_extraction": document.fallback_extraction,
         "ai_extraction_model": document.ai_extraction_model,
         "manual_corrections": document.manual_corrections,
         "manually_corrected_at": document.manually_corrected_at,

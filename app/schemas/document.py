@@ -43,6 +43,7 @@ class DocumentRead(BaseModel):
     validation_candidates: dict[str, Any] | None
     validation_flags: list[str] | None
     ocr_quality_score: float | None
+    fallback_extraction: dict[str, Any] | None
 
     extraction_status: ExtractionStatus
     extraction_confirmed_at: datetime | None

@@ -44,6 +44,11 @@
 {% if document.processing_error %}
   <div class="alert alert-danger">{{ document.processing_error }}</div>
 {% endif %}
+{% if document.validation_status == "needs_review" %}
+  <div class="alert alert-warning">
+    <strong>Review needed:</strong> validation found an unconfirmed, ambiguous or low-quality AI extraction. Check the source evidence, correct fields if necessary, then confirm the result.
+  </div>
+{% endif %}
 {% if document.processing_mode.value == "confidential" %}
   <div class="alert alert-info">
     <strong>Confidential mode:</strong>
@@ -215,6 +220,9 @@
             <div class="mb-3">
               <label class="form-label" for="sender">Sender / vendor</label>
               <input class="form-control" id="sender" name="sender" value="{{ document.sender or '' }}">
+              {% if document.validation_evidence and document.validation_evidence.sender %}
+                <p class="form-text mb-0">AI evidence, page {{ document.validation_evidence.sender.page_number }}: <q>{{ document.validation_evidence.sender.quote }}</q></p>
+              {% endif %}
             </div>
             <div class="mb-3">
               <label class="form-label" for="summary">Summary</label>
@@ -228,16 +236,29 @@
               <div class="col-md-5 mb-3">
                 <label class="form-label" for="currency">Currency</label>
                 <input class="form-control" id="currency" name="currency" minlength="3" maxlength="3" value="{{ document.currency or '' }}">
+                {% if document.validation_evidence and document.validation_evidence.currency %}
+                  <p class="form-text mb-0">Evidence, page {{ document.validation_evidence.currency.page_number }}: <q>{{ document.validation_evidence.currency.quote }}</q></p>
+                {% endif %}
               </div>
             </div>
+            {% if document.validation_evidence and document.validation_evidence.amount %}
+              <p class="form-text mt-n2">Amount evidence, page {{ document.validation_evidence.amount.page_number }}: <q>{{ document.validation_evidence.amount.quote }}</q></p>
+            {% endif %}
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label" for="document_date">Document date</label>
                 <input class="form-control" id="document_date" name="document_date" type="date" value="{{ document.document_date or '' }}">
+                {% if document.validation_evidence and document.validation_evidence.document_date %}
+                  <p class="form-text mb-0">Evidence, page {{ document.validation_evidence.document_date.page_number }}: <q>{{ document.validation_evidence.document_date.quote }}</q></p>
+                {% endif %}
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label" for="deadline">Deadline</label>
                 <input class="form-control" id="deadline" name="deadline" type="date" value="{{ document.deadline or '' }}">
+                {% set deadline_evidence = document.validation_evidence.due_date if document.validation_evidence and document.validation_evidence.due_date else document.validation_evidence.action_deadline if document.validation_evidence and document.validation_evidence.action_deadline else none %}
+                {% if deadline_evidence %}
+                  <p class="form-text mb-0">Evidence, page {{ deadline_evidence.page_number }}: <q>{{ deadline_evidence.quote }}</q></p>
+                {% endif %}
               </div>
             </div>
             <div class="mb-3">
@@ -246,6 +267,28 @@
             </div>
             <button class="btn btn-primary" type="submit">Save changes</button>
           </form>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if document.fallback_extraction %}
+      <div class="card shadow-sm mt-4">
+        <div class="card-body">
+          <h2 class="h5">Fallback AI comparison</h2>
+          <p class="small text-secondary">The primary result above remains unchanged. This is one separate retry for a result that needed review.</p>
+          {% if document.fallback_extraction.status == "completed" %}
+            <span class="badge text-bg-info">{{ document.fallback_extraction.model }}</span>
+            <dl class="row small mt-3 mb-0">
+              <dt class="col-5">Type</dt><dd class="col-7">{{ document.fallback_extraction.data.document_type }}</dd>
+              <dt class="col-5">Sender</dt><dd class="col-7">{{ document.fallback_extraction.data.sender or "-" }}</dd>
+              <dt class="col-5">Amount</dt><dd class="col-7">{{ document.fallback_extraction.data.total_amount or "-" }} {{ document.fallback_extraction.data.currency or "" }}</dd>
+              <dt class="col-5">Document date</dt><dd class="col-7">{{ document.fallback_extraction.data.document_date or "-" }}</dd>
+              <dt class="col-5">Deadline</dt><dd class="col-7">{{ document.fallback_extraction.data.due_date or document.fallback_extraction.data.action_deadline or "-" }}</dd>
+              <dt class="col-5">Validation</dt><dd class="col-7">{{ document.fallback_extraction.validation.status }} ({{ document.fallback_extraction.validation.score|round(0)|int }}/100)</dd>
+            </dl>
+          {% else %}
+            <p class="text-warning mb-0">Fallback attempt failed: {{ document.fallback_extraction.error }}</p>
+          {% endif %}
         </div>
       </div>
     {% endif %}

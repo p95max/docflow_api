@@ -45,3 +45,48 @@ def test_standard_ai_processing_rejects_malformed_structured_output(
 
     invalid_fields = {error["loc"][0] for error in exc_info.value.errors()}
     assert invalid_fields == {"document_type", "confidence_score"}
+
+
+def test_standard_ai_processing_uses_explicit_fallback_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponses:
+        def parse(self, **kwargs: object) -> SimpleNamespace:
+            captured.update(kwargs)
+            return SimpleNamespace(
+                output_parsed={
+                    "document_type": "letter",
+                    "summary": None,
+                    "sender": None,
+                    "recipient": None,
+                    "document_date": None,
+                    "due_date": None,
+                    "total_amount": None,
+                    "currency": None,
+                    "invoice_number": None,
+                    "reference_number": None,
+                    "requires_action": False,
+                    "action_deadline": None,
+                    "confidence_score": 0.5,
+                    "notes": None,
+                },
+                id="resp_fallback",
+                usage=None,
+            )
+
+    monkeypatch.setattr(
+        ai_processing,
+        "create_openai_client",
+        lambda: SimpleNamespace(responses=FakeResponses()),
+    )
+
+    result = ai_processing.run_standard_ai_processing(
+        raw_text="A letter.",
+        original_filename="letter.pdf",
+        model="gpt-4o",
+    )
+
+    assert captured["model"] == "gpt-4o"
+    assert result.model == "gpt-4o"

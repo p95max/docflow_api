@@ -39,6 +39,7 @@ class RecoveryDocumentV2(BaseModel):
     validation_candidates: dict[str, Any] | None = None
     validation_flags: list[str] | None = None
     ocr_quality_score: float | None = Field(default=None, ge=0, le=100)
+    fallback_extraction: dict[str, Any] | None = None
     ai_extraction_model: str | None = Field(default=None, max_length=100)
     manual_corrections: dict[str, Any] | None = None
     manually_corrected_at: datetime | None = None
