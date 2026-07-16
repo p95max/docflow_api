@@ -208,8 +208,20 @@ table td, table th { vertical-align: middle; }
 .page-link:hover { color: var(--docsflow-ink); background: var(--docsflow-surface-raised); border-color: #526681; }
 .page-item.disabled .page-link { color: #72809a; background: rgba(26, 35, 50, 0.55); border-color: var(--docsflow-line); }
 
-.docsflow-ai-nav { display: inline-flex; gap: 0.42rem; align-items: center; }
 .docsflow-ai-icon { display: inline-flex; width: 1.22rem; height: 1.22rem; align-items: center; justify-content: center; color: #092119; font-size: 0.56rem; font-weight: 900; line-height: 1; letter-spacing: -0.05em; background: linear-gradient(135deg, #b6f5da, #62ceac); border-radius: 5px 8px 5px 8px; }
+.docsflow-ai-menu { position: relative; }
+.docsflow-ai-menu summary { list-style: none; }
+.docsflow-ai-menu summary::-webkit-details-marker { display: none; }
+.docsflow-ai-menu-trigger { display: inline-flex; gap: 0.38rem; align-items: center; }
+.docsflow-ai-menu-chevron { margin-left: 0.1rem; font-size: 0.95rem; line-height: 0.7; transition: transform 0.16s ease; }
+.docsflow-ai-menu[open] .docsflow-ai-menu-chevron { transform: rotate(180deg); }
+.docsflow-ai-menu-panel { position: absolute; z-index: 20; top: calc(100% + 0.55rem); left: 0; display: grid; min-width: 16.5rem; padding: 0.4rem; background: #162235; border: 1px solid #405574; border-radius: 12px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38); }
+.docsflow-ai-menu-item { display: flex; gap: 0.7rem; width: 100%; padding: 0.7rem; color: var(--docsflow-ink); text-align: left; text-decoration: none; background: transparent; border: 0; border-radius: 8px; }
+.docsflow-ai-menu-item:hover { color: var(--docsflow-ink); background: rgba(119, 227, 189, 0.09); }
+.docsflow-ai-menu-item strong, .docsflow-ai-menu-item small { display: block; }
+.docsflow-ai-menu-item strong { font-size: 0.8rem; }
+.docsflow-ai-menu-item small { margin-top: 0.14rem; color: var(--docsflow-muted); font-size: 0.7rem; }
+.docsflow-ai-menu-item.is-disabled { opacity: 0.5; }
 .ai-usage-button { display: inline-flex; gap: 0.38rem; align-items: center; }
 .ai-usage-button-label { display: inline-grid; width: 1.2rem; height: 1.2rem; place-items: center; color: #092119; font-size: 0.56rem; font-weight: 900; letter-spacing: -0.05em; background: #f7c86b; border-radius: 50%; }
 .ai-usage-model { max-width: 7.8rem; overflow: hidden; font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -311,8 +323,9 @@ form[aria-busy="true"] { opacity: 0.75; }
 @media (max-width: 576px) {
   .docsflow-nav-inner { padding-top: 0.6rem; padding-bottom: 0.6rem; }
   .docsflow-nav-actions { width: 100%; }
-  .docsflow-nav-actions .btn, .docsflow-nav-actions form { flex: 1 1 auto; }
+  .docsflow-nav-actions .btn, .docsflow-nav-actions form, .docsflow-nav-actions .docsflow-ai-menu { flex: 1 1 auto; }
   .docsflow-nav-actions .btn { justify-content: center; }
+  .docsflow-ai-menu-panel { right: 0; left: auto; }
   .ai-usage-model { display: none; }
   .preview-frame { min-height: 28rem; }
   .knowledge-message { max-width: 93%; }

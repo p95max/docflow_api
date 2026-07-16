@@ -18,25 +18,33 @@
         </a>
         <div class="docsflow-nav-actions">
           {% if current_user %}
+            <details class="docsflow-ai-menu">
+              <summary class="btn btn-sm btn-outline-light docsflow-ai-menu-trigger" title="Open AI menu">
+                <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
+                <span>AI</span>
+                <span class="docsflow-ai-menu-chevron" aria-hidden="true">⌄</span>
+              </summary>
+              <div class="docsflow-ai-menu-panel">
+                {% if knowledge_enabled %}
+                  <a class="docsflow-ai-menu-item" href="/knowledge">
+                    <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
+                    <span><strong>Ask Documents</strong><small>Chat with your indexed documents</small></span>
+                  </a>
+                {% else %}
+                  <span class="docsflow-ai-menu-item is-disabled" aria-disabled="true">
+                    <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
+                    <span><strong>Ask Documents</strong><small>Disabled</small></span>
+                  </span>
+                {% endif %}
+                {% if ai_usage %}
+                  <button class="docsflow-ai-menu-item" type="button" data-dialog-open="ai-usage-modal">
+                    <span class="ai-usage-button-label">AI</span>
+                    <span><strong>AI usage</strong><small>{{ ai_usage.used_tokens|token_count }} / {{ ai_usage.limit_tokens|token_count }} tokens today</small></span>
+                  </button>
+                {% endif %}
+              </div>
+            </details>
             <a class="btn btn-sm btn-outline-light" href="/documents">Documents</a>
-            {% if knowledge_enabled %}
-              <a class="btn btn-sm btn-outline-light docsflow-ai-nav" href="/knowledge">
-                <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
-                <span>Ask Documents</span>
-              </a>
-            {% else %}
-              <span class="btn btn-sm btn-outline-secondary disabled docsflow-ai-nav" aria-disabled="true" title="Ask Documents is disabled">
-                <span class="docsflow-ai-icon" aria-hidden="true">AI</span>
-                <span>Ask Documents</span>
-              </span>
-            {% endif %}
-            {% if ai_usage %}
-              <button class="btn btn-sm btn-outline-light ai-usage-button" type="button" data-dialog-open="ai-usage-modal" title="Open AI usage details">
-                <span class="ai-usage-button-label">AI</span>
-                <span class="ai-usage-model">{{ ai_usage.nav_model }}</span>
-                <span>{{ ai_usage.used_tokens|token_count }} / {{ ai_usage.limit_tokens|token_count }}</span>
-              </button>
-            {% endif %}
             <a class="btn btn-sm btn-outline-light" href="/backups">Backups</a>
             <a class="btn btn-sm btn-light" href="/documents/upload">Upload</a>
             <form method="post" action="/logout" class="m-0">
@@ -149,7 +157,10 @@
           const opener = event.target.closest("[data-dialog-open]");
           if (!opener) return;
           const dialog = document.getElementById(opener.dataset.dialogOpen);
-          if (dialog instanceof HTMLDialogElement) dialog.showModal();
+          if (dialog instanceof HTMLDialogElement) {
+            opener.closest("details")?.removeAttribute("open");
+            dialog.showModal();
+          }
         });
         document.addEventListener("click", (event) => {
           const closer = event.target.closest("[data-dialog-close]");
