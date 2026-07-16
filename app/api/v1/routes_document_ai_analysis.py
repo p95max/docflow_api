@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.v1.dependencies import CurrentUser, DbSession
 from app.models.audit_log import AuditLog
-from app.models.document import DocumentStatus, ProcessingMode
+from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.schemas.processing_job import ProcessingJobRead
 from app.services.processing_jobs import create_processing_job, enqueue_processing_job
 
@@ -21,13 +21,16 @@ def analyze_document_with_ai(
     db: DbSession,
     current_user: CurrentUser,
 ) -> ProcessingJobRead:
-    document = db.get(__import__("app.models.document", fromlist=["Document"]).Document, document_id)
+    document = db.get(Document, document_id)
     if (
         document is None
         or document.owner_id != current_user.id
         or document.deleted_at is not None
     ):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
 
     if document.status in {DocumentStatus.uploaded, DocumentStatus.processing}:
         raise HTTPException(
