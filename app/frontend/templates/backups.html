@@ -181,19 +181,6 @@
   </details>
 
   <details class="card shadow-sm mb-4">
-    <summary class="card-header cursor-pointer">Recovery backup risks and limits</summary>
-    <div class="card-body small text-secondary">
-      <ul class="mb-0 ps-3">
-        <li>If both your saved Recovery Key and the server-side encrypted copy or master key are lost, the encrypted backup cannot be restored.</li>
-        <li>Anyone with both the encrypted file and Recovery Key can read its document data; keep them separately and securely.</li>
-        <li>A compromise of both the DocsFlow database and <code>BACKUP_MASTER_KEY</code> can expose the server-stored Recovery Key.</li>
-        <li>Backups preserve extracted text and document data, but not the original PDF, JPG, or PNG files.</li>
-        <li>Deleting an archive from Google Drive removes that recovery copy.</li>
-      </ul>
-    </div>
-  </details>
-
-  <details class="card shadow-sm mb-4">
     <summary class="card-header cursor-pointer">Restore recovery backup</summary>
     <div class="card-body">
       <p class="text-secondary">Restores document records, extracted text and fields without original PDF, JPG or PNG files. After recovery, previews and original-file downloads are unavailable. Standard documents are indexed again automatically.</p>
@@ -392,6 +379,19 @@
       </p>
     </div>
   </div>
+
+  <details class="card shadow-sm mt-4">
+    <summary class="card-header cursor-pointer">Recovery backup risks and limits</summary>
+    <div class="card-body small text-secondary">
+      <ul class="mb-0 ps-3">
+        <li>If both your saved Recovery Key and the server-side encrypted copy or master key are lost, the encrypted backup cannot be restored.</li>
+        <li>Anyone with both the encrypted file and Recovery Key can read its document data; keep them separately and securely.</li>
+        <li>A compromise of both the DocsFlow database and <code>BACKUP_MASTER_KEY</code> can expose the server-stored Recovery Key.</li>
+        <li>Backups preserve extracted text and document data, but not the original PDF, JPG, or PNG files.</li>
+        <li>Deleting an archive from Google Drive removes that recovery copy.</li>
+      </ul>
+    </div>
+  </details>
 
   <script>
     (() => {
