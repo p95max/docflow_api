@@ -60,9 +60,7 @@
             <p class="workspace-kicker">Last 24 hours</p>
             <h2 id="ai-usage-title">AI usage</h2>
           </div>
-          <form method="dialog">
-            <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="Close AI usage">Close</button>
-          </form>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-dialog-close="ai-usage-modal" aria-label="Close AI usage">Close</button>
         </div>
         <div class="ai-usage-stats">
           <div><span>Tokens used</span><strong>{{ ai_usage.used_tokens|token_count }}</strong></div>
@@ -127,6 +125,12 @@
           if (!opener) return;
           const dialog = document.getElementById(opener.dataset.dialogOpen);
           if (dialog instanceof HTMLDialogElement) dialog.showModal();
+        });
+        document.addEventListener("click", (event) => {
+          const closer = event.target.closest("[data-dialog-close]");
+          if (!closer) return;
+          const dialog = document.getElementById(closer.dataset.dialogClose);
+          if (dialog instanceof HTMLDialogElement) dialog.close();
         });
       })();
     </script>
