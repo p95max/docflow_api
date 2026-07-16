@@ -46,7 +46,8 @@ _GERMAN_MONTHS = {
     "dezember": 12,
 }
 _CURRENCY_PATTERN = re.compile(
-    r"\b(EUR|USD|GBP|CHF|PLN|SEK|NOK|DKK)\b", re.IGNORECASE
+    r"\b(EUR|USD|GBP|CHF|AUD|CAD|NZD|PLN|SEK|NOK|DKK)\b",
+    re.IGNORECASE,
 )
 _ISO_DATE_PATTERN = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 _TEMPLATE_PLACEHOLDER_PATTERN = re.compile(r"\[[^\]\n]{2,80}\]")
@@ -63,6 +64,26 @@ _TEMPLATE_MARKERS = (
     "löschen sie die kursiven platzhalter",
     "loeschen sie die kursiven platzhalter",
     "bitte senden sie den brief nicht an",
+)
+_DOLLAR_SYMBOL_PATTERN = re.compile(r"(?<![A-Z])\$\s*\d", re.IGNORECASE)
+_AUSTRALIAN_CONTEXT_PATTERNS = (
+    re.compile(r"\b(?:VIC|NSW|QLD|WA|SA|TAS|ACT|NT)\s+\d{4}\b", re.IGNORECASE),
+    re.compile(r"\bAustralia\b", re.IGNORECASE),
+    re.compile(r"\bMelbourne\b", re.IGNORECASE),
+    re.compile(r"\bSydney\b", re.IGNORECASE),
+    re.compile(r"\bBrisbane\b", re.IGNORECASE),
+    re.compile(r"\bPerth\b", re.IGNORECASE),
+    re.compile(r"\bAdelaide\b", re.IGNORECASE),
+)
+_CANADIAN_CONTEXT_PATTERNS = (
+    re.compile(r"\bCanada\b", re.IGNORECASE),
+    re.compile(r"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b", re.IGNORECASE),
+)
+_NEW_ZEALAND_CONTEXT_PATTERNS = (
+    re.compile(r"\bNew Zealand\b", re.IGNORECASE),
+    re.compile(r"\bAuckland\b", re.IGNORECASE),
+    re.compile(r"\bWellington\b", re.IGNORECASE),
+    re.compile(r"\bChristchurch\b", re.IGNORECASE),
 )
 
 
@@ -103,11 +124,8 @@ def validate_ai_extraction(
     source_pages: list["ExtractedTextPage"] | None = None,
     today: date | None = None,
 ) -> ExtractionValidationResult:
-    """Validate AI fields against source text and cross-field business rules.
+    """Validate AI fields against source text and cross-field business rules."""
 
-    The validator never mutates model output. Template detection runs before
-    critical-field checks so sample values are not mistaken for real metadata.
-    """
     errors: list[str] = []
     warnings: list[str] = []
     source = raw_text.strip()
@@ -172,6 +190,7 @@ def validate_ai_extraction(
         source=source,
         source_pages=source_pages,
         errors=errors,
+        warnings=warnings,
         skipped_fields=skipped_evidence_fields,
     )
     _validate_currency_amount_link(
@@ -225,11 +244,9 @@ def validate_ai_extraction(
 
 
 def _is_document_template(source: str) -> bool:
-    """Detect instructional/sample documents before validating business fields."""
     normalized = source.casefold()
     if "musterbrief" in normalized:
         return True
-
     marker_count = sum(marker in normalized for marker in _TEMPLATE_MARKERS)
     placeholder_count = len(_TEMPLATE_PLACEHOLDER_PATTERN.findall(source))
     return marker_count >= 2 or (marker_count >= 1 and placeholder_count >= 2)
@@ -319,9 +336,9 @@ def _validate_evidence(
     source: str,
     source_pages: list["ExtractedTextPage"] | None,
     errors: list[str],
+    warnings: list[str],
     skipped_fields: set[str] | None = None,
 ) -> dict[str, FieldEvidence]:
-    """Accept evidence only when its quote and page both match local text."""
     field_values: tuple[tuple[str, str | float | None], ...] = (
         ("amount", extraction.total_amount),
         ("currency", extraction.currency),
@@ -352,6 +369,26 @@ def _validate_evidence(
             errors.append(f"{label.capitalize()} evidence does not match the stated page.")
             continue
 
+        if field_name == "currency":
+            accepted_currency = _validated_currency_evidence(
+                currency=str(field_value),
+                evidence=evidence,
+                source=source,
+            )
+            if accepted_currency is None:
+                errors.append(
+                    "Currency evidence does not support the extracted ISO currency."
+                )
+                continue
+            accepted[field_name] = accepted_currency
+            if accepted_currency.evidence_type == "inferred":
+                _add_once(
+                    warnings,
+                    accepted_currency.reason
+                    or "Currency was inferred from regional document context.",
+                )
+            continue
+
         if not _evidence_supports_value(
             field_name=field_name,
             field_value=field_value,
@@ -363,6 +400,61 @@ def _validate_evidence(
         accepted[field_name] = evidence
 
     return accepted
+
+
+def _validated_currency_evidence(
+    *,
+    currency: str,
+    evidence: FieldEvidence,
+    source: str,
+) -> FieldEvidence | None:
+    normalized_currency = currency.upper()
+    if _text_value_is_grounded(normalized_currency, evidence.quote):
+        return evidence.model_copy(update={"evidence_type": "direct", "reason": None})
+
+    if "$" not in evidence.quote:
+        return None
+
+    inferred_currency = _infer_dollar_currency(source)
+    if inferred_currency != normalized_currency:
+        return None
+
+    reason = {
+        "AUD": (
+            "Currency AUD was inferred from the Australian address because "
+            'the document uses the ambiguous "$" symbol.'
+        ),
+        "CAD": (
+            "Currency CAD was inferred from the Canadian address because "
+            'the document uses the ambiguous "$" symbol.'
+        ),
+        "NZD": (
+            "Currency NZD was inferred from the New Zealand address because "
+            'the document uses the ambiguous "$" symbol.'
+        ),
+    }.get(normalized_currency)
+    if reason is None:
+        return None
+
+    return evidence.model_copy(
+        update={
+            "evidence_type": "inferred",
+            "reason": reason,
+        }
+    )
+
+
+def _infer_dollar_currency(source: str) -> str | None:
+    if not _DOLLAR_SYMBOL_PATTERN.search(source):
+        return None
+
+    matches = {
+        "AUD": any(pattern.search(source) for pattern in _AUSTRALIAN_CONTEXT_PATTERNS),
+        "CAD": any(pattern.search(source) for pattern in _CANADIAN_CONTEXT_PATTERNS),
+        "NZD": any(pattern.search(source) for pattern in _NEW_ZEALAND_CONTEXT_PATTERNS),
+    }
+    inferred = [currency for currency, matched in matches.items() if matched]
+    return inferred[0] if len(inferred) == 1 else None
 
 
 def _evidence_page_text(
@@ -399,7 +491,6 @@ def _validate_currency_amount_link(
     accepted_evidence: dict[str, FieldEvidence],
     errors: list[str],
 ) -> None:
-    """Require the currency evidence to show the grounded total alongside it."""
     if extraction.total_amount is None or extraction.currency is None:
         return
 
@@ -507,7 +598,6 @@ def _date_label(
 
 
 def _line_context(source: str, *, start: int, end: int) -> str:
-    """Use the candidate's own line to avoid labels bleeding from nearby fields."""
     line_start = source.rfind("\n", 0, start) + 1
     line_end = source.find("\n", end)
     if line_end == -1:
