@@ -125,8 +125,10 @@ and a download token cannot be used for preview. Tokens expire after
 
 ### Web Interface
 
-DocsFlow includes a lightweight Bootstrap 5 interface served by FastAPI. No
-separate frontend server or JavaScript build step is required.
+DocsFlow includes a custom server-rendered document workspace served by
+FastAPI. Bootstrap provides the responsive grid and accessible base controls,
+while DocsFlow's own CSS defines the navigation, forms, tables, cards and chat
+interface. No separate frontend server or JavaScript build step is required.
 
 | Page | Purpose |
 |---|---|
@@ -146,6 +148,19 @@ Subresource Integrity hash. Deployments may still vendor it under
 Server-rendered forms retain normal HTML validation and add a small progressive
 enhancement for invalid-field highlighting, loading labels, and double-submit
 protection. The application remains usable when JavaScript is unavailable.
+
+### AI usage indicator
+
+For signed-in users, the navigation bar shows the currently most-used AI model
+in the last 24 hours (or the configured Ask Documents model when there is no
+usage) and the recorded token total against `OPENAI_DAILY_TOKEN_QUOTA`.
+Selecting it opens an AI usage dialog with remaining tokens, a visual limit
+indicator, recorded operations, per-model token usage, and the configured
+models for extraction, Ask Documents and embeddings.
+
+The display is an account-only view of persisted `openai_usage_logs` in the
+rolling 24-hour window. The Redis-backed request quota is enforced separately,
+so failed or blocked attempts may not appear as recorded model usage.
 
 ### Knowledge Base / RAG
 
@@ -753,6 +768,9 @@ operation counter and the rolling token usage persisted in
 `openai_usage_logs`. The token quota provides a configurable spend ceiling; it
 is a safety control, not an accounting or billing report. Set
 `RATE_LIMIT_ENABLED=false` only in isolated tests.
+
+The navigation AI usage indicator exposes the same persisted token usage to the
+signed-in account, grouped by model, for a quick in-product view of consumption.
 
 Outside local development, set `APP_ENV=production`, `APP_DEBUG=false`, and
 `INIT_TEST_USER=false`. Production startup uses `WEB_CONCURRENCY` workers and
