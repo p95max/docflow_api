@@ -75,11 +75,14 @@ def _render_backups_page(
     restore_result: str | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> HTMLResponse:
+    all_backup_jobs = list_backup_jobs(db=db, owner_id=current_user.id)
     return _template_response(
         request=request,
         name="backups.html",
         current_user=current_user,
-        backup_jobs=list_backup_jobs(db=db, owner_id=current_user.id),
+        backup_jobs=[job for job in all_backup_jobs if not job.is_automatic],
+        automatic_backup_jobs=[job for job in all_backup_jobs if job.is_automatic],
+        backup_max_retained=settings.backup_max_retained,
         google_drive_connection=get_google_drive_connection(
             db=db,
             user_id=current_user.id,

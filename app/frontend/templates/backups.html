@@ -83,6 +83,12 @@
       <div class="small text-secondary">
         Google Drive connection alone cannot restore a backup. The Recovery Key is shown only once in the UI. DocsFlow stores a server-encrypted copy so background backups and JSON downloads can use it while the server master key remains available.
       </div>
+      <p class="small text-secondary mb-0 mt-3">
+        An automatic backup runs every Sunday at 03:00 Berlin time. DocsFlow keeps up to
+        {{ backup_max_retained }} manual and {{ backup_max_retained }} automatic completed
+        archives separately. When another archive of either type is created, its oldest
+        archive is removed.
+      </p>
     </div>
   </div>
   <div class="card shadow-sm mb-4">
@@ -215,6 +221,7 @@
     </div>
   </details>
 
+  <h2 class="h5 mb-3">Manual backups</h2>
   {% if backup_jobs %}
     <div class="card shadow-sm overflow-hidden">
       <div class="table-responsive">
@@ -295,7 +302,7 @@
     </div>
   {% else %}
     <div class="empty-state text-center p-5">
-      <h2 class="h5">No backups yet</h2>
+      <h2 class="h5">No manual backups yet</h2>
       <p class="text-secondary mb-0">
         {% if google_drive_connection %}
           Create the first Google Drive backup for this account.
@@ -303,6 +310,70 @@
           Connect Google Drive before creating the first backup.
         {% endif %}
       </p>
+    </div>
+  {% endif %}
+
+  <h2 class="h5 mt-5 mb-3">Automatic backups</h2>
+  {% if automatic_backup_jobs %}
+    <div class="card shadow-sm overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Created</th>
+              <th scope="col">Status</th>
+              <th scope="col">File</th>
+              <th scope="col">Size</th>
+              <th scope="col">Checksum</th>
+              <th scope="col">Key ID</th>
+              <th scope="col" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in automatic_backup_jobs %}
+              <tr{% if job.status.value in ("pending", "running") %} data-backup-status-url="/backups/{{ job.id }}/status" data-backup-id="{{ job.id }}"{% endif %}>
+                <td class="text-nowrap">{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                <td>
+                  <span class="badge {{ job.status|status_badge_class }}" data-backup-status>{{ job.status.value }}</span>
+                  <div class="small text-danger mt-1{% if not job.error_message %} d-none{% endif %}" data-backup-error>{{ job.error_message or "" }}</div>
+                </td>
+                <td data-backup-file>
+                  {% if job.drive_web_view_link %}
+                    <a href="{{ job.drive_web_view_link }}" target="_blank" rel="noopener noreferrer">{{ job.drive_file_name or "Open in Google Drive" }}</a>
+                  {% else %}
+                    {{ job.drive_file_name or "—" }}
+                  {% endif %}
+                </td>
+                <td class="text-nowrap" data-backup-size>{{ job.compressed_size_bytes|file_size }}</td>
+                <td data-backup-checksum>{% if job.checksum_sha256 %}<code title="{{ job.checksum_sha256 }}">{{ job.checksum_sha256[:12] }}…</code>{% else %}—{% endif %}</td>
+                <td data-backup-key-id>{% if job.recovery_key_id %}<code>{{ job.recovery_key_id }}</code>{% else %}—{% endif %}</td>
+                <td class="text-end" data-backup-actions>
+                  <div class="d-inline-flex gap-2">
+                    {% if job.status.value == "completed" and job.drive_file_id %}
+                      <details class="backup-download-menu">
+                        <summary class="btn btn-sm btn-outline-primary">Download</summary>
+                        <div class="backup-download-options border rounded shadow-sm bg-body-tertiary p-2">
+                          <a class="backup-download-option" href="/backups/{{ job.id }}/download/raw"><span class="fw-semibold">Encrypted backup</span><small class="text-secondary">.json.gz.enc · For recovery with its Recovery Key</small></a>
+                          <a class="backup-download-option" href="/backups/{{ job.id }}/download"><span class="fw-semibold">Readable JSON export</span><small class="text-secondary">.json · Decrypted data for viewing or export</small></a>
+                        </div>
+                      </details>
+                    {% endif %}
+                    {% if job.status.value in ("pending", "running") %}
+                      <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Backup is still running">Delete</button>
+                    {% else %}
+                      <form method="post" action="/backups/{{ job.id }}/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-sm btn-outline-danger" type="submit">Delete</button></form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state text-center p-5">
+      <p class="text-secondary mb-0">The first automatic backup will run on Sunday at 03:00 Berlin time.</p>
     </div>
   {% endif %}
 
@@ -315,8 +386,9 @@
         <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as
         encrypted <code>.json.gz.enc</code> files. Original PDF, JPG and PNG
         files are not included, so restored documents have no preview or
-        original-file download. DocsFlow keeps the 5 newest completed recovery
-        archives and removes older ones automatically.
+        original-file download. DocsFlow keeps up to {{ backup_max_retained }} completed
+        manual archives and {{ backup_max_retained }} completed automatic archives; older
+        archives of the same type are removed automatically.
       </p>
     </div>
   </div>

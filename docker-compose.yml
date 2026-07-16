@@ -55,6 +55,30 @@ services:
       redis:
         condition: service_healthy
 
+  celery_beat:
+    build: .
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      GOOGLE_DRIVE_CLIENT_ID: ${GOOGLE_DRIVE_CLIENT_ID:-}
+      GOOGLE_DRIVE_CLIENT_SECRET: ${GOOGLE_DRIVE_CLIENT_SECRET:-}
+      GOOGLE_DRIVE_REDIRECT_URI: ${GOOGLE_DRIVE_REDIRECT_URI:-}
+      GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:-}
+      GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS: ${GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS:-}
+      OPENAI_RAG_MODEL: ${OPENAI_RAG_MODEL:?OPENAI_RAG_MODEL must be set}
+      BACKUP_MASTER_KEY: ${BACKUP_MASTER_KEY:-}
+    volumes:
+      - .:/app
+    depends_on:
+      api:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   db:
     image: pgvector/pgvector:pg16
     environment:

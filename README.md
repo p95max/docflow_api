@@ -210,6 +210,12 @@ For the first backup, use this sequence:
 2. Connect the Google Drive account that will store the archive.
 3. Create the backup.
 
+DocsFlow also creates an automatic recovery archive once a week, by default on
+Sunday at 03:00 Berlin time. It keeps the five newest completed manual archives
+and the five newest completed automatic archives separately. When a sixth
+archive of either type completes, the oldest archive of that same type is
+deleted from DocsFlow and Google Drive.
+
 Google Drive access does not replace the Recovery Key. The UI shows a newly
 generated key only once, while DocsFlow keeps a copy encrypted with
 `BACKUP_MASTER_KEY` so background backups and JSON downloads can use it. If the
@@ -721,7 +727,10 @@ file.
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |
 | `DOCUMENT_PROCESSING_RETRY_DELAY_SECONDS` | `10` | Delay between retries |
 | `BACKUP_MASTER_KEY` | Not set | Valid Fernet key used to protect stored per-user Recovery Keys |
-| `BACKUP_MAX_RETAINED` | `5` | Maximum completed Google Drive recovery archives retained per user; the oldest is removed after a successful new backup. |
+| `BACKUP_MAX_RETAINED` | `5` | Maximum completed recovery archives retained per user **for each type** (manual and automatic); the oldest archive of the same type is removed after a successful new backup. |
+| `AUTOMATIC_BACKUPS_ENABLED` | `true` | Enables the weekly automatic Google Drive recovery backup scheduler. |
+| `AUTOMATIC_BACKUP_WEEKDAY` | `sun` | Day of week for automatic backups (`mon` … `sun`). |
+| `AUTOMATIC_BACKUP_HOUR` | `3` | Hour in Berlin time (0–23) when the automatic backup runs. |
 | `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` | — | Active Fernet key used to encrypt Google Drive refresh tokens at rest |
 | `GOOGLE_DRIVE_TOKEN_PREVIOUS_ENCRYPTION_KEYS` | — | Comma-separated old Fernet keys used temporarily during key rotation |
 | `BACKUP_RESTORE_MAX_FILE_SIZE_MB` | `25` | Maximum uploaded recovery archive size |

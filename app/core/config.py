@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     backup_soft_time_limit_seconds: int = 120
     backup_hard_time_limit_seconds: int = 180
     backup_max_retained: int = Field(default=5, ge=1, le=100)
+    automatic_backups_enabled: bool = True
+    automatic_backup_weekday: str = "sun"
+    automatic_backup_hour: int = Field(default=3, ge=0, le=23)
     backup_master_key: str | None = None
     backup_restore_max_file_size_mb: int = Field(default=25, ge=1)
     backup_restore_max_decompressed_size_mb: int = Field(default=100, ge=1)
@@ -126,6 +129,16 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in parsed if str(origin).strip()]
 
         return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+    @field_validator("automatic_backup_weekday")
+    @classmethod
+    def validate_automatic_backup_weekday(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if normalized not in {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}:
+            raise ValueError(
+                "AUTOMATIC_BACKUP_WEEKDAY must be one of mon, tue, wed, thu, fri, sat, sun"
+            )
+        return normalized
 
     @model_validator(mode="after")
     def validate_deployment_security(self) -> "Settings":

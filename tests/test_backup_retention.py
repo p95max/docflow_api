@@ -35,6 +35,7 @@ def test_backup_retention_deletes_oldest_completed_archives_only(
         db=db_session,
         owner_id=test_user.id,
         keep=5,
+        is_automatic=False,
         delete_remote_file=deleted_remote_files.append,
     )
     db_session.commit()
@@ -70,9 +71,55 @@ def test_backup_retention_keeps_record_when_drive_deletion_fails(
         db=db_session,
         owner_id=test_user.id,
         keep=5,
+        is_automatic=False,
         delete_remote_file=fail_delete,
     )
 
     assert deleted_ids == []
     assert len(errors) == 1
     assert db_session.get(BackupJob, jobs[0].id) is not None
+
+
+def test_backup_retention_keeps_manual_and_automatic_archives_separate(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    base_time = datetime.now(UTC) - timedelta(days=6)
+    manual_jobs = [
+        BackupJob(
+            owner_id=test_user.id,
+            status=BackupJobStatus.completed,
+            drive_file_id=f"manual-{index}",
+            is_automatic=False,
+            created_at=base_time + timedelta(days=index),
+        )
+        for index in range(6)
+    ]
+    automatic_jobs = [
+        BackupJob(
+            owner_id=test_user.id,
+            status=BackupJobStatus.completed,
+            drive_file_id=f"automatic-{index}",
+            is_automatic=True,
+            created_at=base_time + timedelta(days=index),
+        )
+        for index in range(6)
+    ]
+    db_session.add_all([*manual_jobs, *automatic_jobs])
+    db_session.commit()
+
+    deleted_remote_files: list[str] = []
+    deleted_ids, errors = prune_completed_backups(
+        db=db_session,
+        owner_id=test_user.id,
+        keep=5,
+        is_automatic=False,
+        delete_remote_file=deleted_remote_files.append,
+    )
+    db_session.commit()
+
+    assert errors == []
+    assert deleted_ids == [manual_jobs[0].id]
+    assert deleted_remote_files == ["manual-0"]
+    assert db_session.get(BackupJob, manual_jobs[0].id) is None
+    assert db_session.get(BackupJob, automatic_jobs[0].id) is not None

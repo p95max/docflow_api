@@ -7,10 +7,16 @@ from app.models.backup_job import BackupJob, BackupJobStatus
 from app.tasks.backups import run_backup_task
 
 
-def create_backup_job(*, db: Session, owner_id: int) -> BackupJob:
+def create_backup_job(
+    *,
+    db: Session,
+    owner_id: int,
+    is_automatic: bool = False,
+) -> BackupJob:
     job = BackupJob(
         owner_id=owner_id,
         status=BackupJobStatus.pending,
+        is_automatic=is_automatic,
     )
     db.add(job)
     db.flush()

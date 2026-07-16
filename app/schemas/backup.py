@@ -11,6 +11,7 @@ class BackupJobRead(BaseModel):
     owner_id: int
     status: BackupJobStatus
     celery_task_id: str | None
+    is_automatic: bool
     drive_folder_id: str | None
     drive_file_id: str | None
     drive_file_name: str | None

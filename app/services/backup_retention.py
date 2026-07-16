@@ -13,6 +13,7 @@ def prune_completed_backups(
     db: Session,
     owner_id: int,
     keep: int,
+    is_automatic: bool,
     delete_remote_file: Callable[[str], None],
 ) -> tuple[list[int], list[str]]:
     """Keep the newest completed archives and remove older remote/local pairs.
@@ -27,6 +28,7 @@ def prune_completed_backups(
             .where(
                 BackupJob.owner_id == owner_id,
                 BackupJob.status == BackupJobStatus.completed,
+                BackupJob.is_automatic.is_(is_automatic),
             )
             .order_by(BackupJob.created_at.desc(), BackupJob.id.desc())
         ).all()

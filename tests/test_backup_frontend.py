@@ -69,6 +69,8 @@ def test_backup_page_prompts_user_to_connect_google_drive(
     assert "Google Drive backups" in response.text
     assert "Connect Google Drive" in response.text
     assert "server-encrypted copy" in response.text
+    assert "Manual backups" in response.text
+    assert "Automatic backups" in response.text
     assert "cannot be recovered by DocsFlow" not in response.text
     assert '<form method="post" action="/backups/run">' not in response.text
 

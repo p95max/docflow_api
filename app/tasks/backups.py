@@ -1,13 +1,16 @@
 import hashlib
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from celery.exceptions import SoftTimeLimitExceeded
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.backup_job import BackupJob, BackupJobStatus
+from app.models.google_drive_connection import GoogleDriveConnection
 from app.models.user import User
 from app.services.backup_export import build_backup_archive
 from app.services.backup_recovery import (
@@ -22,6 +25,60 @@ from app.worker import celery_app
 
 
 logger = logging.getLogger(__name__)
+BERLIN_TIMEZONE = ZoneInfo("Europe/Berlin")
+
+
+@celery_app.task(name="backups.schedule_automatic_backups")
+def schedule_automatic_backups() -> int:
+    """Queue at most one automatic backup per eligible account per Berlin week."""
+    if not settings.automatic_backups_enabled:
+        return 0
+    with SessionLocal() as db:
+        week_start = _current_berlin_week_start()
+        owner_ids = list(
+            db.scalars(
+                select(User.id)
+                .join(GoogleDriveConnection)
+                .where(
+                    User.is_active.is_(True),
+                    User.backup_recovery_key_encrypted.is_not(None),
+                )
+            ).all()
+        )
+        queued = 0
+        for owner_id in owner_ids:
+            existing_job = db.scalar(
+                select(BackupJob.id).where(
+                    BackupJob.owner_id == owner_id,
+                    BackupJob.is_automatic.is_(True),
+                    BackupJob.created_at >= week_start,
+                )
+            )
+            if existing_job is not None:
+                continue
+
+            from app.services.backup_jobs import create_backup_job, enqueue_backup_job
+
+            job = create_backup_job(
+                db=db,
+                owner_id=owner_id,
+                is_automatic=True,
+            )
+            db.commit()
+            db.refresh(job)
+            try:
+                enqueue_backup_job(db=db, job=job)
+                queued += 1
+            except Exception:
+                logger.exception("Could not queue automatic backup for user %s", owner_id)
+        return queued
+
+
+def _current_berlin_week_start() -> datetime:
+    now = datetime.now(BERLIN_TIMEZONE)
+    return (
+        now - timedelta(days=now.weekday())
+    ).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
 
 
 @celery_app.task(
@@ -90,6 +147,7 @@ def run_backup_task(self, backup_job_id: int) -> None:
                 db=db,
                 owner_id=job.owner_id,
                 keep=settings.backup_max_retained,
+                is_automatic=job.is_automatic,
                 delete_remote_file=lambda file_id: delete_gzip_backup(
                     file_id=file_id,
                     refresh_token=connection.refresh_token,

@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -31,6 +31,13 @@ class BackupJob(Base):
         nullable=False,
     )
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_automatic: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+        index=True,
+    )
 
     drive_folder_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     drive_file_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
