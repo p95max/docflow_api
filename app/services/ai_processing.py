@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.schemas.ai_processing import DocumentAIExtraction
+from app.services.extraction_sanitization import sanitize_ai_extraction
 from app.services.openai_client import (
     OpenAIUsage,
     create_openai_client,
@@ -66,7 +67,10 @@ def run_standard_ai_processing(
     if parsed is None:
         raise ValueError("OpenAI response did not contain parsed structured output.")
 
-    extracted_data = DocumentAIExtraction.model_validate(parsed)
+    extracted_data = sanitize_ai_extraction(
+        extraction=DocumentAIExtraction.model_validate(parsed),
+        raw_text=normalized_text,
+    )
 
     return StandardAIProcessingResult(
         model=selected_model,
