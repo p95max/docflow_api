@@ -151,6 +151,9 @@
               <td class="text-secondary text-nowrap">{{ (page - 1) * filters.page_size + loop.index }}</td>
               <td>
                 <a class="fw-semibold text-decoration-none" href="/documents/{{ document.id }}">{{ document.original_filename }}</a>
+                {% if document.processing_mode.value == "confidential" %}
+                  <span class="badge document-confidential-badge ms-2" title="Processed locally; document data was not sent to AI">Confidential</span>
+                {% endif %}
               </td>
               <td>
                 {% if document.file_size_bytes is not none %}

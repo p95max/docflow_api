@@ -277,6 +277,7 @@ table td, table th { vertical-align: middle; }
 
 .preview-frame { width: 100%; min-height: 38rem; background: #f4f6fb; border: 1px solid #4a5e7d; border-radius: var(--docsflow-radius); box-shadow: 0 22px 45px rgba(0, 0, 0, 0.2); }
 .document-summary { white-space: pre-line; color: #d6e0f0; }
+.document-confidential-badge { color: #f5d9a1; background: rgba(185, 119, 24, 0.2); border: 1px solid rgba(239, 178, 77, 0.52); }
 .raw-text { max-height: 24rem; overflow: auto; color: #c4d1e4; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
 .empty-state { max-width: 34rem; margin: 3rem auto; }
 .cursor-pointer { cursor: pointer; }
