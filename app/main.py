@@ -6,6 +6,7 @@ from app.api.v1.routes import router as api_router
 from app.core.config import settings
 from app.web import FRONTEND_DIR, router as web_router
 from app.web_backups import router as web_backups_router
+from app.web_document_ai import router as web_document_ai_router
 
 app = FastAPI(
     title="DocsFlow API",
@@ -31,8 +32,6 @@ async def add_security_headers(request: Request, call_next):
         and request.url.path.endswith("/preview")
     )
     if is_document_preview:
-        # Signed previews are embedded only by the document page on this origin.
-        # X-Frame-Options: DENY would otherwise block the PDF iframe entirely.
         response.headers.setdefault(
             "Content-Security-Policy",
             "base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
@@ -73,3 +72,4 @@ app.mount(
 )
 app.include_router(web_router)
 app.include_router(web_backups_router)
+app.include_router(web_document_ai_router)
