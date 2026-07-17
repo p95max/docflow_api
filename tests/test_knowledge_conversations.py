@@ -63,12 +63,18 @@ def _search_result() -> SemanticSearchResult:
 
 
 def test_question_schema_enforces_one_sentence() -> None:
-    assert KnowledgeQuestionCreate(
-        question="  What is due to YesLogic Pty. Ltd.?  "
-    ).question == "What is due to YesLogic Pty. Ltd.?"
+    payload = KnowledgeQuestionCreate(
+        question="  What is due to YesLogic Pty. Ltd.?  ",
+        document_id=7,
+    )
+
+    assert payload.question == "What is due to YesLogic Pty. Ltd.?"
+    assert payload.document_id == 7
 
     with pytest.raises(ValidationError):
         KnowledgeQuestionCreate(question="x" * 301)
+    with pytest.raises(ValidationError):
+        KnowledgeQuestionCreate(question="What is due?", document_id=0)
     with pytest.raises(ValidationError, match="one sentence"):
         KnowledgeQuestionCreate(question="Which invoices are due? Include overdue items.")
 
@@ -145,6 +151,55 @@ def test_rag_answer_persists_verified_sources_and_usage(
     assert usage_log.owner_id == test_user.id
     assert usage_log.operation == "knowledge_answer"
     assert usage_log.total_tokens == 160
+
+
+def test_document_scope_is_forwarded_to_retrieval(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conversation = create_conversation(
+        db=db_session,
+        owner_id=test_user.id,
+        title="Selected invoice",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_search_document_chunks(**kwargs: object) -> list[SemanticSearchResult]:
+        captured.update(kwargs)
+        return [_search_result()]
+
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "search_document_chunks",
+        fake_search_document_chunks,
+    )
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "answer_structured_question",
+        lambda **_: pytest.fail("Structured collection query must be skipped"),
+    )
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "create_openai_client",
+        lambda: _FakeClient(
+            {
+                "answer": "The selected invoice is due on 2016-12-26.",
+                "source_chunk_ids": [42],
+            }
+        ),
+    )
+
+    answer_conversation_question(
+        db=db_session,
+        owner_id=test_user.id,
+        conversation_id=conversation.id,
+        question="What deadline is mentioned?",
+        document_id=7,
+    )
+
+    assert captured["owner_id"] == test_user.id
+    assert captured["document_ids"] == [7]
 
 
 def test_invented_source_id_is_not_saved_or_returned(
