@@ -56,6 +56,7 @@ class KnowledgeConversationCreate(BaseModel):
 
 class KnowledgeQuestionCreate(BaseModel):
     question: str = Field(min_length=1, max_length=300)
+    document_id: int | None = Field(default=None, ge=1)
 
     @field_validator("question")
     @classmethod
