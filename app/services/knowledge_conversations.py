@@ -116,6 +116,7 @@ def answer_conversation_question(
     owner_id: int,
     conversation_id: int,
     question: str,
+    document_id: int | None = None,
 ) -> tuple[KnowledgeMessage, KnowledgeMessage]:
     if not settings.knowledge_enabled:
         raise RuntimeError("Knowledge Base is disabled.")
@@ -134,25 +135,26 @@ def answer_conversation_question(
     db.flush()
 
     try:
-        structured_answer = answer_structured_question(
-            db=db,
-            owner_id=owner_id,
-            question=question,
-        )
-        if structured_answer is not None:
-            return _persist_answer(
+        if document_id is None:
+            structured_answer = answer_structured_question(
                 db=db,
-                conversation=conversation,
-                user_message=user_message,
-                answer=structured_answer.answer,
-                sources=structured_answer.sources,
+                owner_id=owner_id,
+                question=question,
             )
+            if structured_answer is not None:
+                return _persist_answer(
+                    db=db,
+                    conversation=conversation,
+                    user_message=user_message,
+                    answer=structured_answer.answer,
+                    sources=structured_answer.sources,
+                )
 
         search_results = search_document_chunks(
             db=db,
             owner_id=owner_id,
             query=question,
-            document_ids=None,
+            document_ids=[document_id] if document_id is not None else None,
             limit=settings.knowledge_retrieval_limit,
         )
         retrieved_sources = [
