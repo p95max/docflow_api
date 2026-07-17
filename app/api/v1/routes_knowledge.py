@@ -158,6 +158,7 @@ def ask_knowledge_question(
             owner_id=current_user.id,
             conversation_id=conversation_id,
             question=payload.question,
+            document_id=payload.document_id,
         )
     except LookupError as exc:
         raise HTTPException(
