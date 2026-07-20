@@ -125,16 +125,16 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 5. Pydantic Schemas
 
-- [ ] Create `CalendarEventCreate`
-- [ ] Create `CalendarEventUpdate`
-- [ ] Create `CalendarEventRead`
-- [ ] Create `CalendarEventListRead`
-- [ ] Create `CalendarRangeQuery`
-- [ ] Create `CalendarEventConfirm`
-- [ ] Create `CalendarEventComplete`
-- [ ] Validate date-only and datetime variants
-- [ ] Prevent users from changing `owner_id`
-- [ ] Prevent direct modification of `source=ai` outside the service layer
+- [x] Create `CalendarEventCreate`
+- [x] Create `CalendarEventUpdate`
+- [x] Create `CalendarEventRead`
+- [x] Create `CalendarEventListRead`
+- [x] Create `CalendarRangeQuery`
+- [x] Create `CalendarEventConfirm`
+- [x] Create `CalendarEventComplete`
+- [x] Validate date-only and datetime variants
+- [x] Prevent users from changing `owner_id`
+- [x] Prevent direct modification of `source=ai` outside the service layer
 
 ## 6. REST API
 
