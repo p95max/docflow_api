@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.core.timezones import validate_iana_timezone
 from app.services.security import hash_password, verify_password
 
 
@@ -39,4 +40,11 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     if not verify_password(password, user.password_hash):
         return None
 
+    return user
+
+
+def update_user_timezone(db: Session, user: User, timezone: str) -> User:
+    user.timezone = validate_iana_timezone(timezone)
+    db.commit()
+    db.refresh(user)
     return user

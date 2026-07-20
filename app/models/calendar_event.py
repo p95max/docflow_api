@@ -20,8 +20,9 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
+from app.core.timezones import normalize_datetime_to_utc
 from app.db.base import Base
 
 
@@ -179,3 +180,9 @@ class CalendarEvent(Base):
 
     owner = relationship("User", back_populates="calendar_events")
     document = relationship("Document", back_populates="calendar_events")
+
+    @validates("start_at", "end_at")
+    def normalize_event_timestamp(self, _key: str, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return normalize_datetime_to_utc(value)

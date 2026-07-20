@@ -27,8 +27,8 @@
     {% endif %}
     <div class="vstack gap-3 knowledge-message-list">
       {% for message in conversation.messages %}
-        {% if loop.first or message.created_at|berlin_date != loop.previtem.created_at|berlin_date %}
-          <div class="knowledge-date-divider"><span>{{ message.created_at|berlin_date }}</span></div>
+        {% if loop.first or message.created_at|local_date != loop.previtem.created_at|local_date %}
+          <div class="knowledge-date-divider"><span>{{ message.created_at|local_date }}</span></div>
         {% endif %}
         <div class="knowledge-message-row knowledge-message-row-{{ message.role.value }}">
         <article id="knowledge-message-{{ message.id }}" class="card shadow-sm knowledge-message knowledge-message-{{ message.role.value }}{% if message.id in unread_assistant_message_ids %} knowledge-message-assistant-new{% endif %}">
@@ -38,7 +38,7 @@
                 {{ "You" if message.role.value == "user" else "DocsFlow" }}
                 {% if message.id in unread_assistant_message_ids %}<span class="badge text-bg-info ms-1 knowledge-new-badge">New</span>{% endif %}
               </h2>
-              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|berlin_time }}</time>
+              <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|local_time }}</time>
             </div>
             <div class="knowledge-message-content">{{ message.content }}</div>
             {% if message.sources %}

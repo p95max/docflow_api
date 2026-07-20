@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import CurrentUser
 from app.db.session import get_db
-from app.schemas.user import UserCreate, UserRead
+from app.schemas.user import UserCreate, UserRead, UserTimezoneUpdate
 from app.services.rate_limits import enforce_registration_rate_limit
-from app.services.users import create_user, get_user_by_email
+from app.services.users import create_user, get_user_by_email, update_user_timezone
 
 router = APIRouter()
 
@@ -47,3 +47,12 @@ def register(
 @router.get("/me", response_model=UserRead)
 def me(current_user: CurrentUser) -> UserRead:
     return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me_timezone(
+    payload: UserTimezoneUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> UserRead:
+    return update_user_timezone(db=db, user=current_user, timezone=payload.timezone)

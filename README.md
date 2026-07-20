@@ -134,6 +134,7 @@ interface. No separate frontend server or JavaScript build step is required.
 |---|---|
 | `/login` | Authenticate with email and password |
 | `/register` | Create an account |
+| `/settings` | Set the account timezone used for date and time display |
 | `/documents` | List the current user's documents |
 | `/documents/upload` | Upload a document and select confidential mode |
 | `/documents/{id}` | Preview/download a file, edit extracted fields, add a note, confirm or delete |
@@ -484,6 +485,12 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
 ```bash
 curl http://localhost:8000/api/v1/users/me \
   -H "Authorization: Bearer $TOKEN"
+
+# Set the IANA timezone for the account and web date/time display
+curl -X PATCH http://localhost:8000/api/v1/users/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"timezone": "Europe/Berlin"}'
 ```
 
 ---

@@ -108,16 +108,16 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 4. User Timezone
 
-- [ ] Add `users.timezone`
-- [ ] Default value: `Europe/Berlin`
-- [ ] Validate it using `zoneinfo.ZoneInfo`
-- [ ] Accept only IANA timezone identifiers
-- [ ] Add a timezone setting to the user profile
-- [ ] Remove the hard dependency of the web UI on `Europe/Berlin`
-- [ ] Do not convert date-only events to UTC
-- [ ] Store datetime events in UTC
-- [ ] Preserve the original timezone separately
-- [ ] Add DST-related tests
+- [x] Add `users.timezone`
+- [x] Default value: `Europe/Berlin`
+- [x] Validate it using `zoneinfo.ZoneInfo`
+- [x] Accept only IANA timezone identifiers
+- [x] Add a timezone setting to the user profile
+- [x] Remove the hard dependency of the web UI on `Europe/Berlin`
+- [x] Do not convert date-only events to UTC
+- [x] Store datetime events in UTC
+- [x] Preserve the original timezone separately
+- [x] Add DST-related tests
 
 ---
 

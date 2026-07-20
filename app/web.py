@@ -19,6 +19,8 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
+from jinja2.runtime import Context
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -38,6 +40,7 @@ from app.api.v1.routes_documents import (
     upload_document as api_upload_document,
 )
 from app.core.config import settings
+from app.core.timezones import DEFAULT_USER_TIMEZONE, validate_iana_timezone
 from app.db.session import get_db
 from app.models.user import User
 from app.models.document import Document, DocumentStatus, ProcessingMode
@@ -54,7 +57,7 @@ from app.services.knowledge_conversations import (
     get_owned_conversation,
     list_conversations,
 )
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserTimezoneUpdate
 from app.services.security import create_access_token, decode_access_token
 from app.services.rate_limits import (
     enforce_knowledge_question_rate_limit,
@@ -67,6 +70,7 @@ from app.services.users import (
     create_user,
     get_user_by_email,
     get_user_by_id,
+    update_user_timezone,
 )
 
 
@@ -84,8 +88,6 @@ DOCUMENT_TYPES = (
     "medical_document",
     "other",
 )
-BERLIN_TIMEZONE = ZoneInfo("Europe/Berlin")
-
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -112,22 +114,49 @@ def _status_badge_class(value: object) -> str:
     }.get(status_value, "text-bg-secondary")
 
 
-def _to_berlin_timezone(value: datetime) -> datetime:
+def _get_user_timezone_name(user: User | None) -> str:
+    if user is None:
+        return DEFAULT_USER_TIMEZONE
+    try:
+        return validate_iana_timezone(user.timezone)
+    except ValueError:
+        return DEFAULT_USER_TIMEZONE
+
+
+def _to_user_timezone(value: datetime, timezone_name: str) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(BERLIN_TIMEZONE)
+    return value.astimezone(ZoneInfo(timezone_name))
 
 
-def _format_berlin_datetime(value: datetime) -> str:
-    return _to_berlin_timezone(value).strftime("%H:%M %d-%m-%Y")
+def _format_user_datetime(value: datetime, timezone_name: str) -> str:
+    return _to_user_timezone(value, timezone_name).strftime("%H:%M %d-%m-%Y")
 
 
-def _format_berlin_date(value: datetime) -> str:
-    return _to_berlin_timezone(value).strftime("%d-%m-%Y")
+def _format_user_date(value: datetime, timezone_name: str) -> str:
+    return _to_user_timezone(value, timezone_name).strftime("%d-%m-%Y")
 
 
-def _format_berlin_time(value: datetime) -> str:
-    return _to_berlin_timezone(value).strftime("%H:%M")
+def _format_user_time(value: datetime, timezone_name: str) -> str:
+    return _to_user_timezone(value, timezone_name).strftime("%H:%M")
+
+
+@pass_context
+def _format_local_datetime(context: Context, value: datetime) -> str:
+    timezone_name = str(context.get("display_timezone", DEFAULT_USER_TIMEZONE))
+    return _format_user_datetime(value, timezone_name)
+
+
+@pass_context
+def _format_local_date(context: Context, value: datetime) -> str:
+    timezone_name = str(context.get("display_timezone", DEFAULT_USER_TIMEZONE))
+    return _format_user_date(value, timezone_name)
+
+
+@pass_context
+def _format_local_time(context: Context, value: datetime) -> str:
+    timezone_name = str(context.get("display_timezone", DEFAULT_USER_TIMEZONE))
+    return _format_user_time(value, timezone_name)
 
 
 def _format_token_count(value: int) -> str:
@@ -144,8 +173,9 @@ def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None
         return None
 
     window_start = datetime.now(timezone.utc) - timedelta(days=1)
-    now_berlin = datetime.now(BERLIN_TIMEZONE)
-    month_start = now_berlin.replace(
+    user_timezone = ZoneInfo(_get_user_timezone_name(current_user))
+    now_in_user_timezone = datetime.now(user_timezone)
+    month_start = now_in_user_timezone.replace(
         day=1,
         hour=0,
         minute=0,
@@ -209,7 +239,7 @@ def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None
         "nav_model": str(models[0]["name"]) if models else settings.openai_rag_model,
         "monthly": {
             **monthly_usage,
-            "label": now_berlin.strftime("%B %Y"),
+            "label": now_in_user_timezone.strftime("%B %Y"),
         },
         "configured_models": (
             ("Document extraction", settings.openai_model),
@@ -221,9 +251,9 @@ def _get_ai_usage_summary(current_user: User | None) -> dict[str, object] | None
 
 templates.env.filters["file_size"] = _format_file_size
 templates.env.filters["status_badge_class"] = _status_badge_class
-templates.env.filters["berlin_datetime"] = _format_berlin_datetime
-templates.env.filters["berlin_date"] = _format_berlin_date
-templates.env.filters["berlin_time"] = _format_berlin_time
+templates.env.filters["local_datetime"] = _format_local_datetime
+templates.env.filters["local_date"] = _format_local_date
+templates.env.filters["local_time"] = _format_local_time
 templates.env.filters["token_count"] = _format_token_count
 
 
@@ -298,6 +328,7 @@ def _template_response(
             "current_user": current_user,
             "document_types": DOCUMENT_TYPES,
             "knowledge_enabled": settings.knowledge_enabled,
+            "display_timezone": _get_user_timezone_name(current_user),
             "csrf_token": csrf_token,
             "ai_usage": _get_ai_usage_summary(current_user),
             **context,
@@ -732,6 +763,62 @@ def register_submit(
 
     return RedirectResponse(
         url="/login?registered=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get(
+    "/settings",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def settings_page(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    return _template_response(
+        request=request,
+        name="settings.html",
+        current_user=current_user,
+        timezone_value=current_user.timezone,
+        updated=request.query_params.get("updated") == "1",
+    )
+
+
+@router.post(
+    "/settings/timezone",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def update_timezone_setting(
+    request: Request,
+    timezone: str = Form(...),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    try:
+        payload = UserTimezoneUpdate(timezone=timezone)
+    except ValidationError as exc:
+        return _template_response(
+            request=request,
+            name="settings.html",
+            current_user=current_user,
+            timezone_value=timezone,
+            error=exc.errors()[0].get("msg", "Enter a valid IANA timezone."),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    update_user_timezone(db=db, user=current_user, timezone=payload.timezone)
+    return RedirectResponse(
+        url="/settings?updated=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

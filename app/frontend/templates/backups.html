@@ -143,7 +143,7 @@
         </div>
         {% if google_drive_connection %}
           <div class="small text-secondary text-md-end">
-            Connected {{ google_drive_connection.updated_at|berlin_datetime }}
+            Connected {{ google_drive_connection.updated_at|local_datetime }}
           </div>
         {% endif %}
       </div>
@@ -227,7 +227,7 @@
           <tbody>
             {% for job in backup_jobs %}
               <tr{% if job.status.value in ("pending", "running") %} data-backup-status-url="/backups/{{ job.id }}/status" data-backup-id="{{ job.id }}"{% endif %}>
-                <td class="text-nowrap">{{ job.created_at|berlin_datetime }}</td>
+                <td class="text-nowrap">{{ job.created_at|local_datetime }}</td>
                 <td>
                   <span class="badge {{ job.status|status_badge_class }}" data-backup-status>{{ job.status.value }}</span>
                   <div class="small text-danger mt-1{% if not job.error_message %} d-none{% endif %}" data-backup-error>{{ job.error_message or "" }}</div>
@@ -319,7 +319,7 @@
           <tbody>
             {% for job in automatic_backup_jobs %}
               <tr{% if job.status.value in ("pending", "running") %} data-backup-status-url="/backups/{{ job.id }}/status" data-backup-id="{{ job.id }}"{% endif %}>
-                <td class="text-nowrap">{{ job.created_at|berlin_datetime }}</td>
+                <td class="text-nowrap">{{ job.created_at|local_datetime }}</td>
                 <td>
                   <span class="badge {{ job.status|status_badge_class }}" data-backup-status>{{ job.status.value }}</span>
                   <div class="small text-danger mt-1{% if not job.error_message %} d-none{% endif %}" data-backup-error>{{ job.error_message or "" }}</div>

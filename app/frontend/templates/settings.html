@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · DocsFlow{% endblock %}
+
+{% block content %}
+  <section class="auth-shell">
+    <div class="card docsflow-panel">
+      <div class="card-body p-4">
+        <p class="workspace-kicker">Account</p>
+        <h1 class="h3 mb-2">Settings</h1>
+        <p class="text-secondary mb-4">Choose the timezone used to display dates and times in DocsFlow.</p>
+
+        {% if updated %}
+          <div class="alert alert-success" role="status">Timezone saved.</div>
+        {% endif %}
+        {% if error %}
+          <div class="alert alert-danger" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/settings/timezone" class="vstack gap-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div>
+            <label class="form-label" for="timezone">Timezone</label>
+            <input class="form-control" id="timezone" name="timezone" type="text" value="{{ timezone_value }}" maxlength="64" required autocomplete="off" aria-describedby="timezone-help">
+            <div class="form-text" id="timezone-help">Use an IANA identifier, for example <code>Europe/Berlin</code> or <code>America/New_York</code>.</div>
+          </div>
+          <div><button class="btn btn-primary" type="submit" data-loading-label="Saving…">Save timezone</button></div>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

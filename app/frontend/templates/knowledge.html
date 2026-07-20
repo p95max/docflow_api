@@ -43,7 +43,7 @@
               <div class="list-group-item d-flex align-items-center gap-3">
                 <a class="flex-grow-1 text-decoration-none" href="/knowledge/conversations/{{ conversation.id }}">
                   <span class="d-block fw-semibold">{{ conversation.title or "Untitled conversation" }}</span>
-                  <small class="text-secondary">Updated {{ conversation.updated_at|berlin_datetime }}</small>
+                  <small class="text-secondary">Updated {{ conversation.updated_at|local_datetime }}</small>
                 </a>
                 <form method="post" action="/knowledge/conversations/{{ conversation.id }}/delete">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
