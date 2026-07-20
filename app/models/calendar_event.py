@@ -180,6 +180,7 @@ class CalendarEvent(Base):
 
     owner = relationship("User", back_populates="calendar_events")
     document = relationship("Document", back_populates="calendar_events")
+    audit_logs = relationship("AuditLog", back_populates="calendar_event")
 
     @validates("start_at", "end_at")
     def normalize_event_timestamp(self, _key: str, value: datetime | None) -> datetime | None:

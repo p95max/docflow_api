@@ -14,9 +14,14 @@ class AuditLog(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(
+    document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    calendar_event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("calendar_events.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     user_id: Mapped[int] = mapped_column(
@@ -35,4 +40,5 @@ class AuditLog(Base):
     )
 
     document = relationship("Document", back_populates="audit_logs")
+    calendar_event = relationship("CalendarEvent", back_populates="audit_logs")
     user = relationship("User", back_populates="audit_logs")

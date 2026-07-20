@@ -138,25 +138,25 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 6. REST API
 
-- [ ] `GET /api/v1/calendar/events`
-- [ ] Support parameters:
-  - [ ] `start`
-  - [ ] `end`
-  - [ ] `status`
-  - [ ] `event_type`
-  - [ ] `document_id`
-  - [ ] `source`
-- [ ] `POST /api/v1/calendar/events`
-- [ ] `GET /api/v1/calendar/events/{id}`
-- [ ] `PATCH /api/v1/calendar/events/{id}`
-- [ ] `DELETE /api/v1/calendar/events/{id}`
-- [ ] `POST /api/v1/calendar/events/{id}/confirm`
-- [ ] `POST /api/v1/calendar/events/{id}/complete`
-- [ ] `POST /api/v1/calendar/events/{id}/cancel`
-- [ ] Verify ownership in every endpoint
-- [ ] Use soft deletion
+- [x] `GET /api/v1/calendar/events`
+- [x] Support parameters:
+  - [x] `start`
+  - [x] `end`
+  - [x] `status`
+  - [x] `event_type`
+  - [x] `document_id`
+  - [x] `source`
+- [x] `POST /api/v1/calendar/events`
+- [x] `GET /api/v1/calendar/events/{id}`
+- [x] `PATCH /api/v1/calendar/events/{id}`
+- [x] `DELETE /api/v1/calendar/events/{id}`
+- [x] `POST /api/v1/calendar/events/{id}/confirm`
+- [x] `POST /api/v1/calendar/events/{id}/complete`
+- [x] `POST /api/v1/calendar/events/{id}/cancel`
+- [x] Verify ownership in every endpoint
+- [x] Use soft deletion
 - [ ] Add rate limiting for bulk operations
-- [ ] Add audit logs for create, update, delete, confirm, and complete actions
+- [x] Add audit logs for create, update, delete, confirm, and complete actions
 
 ---
 
@@ -416,15 +416,15 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 19. Audit Log
 
-- [ ] Extend the audit log to support events without documents
-- [ ] Make `document_id` nullable
-- [ ] Add `calendar_event_id`
+- [x] Extend the audit log to support events without documents
+- [x] Make `document_id` nullable
+- [x] Add `calendar_event_id`
 - [ ] Log:
-  - [ ] Event created
-  - [ ] Event updated
-  - [ ] Event confirmed
-  - [ ] Event completed
-  - [ ] Event cancelled
+  - [x] Event created
+  - [x] Event updated
+  - [x] Event confirmed
+  - [x] Event completed
+  - [x] Event cancelled
   - [ ] Reminder created
   - [ ] Reminder sent
 - [ ] Do not store secret tokens in the audit log

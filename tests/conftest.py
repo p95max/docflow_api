@@ -48,6 +48,7 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.models.audit_log import AuditLog  # noqa: F401, E402
 from app.models.backup_job import BackupJob  # noqa: F401, E402
+from app.models.calendar_event import CalendarEvent  # noqa: F401, E402
 from app.models.google_drive_connection import (  # noqa: F401, E402
     GoogleDriveConnection,
 )

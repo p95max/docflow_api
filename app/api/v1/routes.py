@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     routes_auth,
     routes_backups,
+    routes_calendar,
     routes_document_ai_analysis,
     routes_document_deletion,
     routes_documents,
@@ -22,6 +23,12 @@ router.include_router(
     routes_users.router,
     prefix="/users",
     tags=["users"],
+)
+
+router.include_router(
+    routes_calendar.router,
+    prefix="/calendar",
+    tags=["calendar"],
 )
 
 router.include_router(
