@@ -112,7 +112,7 @@ def test_range_and_lifecycle_schemas_are_strict() -> None:
     with pytest.raises(ValidationError, match="end must not be earlier"):
         CalendarRangeQuery(start=date(2026, 8, 2), end=date(2026, 8, 1))
 
-    assert CalendarEventConfirm().model_dump() == {}
-    assert CalendarEventComplete().model_dump() == {}
+    assert CalendarEventConfirm().model_dump(exclude_none=True) == {}
+    assert CalendarEventComplete().model_dump(exclude_none=True) == {}
     with pytest.raises(ValidationError):
         CalendarEventComplete(unexpected=True)

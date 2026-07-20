@@ -99,6 +99,7 @@ class CalendarEventUpdate(BaseModel):
     end_at: datetime | None = None
     timezone: str | None = Field(default=None, max_length=64)
     document_id: int | None = Field(default=None, gt=0)
+    expected_sequence: int | None = Field(default=None, ge=0)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -216,8 +217,12 @@ class CalendarRangeQuery(BaseModel):
 
 
 class CalendarEventConfirm(BaseModel):
+    expected_sequence: int | None = Field(default=None, ge=0)
+
     model_config = ConfigDict(extra="forbid")
 
 
 class CalendarEventComplete(BaseModel):
+    expected_sequence: int | None = Field(default=None, ge=0)
+
     model_config = ConfigDict(extra="forbid")

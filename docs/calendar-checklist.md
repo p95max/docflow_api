@@ -164,23 +164,23 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 7. Service Layer
 
-- [ ] Create `app/services/calendar_events.py`
-- [ ] Move the following operations into the service:
-  - [ ] Create event
-  - [ ] Update event
-  - [ ] Delete event
-  - [ ] Confirm event
-  - [ ] Complete event
-  - [ ] Cancel event
-  - [ ] Retrieve events for a date range
-  - [ ] Reconcile events with document data
-- [ ] Do not place business logic in route handlers
-- [ ] Make operations idempotent
-- [ ] Add optimistic locking through `sequence` or `updated_at`
-- [ ] When an AI event is manually edited:
-  - [ ] Set `source = user`
-  - [ ] Or set `detached_from_source = true`
-- [ ] Do not overwrite manual changes during repeated AI analysis
+- [x] Create `app/services/calendar_events.py`
+- [x] Move the following operations into the service:
+  - [x] Create event
+  - [x] Update event
+  - [x] Delete event
+  - [x] Confirm event
+  - [x] Complete event
+  - [x] Cancel event
+  - [x] Retrieve events for a date range
+  - [x] Reconcile events with document data
+- [x] Do not place business logic in route handlers
+- [x] Make operations idempotent
+- [x] Add optimistic locking through `sequence` or `updated_at`
+- [x] When an AI event is manually edited:
+  - [x] Set `source = user`
+  - [x] Or set `detached_from_source = true`
+- [x] Do not overwrite manual changes during repeated AI analysis
 
 ---
 
