@@ -1,7 +1,10 @@
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.schemas.ai_processing import DocumentAIExtraction
+from app.schemas.ai_processing import (
+    MAX_TEMPORAL_EVENTS_PER_DOCUMENT,
+    DocumentAIExtraction,
+)
 from app.services.extraction_sanitization import sanitize_ai_extraction
 from app.services.openai_client import (
     OpenAIUsage,
@@ -19,6 +22,19 @@ Do not invent values.
 If a field is missing or unclear, use null.
 Dates must use ISO format YYYY-MM-DD when possible.
 Currency must use ISO 4217 codes like EUR or USD.
+
+Keep the existing due_date and action_deadline fields populated when supported.
+Also extract at most {max_temporal_events} temporal_events from the document.
+Use only the event_type and source_field values allowed by the response schema.
+For every temporal event, include a concise title, requires_action, confidence_score,
+the exact original_phrase, and evidence with an exact quote and one-based page_number.
+Use date only for all-day events and datetime only for timed events. Include a datetime
+offset and an IANA timezone only when the document explicitly states them; never invent
+timezone information.
+If a date is ambiguous, return null for both date and datetime; do not guess.
+Do not calculate a relative phrase such as "within 14 days" unless the document
+contains an explicit reference point. When resolving it, include that reference point
+as reference_date. Otherwise preserve the phrase and return null for date and datetime.
 """
 
 
@@ -49,7 +65,9 @@ def run_standard_ai_processing(
         input=[
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT.strip(),
+                "content": SYSTEM_PROMPT.format(
+                    max_temporal_events=MAX_TEMPORAL_EVENTS_PER_DOCUMENT,
+                ).strip(),
             },
             {
                 "role": "user",

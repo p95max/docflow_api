@@ -1,7 +1,12 @@
-from datetime import date
+from __future__ import annotations
+
+import re
+from datetime import date as Date, datetime as DateTime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.timezones import validate_iana_timezone
 
 
 DocumentType = Literal[
@@ -14,6 +19,120 @@ DocumentType = Literal[
     "medical_document",
     "other",
 ]
+
+MAX_TEMPORAL_EVENTS_PER_DOCUMENT = 20
+
+TemporalEventType = Literal[
+    "payment_due",
+    "response_deadline",
+    "action_deadline",
+    "appointment",
+    "contract_start",
+    "contract_end",
+    "cancellation_deadline",
+    "renewal",
+]
+
+TemporalEventSourceField = Literal[
+    "due_date",
+    "action_deadline",
+    "contract_end",
+    "appointment_date",
+]
+
+_RELATIVE_DATE_PHRASE_PATTERN = re.compile(
+    r"(?:\bwithin\s+\d+\s+(?:calendar\s+|business\s+)?days?\b|"
+    r"\b\d+\s+(?:calendar\s+|business\s+)?days?\s+(?:after|before|from)\b|"
+    r"\b(?:after|before)\s+(?:receipt|delivery|issue|signing)\b|"
+    r"\b(?:innerhalb|binnen)\s+(?:von\s+)?\d+\s+tagen?\b|"
+    r"\b\d+\s+tage?n?\s+(?:nach|vor)\b)",
+    re.IGNORECASE,
+)
+
+
+class TemporalEventEvidence(BaseModel):
+    """Page-specific source evidence for one temporal candidate."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    quote: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Exact source quote supporting the temporal event.",
+    )
+    page_number: int = Field(
+        ge=1,
+        description="One-based page number containing the quote.",
+    )
+
+
+class TemporalEventExtraction(BaseModel):
+    """Strict AI contract for one date or datetime found in a document."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    event_type: TemporalEventType
+    title: str = Field(min_length=1, max_length=255)
+    date: Date | None = Field(
+        default=None,
+        description="ISO date for an all-day event; null when ambiguous.",
+    )
+    datetime: DateTime | None = Field(
+        default=None,
+        description=(
+            "ISO datetime for a timed event; null when ambiguous. Include timezone "
+            "information only when explicitly present in the document."
+        ),
+    )
+    all_day: bool
+    timezone: str | None = Field(
+        default=None,
+        max_length=64,
+        description="IANA timezone only when explicitly stated in the document.",
+    )
+    requires_action: bool
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    evidence: TemporalEventEvidence
+    original_phrase: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Original date or deadline phrase exactly as written.",
+    )
+    source_field: TemporalEventSourceField
+    reference_date: Date | None = Field(
+        default=None,
+        description=(
+            "Explicit ISO reference date used to resolve a relative phrase; otherwise null."
+        ),
+    )
+
+    @field_validator("timezone")
+    @classmethod
+    def timezone_must_be_iana(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_iana_timezone(value)
+
+    @model_validator(mode="after")
+    def validate_time_representation(self) -> TemporalEventExtraction:
+        if self.all_day and self.datetime is not None:
+            raise ValueError("All-day temporal events cannot include datetime.")
+        if not self.all_day and self.date is not None:
+            raise ValueError("Timed temporal events cannot include date.")
+        if self.date is not None and self.datetime is not None:
+            raise ValueError("Temporal events cannot include both date and datetime.")
+
+        has_resolved_value = self.date is not None or self.datetime is not None
+        if (
+            has_resolved_value
+            and _RELATIVE_DATE_PHRASE_PATTERN.search(self.original_phrase)
+            and self.reference_date is None
+        ):
+            raise ValueError(
+                "Relative temporal events require an explicit reference_date before "
+                "date calculation."
+            )
+        return self
 
 
 class DocumentAIExtraction(BaseModel):
@@ -64,6 +183,14 @@ class DocumentAIExtraction(BaseModel):
     action_deadline: str | None = Field(
         description="Action deadline in ISO format YYYY-MM-DD if available.",
     )
+    temporal_events: list[TemporalEventExtraction] = Field(
+        default_factory=list,
+        max_length=MAX_TEMPORAL_EVENTS_PER_DOCUMENT,
+        description=(
+            "Bounded temporal candidates grounded in the document. Keep ambiguous or "
+            "unresolved relative dates with null date and datetime values."
+        ),
+    )
     confidence_score: float = Field(
         ge=0.0,
         le=1.0,
@@ -91,7 +218,7 @@ class DocumentAIExtraction(BaseModel):
     @classmethod
     def require_iso_dates(cls, value: str | None) -> str | None:
         if value is not None:
-            date.fromisoformat(value)
+            Date.fromisoformat(value)
         return value
 
 

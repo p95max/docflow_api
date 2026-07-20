@@ -321,7 +321,10 @@ def _source_pages_for_evidence(
     document: Document,
     ai_result: StandardAIProcessingResult,
 ):
-    if not ai_result.extracted_data.evidence.model_dump(exclude_none=True):
+    if (
+        not ai_result.extracted_data.evidence.model_dump(exclude_none=True)
+        and not ai_result.extracted_data.temporal_events
+    ):
         return None
     return extract_text_pages_from_document(document)
 

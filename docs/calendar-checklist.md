@@ -188,31 +188,31 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 8. Extend the AI Contract
 
-- [ ] Do not remove the existing `due_date` and `action_deadline` fields
-- [ ] Add a `temporal_events` array
-- [ ] Extract the following for each event:
-  - [ ] `event_type`
-  - [ ] `title`
-  - [ ] `date`
-  - [ ] `datetime`
-  - [ ] `all_day`
-  - [ ] `timezone`, when explicitly present
-  - [ ] `requires_action`
-  - [ ] `confidence_score`
-  - [ ] `evidence.quote`
-  - [ ] `evidence.page_number`
-- [ ] Limit the maximum number of events per document
-- [ ] Disallow unknown free-form event types
-- [ ] Return `null` for ambiguous dates
-- [ ] Do not calculate relative dates without an explicit reference point
-- [ ] Preserve the original phrase separately:
-  - [ ] `within 14 days`
-  - [ ] `bis zum 31.07.2026`
-- [ ] Add source fields:
-  - [ ] `due_date`
-  - [ ] `action_deadline`
-  - [ ] `contract_end`
-  - [ ] `appointment_date`
+- [x] Do not remove the existing `due_date` and `action_deadline` fields
+- [x] Add a `temporal_events` array
+- [x] Extract the following for each event:
+  - [x] `event_type`
+  - [x] `title`
+  - [x] `date`
+  - [x] `datetime`
+  - [x] `all_day`
+  - [x] `timezone`, when explicitly present
+  - [x] `requires_action`
+  - [x] `confidence_score`
+  - [x] `evidence.quote`
+  - [x] `evidence.page_number`
+- [x] Limit the maximum number of events per document
+- [x] Disallow unknown free-form event types
+- [x] Return `null` for ambiguous dates
+- [x] Do not calculate relative dates without an explicit reference point
+- [x] Preserve the original phrase separately:
+  - [x] `within 14 days`
+  - [x] `bis zum 31.07.2026`
+- [x] Add source fields:
+  - [x] `due_date`
+  - [x] `action_deadline`
+  - [x] `contract_end`
+  - [x] `appointment_date`
 
 ## 9. Temporal Validation
 

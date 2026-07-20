@@ -589,6 +589,25 @@ def _fake_ai_processing_result() -> StandardAIProcessingResult:
             reference_number=None,
             requires_action=True,
             action_deadline=None,
+            temporal_events=[
+                {
+                    "event_type": "payment_due",
+                    "title": "Pay invoice 161126",
+                    "date": "2016-12-26",
+                    "datetime": None,
+                    "all_day": True,
+                    "timezone": None,
+                    "requires_action": True,
+                    "confidence_score": 0.93,
+                    "original_phrase": "due 2016-12-26",
+                    "source_field": "due_date",
+                    "reference_date": None,
+                    "evidence": {
+                        "quote": "due 2016-12-26",
+                        "page_number": 1,
+                    },
+                }
+            ],
             confidence_score=0.95,
             notes=None,
         ),
@@ -669,6 +688,11 @@ def test_process_document_task_runs_ai_processing_for_standard_document(
     assert document.ai_extracted_data is not None
     assert document.ai_extracted_data["sender"] == "YesLogic Pty. Ltd."
     assert document.ai_extracted_data["total_amount"] == 950.0
+    assert (
+        document.ai_extracted_data["temporal_events"][0]["event_type"]
+        == "payment_due"
+    )
+    assert document.ai_extracted_data["temporal_events"][0]["date"] == "2016-12-26"
     assert document.ai_extraction_model == "gpt-4o-mini"
     assert document.ai_extraction_completed_at is not None
 
