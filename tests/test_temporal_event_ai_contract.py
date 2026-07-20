@@ -13,7 +13,9 @@ from app.schemas.ai_processing import (
     TemporalEventExtraction,
 )
 from app.services.ai_processing import OpenAIUsage, StandardAIProcessingResult
+from app.services.calendar_event_validation import validate_temporal_events
 from app.services.extraction_validation import ExtractionValidationResult
+from app.services.text_extraction import ExtractedTextPage
 
 
 def _document_extraction_data(**overrides: object) -> dict[str, object]:
@@ -313,6 +315,16 @@ def test_processing_result_persists_temporal_events_in_document_json() -> None:
         score=100,
         ocr_quality_score=100,
     )
+    temporal_validation = validate_temporal_events(
+        extraction=extraction,
+        raw_text="Bitte zahlen Sie bis zum 31.07.2026.",
+        source_pages=[
+            ExtractedTextPage(
+                page_number=2,
+                text="Bitte zahlen Sie bis zum 31.07.2026.",
+            )
+        ],
+    )
     document = SimpleNamespace(id=123, owner_id=456)
 
     class FakeSession:
@@ -329,6 +341,7 @@ def test_processing_result_persists_temporal_events_in_document_json() -> None:
         document=document,  # type: ignore[arg-type]
         ai_result=ai_result,
         validation_result=validation_result,
+        temporal_validation=temporal_validation,
     )
 
     assert document.ai_extracted_data["due_date"] == "2026-07-31"
@@ -338,4 +351,7 @@ def test_processing_result_persists_temporal_events_in_document_json() -> None:
         "quote": "Bitte zahlen Sie bis zum 31.07.2026.",
         "page_number": 2,
     }
+    assert document.validation_candidates["temporal_validation"]["events"][0][
+        "status"
+    ] == "valid"
     assert len(db.added) == 2

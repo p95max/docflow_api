@@ -216,29 +216,29 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 9. Temporal Validation
 
-- [ ] Create `app/services/calendar_event_validation.py`
-- [ ] Validate dates against OCR text
-- [ ] Validate page-specific evidence
-- [ ] Support:
-  - [ ] ISO dates
-  - [ ] German dates
-  - [ ] English dates
-  - [ ] Numeric European dates
-- [ ] Distinguish between:
-  - [ ] A concrete date
-  - [ ] A relative deadline
-  - [ ] An example or placeholder
-  - [ ] A document date
-  - [ ] An event date
-- [ ] Do not create events from template placeholders
-- [ ] Validate that a deadline is not earlier than the document date
-- [ ] Detect conflicts between multiple dates
-- [ ] Return machine-readable issue codes
-- [ ] Assign validation statuses:
-  - [ ] `valid`
-  - [ ] `warning`
-  - [ ] `needs_review`
-  - [ ] `failed`
+- [x] Create `app/services/calendar_event_validation.py`
+- [x] Validate dates against OCR text
+- [x] Validate page-specific evidence
+- [x] Support:
+  - [x] ISO dates
+  - [x] German dates
+  - [x] English dates
+  - [x] Numeric European dates
+- [x] Distinguish between:
+  - [x] A concrete date
+  - [x] A relative deadline
+  - [x] An example or placeholder
+  - [x] A document date
+  - [x] An event date
+- [x] Do not create events from template placeholders
+- [x] Validate that a deadline is not earlier than the document date
+- [x] Detect conflicts between multiple dates
+- [x] Return machine-readable issue codes
+- [x] Assign validation statuses:
+  - [x] `valid`
+  - [x] `warning`
+  - [x] `needs_review`
+  - [x] `failed`
 
 ---
 

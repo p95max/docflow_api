@@ -16,6 +16,10 @@ from app.models.document import (
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob, ProcessingJobStatus
 from app.services.ai_processing import StandardAIProcessingResult, run_standard_ai_processing
+from app.services.calendar_event_validation import (
+    TemporalEventsValidationResult,
+    validate_temporal_events,
+)
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.extraction_validation import (
     ExtractionValidationResult,
@@ -88,11 +92,17 @@ def process_document_task(self, job_id: int) -> None:
                     raw_text=extracted_text,
                     source_pages=source_pages,
                 )
+                temporal_validation = validate_temporal_events(
+                    extraction=ai_result.extracted_data,
+                    raw_text=extracted_text,
+                    source_pages=source_pages,
+                )
                 _apply_standard_ai_processing_result(
                     db=db,
                     document=document,
                     ai_result=ai_result,
                     validation_result=validation_result,
+                    temporal_validation=temporal_validation,
                 )
                 _run_validation_fallback_if_needed(
                     db=db,
@@ -225,6 +235,7 @@ def _apply_standard_ai_processing_result(
     document: Document,
     ai_result: StandardAIProcessingResult,
     validation_result: ExtractionValidationResult,
+    temporal_validation: TemporalEventsValidationResult,
 ) -> None:
     extracted_data = ai_result.extracted_data
 
@@ -266,6 +277,7 @@ def _apply_standard_ai_processing_result(
             candidate.model_dump(mode="json")
             for candidate in validation_result.date_candidates
         ],
+        "temporal_validation": temporal_validation.model_dump(mode="json"),
     }
     document.validation_flags = validation_result.ambiguity_flags or None
     document.ocr_quality_score = validation_result.ocr_quality_score
@@ -298,6 +310,7 @@ def _apply_standard_ai_processing_result(
                 "response_id": ai_result.response_id,
                 "data": document.ai_extracted_data,
                 "validation": _serialize_validation_result(validation_result),
+                "temporal_validation": temporal_validation.model_dump(mode="json"),
             },
         )
     )
@@ -362,12 +375,20 @@ def _run_validation_fallback_if_needed(
             raw_text=raw_text,
             source_pages=fallback_pages,
         )
+        fallback_temporal_validation = validate_temporal_events(
+            extraction=fallback_result.extracted_data,
+            raw_text=raw_text,
+            source_pages=fallback_pages,
+        )
         document.fallback_extraction = {
             "status": "completed",
             "model": fallback_result.model,
             "response_id": fallback_result.response_id,
             "data": fallback_result.extracted_data.model_dump(mode="json"),
             "validation": _serialize_validation_result(fallback_validation),
+            "temporal_validation": fallback_temporal_validation.model_dump(
+                mode="json"
+            ),
             "created_at": datetime.now(UTC).isoformat(),
         }
         db.add(

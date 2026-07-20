@@ -693,6 +693,10 @@ def test_process_document_task_runs_ai_processing_for_standard_document(
         == "payment_due"
     )
     assert document.ai_extracted_data["temporal_events"][0]["date"] == "2016-12-26"
+    assert document.validation_candidates is not None
+    assert document.validation_candidates["temporal_validation"]["events"][0][
+        "event_index"
+    ] == 0
     assert document.ai_extraction_model == "gpt-4o-mini"
     assert document.ai_extraction_completed_at is not None
 
