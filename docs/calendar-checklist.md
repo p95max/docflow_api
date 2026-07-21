@@ -246,26 +246,25 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 10. Calendar Projection
 
-- [ ] Create `app/services/document_calendar_projection.py`
-- [ ] Run it after:
-  - [ ] Sanitization
-  - [ ] Validation
-  - [ ] Persistence of the extraction result
-- [ ] Create events only from confirmed temporal candidates
-- [ ] Create `suggested` events for warning-level candidates
-- [ ] For `needs_review`:
-  - [ ] Do not create an event
-  - [ ] Or create a hidden suggestion
-- [ ] Generate a stable `source_key`, for example:
+- [x] Create `app/services/document_calendar_projection.py`
+- [x] Run it after:
+  - [x] Sanitization
+  - [x] Validation
+  - [x] Persistence of the extraction result
+- [x] Create events only from confirmed temporal candidates
+- [x] Create `suggested` events for warning-level candidates
+- [x] For `needs_review`:
+  - [x] Do not create an event
+- [x] Generate a stable `source_key`, for example:
   ```text
   document:{document_id}:payment_due:2026-07-31
   ```
-- [ ] Do not create duplicates during repeated processing
-- [ ] Update an existing suggestion when the AI result changes
-- [ ] Do not update manually edited events
-- [ ] Remove obsolete AI suggestions only when they have not been confirmed by the user
-- [ ] Support reconciliation after manual document correction
-- [ ] Add audit logs for projection create, update, and remove operations
+- [x] Do not create duplicates during repeated processing
+- [x] Update an existing suggestion when the AI result changes
+- [x] Do not update manually edited events
+- [x] Remove obsolete AI suggestions only when they have not been confirmed by the user
+- [x] Support reconciliation after manual document correction
+- [x] Add audit logs for projection create, update, and remove operations
 
 ---
 

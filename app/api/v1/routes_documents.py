@@ -47,6 +47,9 @@ from app.services.document_search import (
     normalize_document_sort_field,
     search_documents,
 )
+from app.services.document_calendar_projection import (
+    reconcile_document_calendar_events,
+)
 from app.schemas.processing_job import ProcessingJobRead
 from app.services.processing_jobs import (
     create_processing_job,
@@ -367,6 +370,7 @@ def correct_document_result(
     document.extraction_confirmed_at = None
 
     db.commit()
+    reconcile_document_calendar_events(db=db, document=document)
     db.refresh(document)
 
     latest_job = _get_latest_processing_job(

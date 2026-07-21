@@ -290,6 +290,8 @@ def reconcile_ai_event(
     payload: CalendarEventCreate,
     source_field: str | None = None,
     source_evidence: dict[str, Any] | None = None,
+    confidence_score: float | None = None,
+    requires_review: bool = False,
 ) -> CalendarEvent:
     """Idempotently project one validated AI event without overwriting user changes."""
     _ensure_owned_document(db=db, owner_id=owner_id, document_id=document_id)
@@ -310,6 +312,8 @@ def reconcile_ai_event(
             source_key=source_key,
             source_field=source_field,
             source_evidence=source_evidence or {},
+            confidence_score=confidence_score,
+            requires_review=requires_review,
             **payload.model_dump(exclude={"document_id"}),
         )
         db.add(event)
@@ -342,6 +346,12 @@ def reconcile_ai_event(
     evidence = source_evidence or {}
     if event.source_evidence != evidence:
         event.source_evidence = evidence
+        changed = True
+    if event.confidence_score != confidence_score:
+        event.confidence_score = confidence_score
+        changed = True
+    if event.requires_review != requires_review:
+        event.requires_review = requires_review
         changed = True
     if changed:
         event.sequence += 1

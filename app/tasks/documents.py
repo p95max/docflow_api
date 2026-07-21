@@ -20,6 +20,9 @@ from app.services.calendar_event_validation import (
     TemporalEventsValidationResult,
     validate_temporal_events,
 )
+from app.services.document_calendar_projection import (
+    reconcile_document_calendar_events,
+)
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.extraction_validation import (
     ExtractionValidationResult,
@@ -119,6 +122,7 @@ def process_document_task(self, job_id: int) -> None:
             job.finished_at = datetime.now(UTC)
 
             db.commit()
+            reconcile_document_calendar_events(db=db, document=document)
             enqueue_document_index_job(db=db, document=document)
 
         except SoftTimeLimitExceeded as exc:
