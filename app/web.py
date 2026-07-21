@@ -365,16 +365,16 @@ def _template_response(
 async def require_csrf(request: Request) -> None:
     """Require the double-submit CSRF token for cookie-authenticated HTML forms."""
     cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
-    submitted_token = request.headers.get("X-CSRF-Token")
-    if not submitted_token:
-        form = await request.form()
-        submitted_value = form.get("csrf_token")
-        submitted_token = submitted_value if isinstance(submitted_value, str) else None
-
-    if not (
-        cookie_token
-        and submitted_token
-        and secrets.compare_digest(cookie_token, submitted_token)
+    form = await request.form()
+    submitted_value = form.get("csrf_token")
+    submitted_form_token = submitted_value if isinstance(submitted_value, str) else None
+    submitted_tokens = (
+        request.headers.get("X-CSRF-Token"),
+        submitted_form_token,
+    )
+    if not cookie_token or not any(
+        token and secrets.compare_digest(cookie_token, token)
+        for token in submitted_tokens
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

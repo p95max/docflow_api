@@ -217,7 +217,7 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert invalid.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert "end_date must not be earlier than start_date" in invalid.text
 
-    del client.headers["X-CSRF-Token"]
+    client.headers["X-CSRF-Token"] = "stale-token"
     created = client.post(
         "/calendar/events",
         data={
