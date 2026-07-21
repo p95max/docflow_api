@@ -21,6 +21,7 @@
 
 <form class="card shadow-sm" method="post" action="{% if event %}/calendar/events/{{ event.id }}/edit{% else %}/calendar/events{% endif %}" data-calendar-event-form>
   <div class="card-body">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
     <div class="row g-3">
       <div class="col-lg-8">

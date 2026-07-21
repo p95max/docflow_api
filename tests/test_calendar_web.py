@@ -13,6 +13,7 @@ from app.models.calendar_event import (
 )
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.user import User
+from app.web import CSRF_COOKIE_NAME
 
 
 def _login(client: TestClient, user: User) -> None:
@@ -199,6 +200,9 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert 'name="start_time"' in form.text
     assert 'name="timezone_name"' in form.text
     assert "Reminder delivery is planned for MVP 8" in form.text
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token
+    assert f'name="csrf_token" value="{csrf_token}"' in form.text
 
     invalid = client.post(
         "/calendar/events",
@@ -213,9 +217,11 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert invalid.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert "end_date must not be earlier than start_date" in invalid.text
 
+    del client.headers["X-CSRF-Token"]
     created = client.post(
         "/calendar/events",
         data={
+            "csrf_token": csrf_token,
             "title": "Contract call",
             "description": "Discuss renewal terms.",
             "event_type": "appointment",
