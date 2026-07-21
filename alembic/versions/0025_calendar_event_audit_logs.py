@@ -44,6 +44,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Preserve calendar audit rows that can still be associated with a document.
+    # Calendar-only rows have no representation in the pre-0025 schema, so they
+    # must be removed before document_id becomes required again.
+    op.execute(
+        """
+        UPDATE audit_logs AS audit
+        SET document_id = event.document_id
+        FROM calendar_events AS event
+        WHERE audit.calendar_event_id = event.id
+          AND audit.document_id IS NULL
+          AND event.document_id IS NOT NULL
+        """
+    )
+    op.execute("DELETE FROM audit_logs WHERE document_id IS NULL")
+
     op.drop_index("ix_audit_logs_calendar_event_id", table_name="audit_logs")
     op.drop_constraint(
         "fk_audit_logs_calendar_event_id_calendar_events",

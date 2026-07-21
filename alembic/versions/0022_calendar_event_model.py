@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 
 revision: str = "0022_calendar_event_model"
@@ -17,7 +18,43 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+calendar_event_type = postgresql.ENUM(
+    "payment_due",
+    "response_deadline",
+    "action_deadline",
+    "appointment",
+    "contract_start",
+    "contract_end",
+    "cancellation_deadline",
+    "renewal",
+    "custom",
+    name="calendar_event_type",
+    create_type=False,
+)
+calendar_event_status = postgresql.ENUM(
+    "suggested",
+    "confirmed",
+    "completed",
+    "cancelled",
+    name="calendar_event_status",
+    create_type=False,
+)
+calendar_event_source = postgresql.ENUM(
+    "ai",
+    "user",
+    "system",
+    "external",
+    name="calendar_event_source",
+    create_type=False,
+)
+
+
 def upgrade() -> None:
+    bind = op.get_bind()
+    calendar_event_type.create(bind, checkfirst=True)
+    calendar_event_status.create(bind, checkfirst=True)
+    calendar_event_source.create(bind, checkfirst=True)
+
     op.create_table(
         "calendar_events",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -28,22 +65,18 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
             "event_type",
-            sa.Enum(
-                "payment_due", "response_deadline", "action_deadline", "appointment",
-                "contract_start", "contract_end", "cancellation_deadline", "renewal",
-                "custom", name="calendar_event_type",
-            ),
+            calendar_event_type,
             nullable=False,
         ),
         sa.Column(
             "status",
-            sa.Enum("suggested", "confirmed", "completed", "cancelled", name="calendar_event_status"),
+            calendar_event_status,
             server_default="suggested",
             nullable=False,
         ),
         sa.Column(
             "source",
-            sa.Enum("ai", "user", "system", "external", name="calendar_event_source"),
+            calendar_event_source,
             server_default="user",
             nullable=False,
         ),
@@ -85,3 +118,8 @@ def downgrade() -> None:
     op.drop_index("ix_calendar_events_owner_id", table_name="calendar_events")
     op.drop_index("ix_calendar_events_document_id", table_name="calendar_events")
     op.drop_table("calendar_events")
+
+    bind = op.get_bind()
+    calendar_event_source.drop(bind, checkfirst=True)
+    calendar_event_status.drop(bind, checkfirst=True)
+    calendar_event_type.drop(bind, checkfirst=True)

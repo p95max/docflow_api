@@ -1123,14 +1123,14 @@ def reindex_knowledge_document_submit(
     )
 
 
-def _calendar_month(value: str | None) -> date:
+def _calendar_month(value: str | None, *, today: date | None = None) -> date:
     if value:
         try:
             parsed = datetime.strptime(value, "%Y-%m").date()
             return parsed.replace(day=1)
         except ValueError:
             pass
-    return date.today().replace(day=1)
+    return (today or date.today()).replace(day=1)
 
 
 def _shift_calendar_month(value: date, months: int) -> date:
@@ -1143,12 +1143,25 @@ def _calendar_month_bounds(value: date) -> tuple[date, date]:
     return value, next_month - timedelta(days=1)
 
 
-def _calendar_event_day(event: CalendarEvent, timezone_name: str) -> date:
+def _calendar_today(timezone_name: str) -> date:
+    return datetime.now(ZoneInfo(validate_iana_timezone(timezone_name))).date()
+
+
+def _calendar_event_date_range(
+    event: CalendarEvent,
+    timezone_name: str,
+) -> tuple[date, date]:
     if event.all_day:
         assert event.start_date is not None
-        return event.start_date
+        return event.start_date, event.end_date or event.start_date
     assert event.start_at is not None
-    return _to_user_timezone(event.start_at, timezone_name).date()
+    start_day = _to_user_timezone(event.start_at, timezone_name).date()
+    end_day = _to_user_timezone(event.end_at or event.start_at, timezone_name).date()
+    return start_day, end_day
+
+
+def _calendar_event_day(event: CalendarEvent, timezone_name: str) -> date:
+    return _calendar_event_date_range(event, timezone_name)[0]
 
 
 def _calendar_query_url(
@@ -1231,7 +1244,7 @@ def _calendar_form_values(
             "description": "",
             "event_type": CalendarEventType.custom.value,
             "all_day": True,
-            "start_date": date.today().isoformat(),
+            "start_date": _calendar_today(timezone_name).isoformat(),
             "end_date": "",
             "start_time": "",
             "end_time": "",
@@ -1285,6 +1298,7 @@ def _render_calendar_event_form(
         timezone_name=timezone_name,
         document_id=document_id,
     )
+    today = _calendar_today(timezone_name)
     start_value = str(form_values["start_date"] or form_values["start_time"] or "")
     start_day = date.fromisoformat(start_value[:10]) if start_value else None
     return _template_response(
@@ -1295,8 +1309,9 @@ def _render_calendar_event_form(
         form_values=form_values,
         documents=_calendar_documents(db=db, owner_id=current_user.id),
         calendar_event_types=CalendarEventType,
+        calendar_today=today.isoformat(),
         error=error,
-        is_past=bool(start_day and start_day < date.today()),
+        is_past=bool(start_day and start_day < today),
         status_code=status_code,
     )
 
@@ -1330,10 +1345,17 @@ def _parse_calendar_event_form(
             "document_id": parsed_document_id,
         }
     else:
-        zone = ZoneInfo(validate_iana_timezone(timezone_name))
-        start_at = datetime.fromisoformat(start_time).replace(tzinfo=zone)
+        start_at = _parse_local_calendar_datetime(
+            start_time,
+            timezone_name=timezone_name,
+            field_label="Start time",
+        )
         end_at = (
-            datetime.fromisoformat(end_time).replace(tzinfo=zone)
+            _parse_local_calendar_datetime(
+                end_time,
+                timezone_name=timezone_name,
+                field_label="End time",
+            )
             if end_time
             else None
         )
@@ -1354,6 +1376,40 @@ def _parse_calendar_event_form(
     return CalendarEventUpdate.model_validate(
         {**values, "expected_sequence": expected_sequence}
     )
+
+
+def _parse_local_calendar_datetime(
+    value: str,
+    *,
+    timezone_name: str,
+    field_label: str,
+) -> datetime:
+    local_value = datetime.fromisoformat(value)
+    if local_value.tzinfo is not None:
+        raise ValueError(f"{field_label} must be a local date and time.")
+
+    zone = ZoneInfo(validate_iana_timezone(timezone_name))
+    valid_candidates: dict[datetime, datetime] = {}
+    for fold in (0, 1):
+        candidate = local_value.replace(tzinfo=zone, fold=fold)
+        utc_candidate = candidate.astimezone(timezone.utc)
+        round_trip = utc_candidate.astimezone(zone).replace(tzinfo=None)
+        if round_trip == local_value:
+            valid_candidates[utc_candidate] = candidate
+
+    if not valid_candidates:
+        message = (
+            f"{field_label} does not exist in {timezone_name} because of a "
+            "daylight-saving transition."
+        )
+        raise ValueError(message)
+    if len(valid_candidates) > 1:
+        message = (
+            f"{field_label} is ambiguous in {timezone_name} because of a "
+            "daylight-saving transition."
+        )
+        raise ValueError(message)
+    return next(iter(valid_candidates.values()))
 
 
 def _calendar_form_error(exc: Exception) -> str:
@@ -1385,9 +1441,10 @@ def calendar_page(
     if current_user is None:
         return _redirect_to_login()
 
-    active_month = _calendar_month(month)
-    start, end = _calendar_month_bounds(active_month)
     timezone_name = _get_user_timezone_name(current_user)
+    today = _calendar_today(timezone_name)
+    active_month = _calendar_month(month, today=today)
+    start, end = _calendar_month_bounds(active_month)
     events = calendar_events.list_events(
         db=db,
         owner_id=current_user.id,
@@ -1404,7 +1461,12 @@ def calendar_page(
     events.sort(key=lambda event: (_calendar_event_day(event, timezone_name), event.id))
     events_by_day: dict[date, list[CalendarEvent]] = {}
     for event in events:
-        events_by_day.setdefault(_calendar_event_day(event, timezone_name), []).append(event)
+        event_start, event_end = _calendar_event_date_range(event, timezone_name)
+        current_day = max(event_start, start)
+        last_day = min(event_end, end)
+        while current_day <= last_day:
+            events_by_day.setdefault(current_day, []).append(event)
+            current_day += timedelta(days=1)
 
     calendar_weeks = [
         [
@@ -1421,7 +1483,7 @@ def calendar_page(
         name="calendar.html",
         current_user=current_user,
         active_month=active_month,
-        today=date.today(),
+        today=today,
         view=view,
         events=events,
         events_by_day=events_by_day,
@@ -1454,7 +1516,7 @@ def calendar_page(
             document_id=document_id,
         ),
         today_url=_calendar_query_url(
-            month=date.today().replace(day=1),
+            month=today.replace(day=1),
             view=view,
             event_type=event_type,
             status_filter=status_filter,

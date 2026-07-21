@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 
 revision: str = "0026_event_reminders"
@@ -17,28 +18,42 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+event_reminder_channel = postgresql.ENUM(
+    "in_app",
+    "email",
+    name="event_reminder_channel",
+    create_type=False,
+)
+event_reminder_status = postgresql.ENUM(
+    "pending",
+    "sending",
+    "sent",
+    "failed",
+    "cancelled",
+    name="event_reminder_status",
+    create_type=False,
+)
+
+
 def upgrade() -> None:
+    bind = op.get_bind()
+    event_reminder_channel.create(bind, checkfirst=True)
+    event_reminder_status.create(bind, checkfirst=True)
+
     op.create_table(
         "event_reminders",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("event_id", sa.Integer(), nullable=False),
         sa.Column(
             "channel",
-            sa.Enum("in_app", "email", name="event_reminder_channel"),
+            event_reminder_channel,
             nullable=False,
         ),
         sa.Column("offset_minutes", sa.Integer(), nullable=False),
         sa.Column("scheduled_for", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
             "status",
-            sa.Enum(
-                "pending",
-                "sending",
-                "sent",
-                "failed",
-                "cancelled",
-                name="event_reminder_status",
-            ),
+            event_reminder_status,
             server_default="pending",
             nullable=False,
         ),
@@ -70,3 +85,7 @@ def downgrade() -> None:
     op.drop_index("ix_event_reminders_status_scheduled_for", table_name="event_reminders")
     op.drop_index("uq_event_reminders_event_channel_offset", table_name="event_reminders")
     op.drop_table("event_reminders")
+
+    bind = op.get_bind()
+    event_reminder_status.drop(bind, checkfirst=True)
+    event_reminder_channel.drop(bind, checkfirst=True)

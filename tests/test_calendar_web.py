@@ -1,10 +1,12 @@
-from datetime import date
+from datetime import UTC, date, datetime, tzinfo
 
+import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import web
 from app.models.calendar_event import (
     CalendarEvent,
     CalendarEventSource,
@@ -69,6 +71,42 @@ def test_calendar_page_renders_month_agenda_filters_and_event_detail_link(
     agenda = client.get("/calendar?month=2026-08&view=agenda&source=ai")
     assert agenda.status_code == status.HTTP_200_OK
     assert "Pay invoice" in agenda.text
+
+
+def test_calendar_month_renders_each_overlapping_day_of_multiday_event(
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    event = CalendarEvent(
+        owner_id=test_user.id,
+        title="Conference",
+        event_type=CalendarEventType.custom,
+        start_date=date(2026, 7, 31),
+        end_date=date(2026, 8, 2),
+        source_evidence={},
+    )
+    db_session.add(event)
+    db_session.commit()
+    _login(client, test_user)
+
+    response = client.get("/calendar?month=2026-08&view=month")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.text.count(">Conference</span>") == 2
+
+
+def test_calendar_today_uses_the_user_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            value = datetime(2026, 8, 1, 0, 30, tzinfo=UTC)
+            return value.astimezone(tz) if tz is not None else value.replace(tzinfo=None)
+
+    monkeypatch.setattr(web, "datetime", FrozenDatetime)
+
+    assert web._calendar_today("Europe/Berlin") == date(2026, 8, 1)
+    assert web._calendar_today("America/Los_Angeles") == date(2026, 7, 31)
 
 
 def test_calendar_detail_confirms_and_dismisses_suggestion(
@@ -242,6 +280,50 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert event.document_id == document.id
     assert event.start_at is not None
     assert event.start_at.hour == 7
+
+
+@pytest.mark.parametrize(
+    ("start_time", "message"),
+    [
+        (
+            "2026-03-29T02:30",
+            "does not exist in Europe/Berlin because of a daylight-saving transition",
+        ),
+        (
+            "2026-10-25T02:30",
+            "is ambiguous in Europe/Berlin because of a daylight-saving transition",
+        ),
+    ],
+)
+def test_calendar_event_form_rejects_invalid_dst_local_times(
+    start_time: str,
+    message: str,
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    _login(client, test_user)
+    form = client.get("/calendar/new")
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert form.status_code == status.HTTP_200_OK
+    assert csrf_token
+
+    response = client.post(
+        "/calendar/events",
+        data={
+            "csrf_token": csrf_token,
+            "title": "DST appointment",
+            "event_type": "appointment",
+            "start_time": start_time,
+            "timezone_name": "Europe/Berlin",
+        },
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert message in response.text
+    assert db_session.scalar(
+        select(CalendarEvent).where(CalendarEvent.title == "DST appointment")
+    ) is None
 
 
 def test_editing_ai_event_displays_evidence_and_detaches_from_projection(

@@ -19,7 +19,7 @@
   <div class="alert alert-warning"><strong>This event is in the past.</strong> You can still save it, but check the date before continuing.</div>
 {% endif %}
 
-<form class="card shadow-sm" method="post" action="{% if event %}/calendar/events/{{ event.id }}/edit{% else %}/calendar/events{% endif %}" data-calendar-event-form>
+<form class="card shadow-sm" method="post" action="{% if event %}/calendar/events/{{ event.id }}/edit{% else %}/calendar/events{% endif %}" data-calendar-event-form data-calendar-today="{{ calendar_today }}">
   <div class="card-body">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
@@ -94,6 +94,7 @@
   const startTime = form.querySelector("[data-calendar-start-time]");
   const endTime = form.querySelector("[data-calendar-end-time]");
   const zone = form.querySelector("[data-calendar-timezone]");
+  const calendarToday = form.dataset.calendarToday;
   const toggle = () => {
     const isAllDay = allDay.checked;
     dateFields.forEach((field) => field.hidden = !isAllDay);
@@ -113,7 +114,7 @@
     const invalidRange = allDay.checked ? endDate.value && endDate.value < startDate.value : endTime.value && endTime.value < startTime.value;
     if (invalidRange) { event.preventDefault(); window.alert("End must not be earlier than start."); }
     const startValue = allDay.checked ? startDate.value : startTime.value;
-    if (!invalidRange && startValue && new Date(startValue) < new Date(new Date().toDateString()) && !window.confirm("This event is in the past. Save it anyway?")) event.preventDefault();
+    if (!invalidRange && startValue && startValue.slice(0, 10) < calendarToday && !window.confirm("This event is in the past. Save it anyway?")) event.preventDefault();
   });
   toggle(); ranges();
 })();
