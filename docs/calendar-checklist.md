@@ -326,30 +326,30 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 13. `EventReminder` Model
 
-- [ ] Create the `event_reminders` table
-- [ ] Add fields:
-  - [ ] `id`
-  - [ ] `event_id`
-  - [ ] `channel`
-  - [ ] `offset_minutes`
-  - [ ] `scheduled_for`
-  - [ ] `status`
-  - [ ] `last_attempt_at`
-  - [ ] `sent_at`
-  - [ ] `attempts`
-  - [ ] `error_message`
-  - [ ] `created_at`
-  - [ ] `updated_at`
-- [ ] First-release channels:
-  - [ ] `in_app`
-  - [ ] `email`, optional
-- [ ] Statuses:
-  - [ ] `pending`
-  - [ ] `sending`
-  - [ ] `sent`
-  - [ ] `failed`
-  - [ ] `cancelled`
-- [ ] Add a unique index to prevent duplicate delivery
+- [x] Create the `event_reminders` table
+- [x] Add fields:
+  - [x] `id`
+  - [x] `event_id`
+  - [x] `channel`
+  - [x] `offset_minutes`
+  - [x] `scheduled_for`
+  - [x] `status`
+  - [x] `last_attempt_at`
+  - [x] `sent_at`
+  - [x] `attempts`
+  - [x] `error_message`
+  - [x] `created_at`
+  - [x] `updated_at`
+- [x] First-release channels:
+  - [x] `in_app`
+  - [x] `email`, optional
+- [x] Statuses:
+  - [x] `pending`
+  - [x] `sending`
+  - [x] `sent`
+  - [x] `failed`
+  - [x] `cancelled`
+- [x] Add a unique index to prevent duplicate delivery
 
 ## 14. Reminder Scheduler
 
