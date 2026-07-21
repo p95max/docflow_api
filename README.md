@@ -7,8 +7,10 @@
 DocsFlow is a server-rendered FastAPI application for personal document
 management. It uploads and processes documents asynchronously, extracts
 structured fields, supports a per-user Knowledge Base, and creates encrypted
-Google Drive recovery backups. FastAPI serves both the JSON API and the
-Bootstrap interface; there is no separate frontend service or build step.
+Google Drive recovery backups. It also turns validated document deadlines into
+reviewable calendar suggestions and lets users maintain their own events.
+FastAPI serves both the JSON API and the Bootstrap interface; there is no
+separate frontend service or build step.
 
 ## Tech Stack
 
@@ -116,6 +118,27 @@ is stored as a separate immutable `AuditLog` row with the old and new value.
 Personal notes are optional, private to the account, audited, and included in
 recovery backups.
 
+### Calendar
+
+The calendar is a separate domain from `Document.deadline`: a document may have
+multiple related events, and users may create events without a document.
+
+- Month and agenda views with filters for event type, status, source, and document
+- User-created all-day and timed events, including optional end dates/times and document links
+- AI suggestions projected from validated temporal document data; `needs_review`
+  candidates are not added automatically
+- Confirmation and dismissal of AI suggestions; editing an AI event detaches it
+  from later document reprocessing
+- Owner-scoped JSON API for list, create, read, update, delete, confirm,
+  complete, and cancel operations
+- IANA user timezones; timed events are stored in UTC while date-only events
+  remain dates. The web form rejects nonexistent and ambiguous DST local times.
+- Calendar audit logs and optimistic locking through an event sequence number
+
+The `event_reminders` persistence model is available, but reminder scheduling
+and delivery are not yet enabled. The event form therefore shows reminders as
+unavailable.
+
 ### Signed File URLs
 
 Document result responses include short-lived, signed URLs for inline preview
@@ -138,6 +161,8 @@ interface. No separate frontend server or JavaScript build step is required.
 | `/documents` | List the current user's documents |
 | `/documents/upload` | Upload a document and select confidential mode |
 | `/documents/{id}` | Preview/download a file, edit extracted fields, add a note, confirm or delete |
+| `/calendar` | Browse month or agenda views, filter events, and open event details |
+| `/calendar/new` | Create an all-day or timed calendar event |
 | `/knowledge` | Create conversations and ask concise questions about indexed documents |
 | `/backups` | Create encrypted Google Drive recovery backups and restore document data |
 
@@ -308,6 +333,8 @@ app/
   models/
     user.py
     document.py
+    calendar_event.py
+    event_reminder.py
     audit_log.py
     document_chunk.py
     backup_job.py
@@ -315,6 +342,9 @@ app/
     processing_job.py
   schemas/
   services/
+    calendar_events.py
+    calendar_event_validation.py
+    document_calendar_projection.py
     uploads.py
     storage.py
     processing_jobs.py
@@ -451,6 +481,8 @@ document_index_jobs
 knowledge_conversations
 knowledge_messages
 knowledge_message_sources
+calendar_events
+event_reminders
 google_drive_connections
 backup_jobs
 alembic_version
@@ -592,6 +624,65 @@ curl -X DELETE http://localhost:8000/api/v1/documents/1 \
 ```
 
 > Reprocessing is allowed only for documents with status `failed`.
+
+---
+
+## Calendar API
+
+Calendar endpoints are owner-scoped and require the same Bearer token as the
+document API. The list endpoint accepts `start`, `end`, `status`, `event_type`,
+`source`, and `document_id` filters.
+
+```bash
+# List events that overlap August 2026 in the user's timezone
+curl "http://localhost:8000/api/v1/calendar/events?start=2026-08-01&end=2026-08-31" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Create an all-day user event
+curl -X POST http://localhost:8000/api/v1/calendar/events \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Pay invoice",
+    "event_type": "payment_due",
+    "all_day": true,
+    "start_date": "2026-08-15",
+    "document_id": 1
+  }'
+
+# Create a timed event. Datetimes must include an offset and timezone is IANA.
+curl -X POST http://localhost:8000/api/v1/calendar/events \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Call supplier",
+    "event_type": "appointment",
+    "all_day": false,
+    "start_at": "2026-08-15T09:30:00+02:00",
+    "end_at": "2026-08-15T10:00:00+02:00",
+    "timezone": "Europe/Berlin"
+  }'
+
+# Update an event with optimistic locking
+curl -X PATCH http://localhost:8000/api/v1/calendar/events/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Pay corrected invoice","expected_sequence":0}'
+
+# Act on an event
+curl -X POST http://localhost:8000/api/v1/calendar/events/1/confirm \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"expected_sequence":0}'
+curl -X POST http://localhost:8000/api/v1/calendar/events/1/complete \
+  -H "Authorization: Bearer $TOKEN"
+curl -X POST "http://localhost:8000/api/v1/calendar/events/1/cancel?expected_sequence=1" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Event lifecycle statuses are `suggested`, `confirmed`, `completed`, and
+`cancelled`. User-created events start as `confirmed`; AI projections always
+start as `suggested`.
 
 ---
 
@@ -809,6 +900,7 @@ upload
 -> schema and deterministic validation (grounding + logic)
 -> save extracted JSON and OpenAI usage log
 -> mark document as completed
+-> project validated temporal candidates into suggested calendar events
 ```
 
 > AI processing is executed only after local text extraction has completed successfully.
@@ -833,6 +925,12 @@ extracted page text before storing it as verified evidence.
 The validation layer also stores labelled amount/date candidates, flags only
 competing totals or deadlines, and records a deterministic OCR-quality score.
 Those signals affect the score and can move an extraction to `needs_review`.
+
+Validated temporal candidates are projected to the calendar only when they are
+`valid` or `warning`. Warnings create suggestions marked for review; candidates
+that need review are kept in the document result but do not create an event.
+Projection uses a stable source key, is idempotent during reprocessing, and
+never overwrites a confirmed or manually edited calendar event.
 
 **Storage fields:**
 
@@ -944,6 +1042,9 @@ docker compose exec db psql -U docsflow -d docsflow \
 - Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
 - Confidential RAG is intentionally not enabled until the documented local-only embedding and LLM design is implemented
 - standard-mode AI extraction requires `OPENAI_API_KEY`
+- Calendar reminders are stored but not delivered yet: the scheduler,
+  notifications, email delivery, and reminder recalculation are planned work
+- External calendar synchronization and `.ics` feeds are not implemented yet
 
 ## Contacts
 
