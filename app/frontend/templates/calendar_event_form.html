@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}{% if event %}Edit {{ event.title }}{% else %}New event{% endif %} · Calendar · DocsFlow{% endblock %}
+{% block content %}
+<a class="text-decoration-none" href="{% if event %}/calendar/events/{{ event.id }}{% else %}/calendar{% endif %}">← {% if event %}Event{% else %}Calendar{% endif %}</a>
+<div class="workspace-page-head mt-3">
+  <div>
+    <p class="workspace-kicker">Calendar event</p>
+    <h1>{% if event %}Edit event{% else %}Add event{% endif %}</h1>
+    <p class="text-secondary">{% if event %}Update the event details below.{% else %}Create a confirmed event for your own schedule.{% endif %}</p>
+  </div>
+  {% if event %}<span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span>{% endif %}
+</div>
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if event and event.source.value == 'ai' %}
+  <div class="alert alert-warning"><strong>AI-generated event:</strong> saving changes detaches this event from its AI suggestion, so future document processing will not overwrite your edits.</div>
+{% endif %}
+{% if is_past %}
+  <div class="alert alert-warning"><strong>This event is in the past.</strong> You can still save it, but check the date before continuing.</div>
+{% endif %}
+
+<form class="card shadow-sm" method="post" action="{% if event %}/calendar/events/{{ event.id }}/edit{% else %}/calendar/events{% endif %}" data-calendar-event-form>
+  <div class="card-body">
+    {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <label class="form-label" for="title">Title</label>
+        <input class="form-control" id="title" name="title" maxlength="255" required value="{{ form_values.title }}">
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label" for="event_type">Event type</label>
+        <select class="form-select" id="event_type" name="event_type" required>
+          {% for value in calendar_event_types %}<option value="{{ value.value }}"{% if form_values.event_type == value.value %} selected{% endif %}>{{ value.value|replace('_', ' ')|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="description">Description</label>
+        <textarea class="form-control" id="description" name="description" rows="4" maxlength="10000">{{ form_values.description }}</textarea>
+      </div>
+      <div class="col-12">
+        <div class="form-check"><input class="form-check-input" id="all_day" name="all_day" type="checkbox" value="true"{% if form_values.all_day %} checked{% endif %} data-calendar-all-day><label class="form-check-label" for="all_day">All-day event</label></div>
+      </div>
+      <div class="col-md-6" data-calendar-date-field>
+        <label class="form-label" for="start_date">Start date</label>
+        <input class="form-control" id="start_date" name="start_date" type="date" value="{{ form_values.start_date }}" data-calendar-start-date>
+      </div>
+      <div class="col-md-6" data-calendar-date-field>
+        <label class="form-label" for="end_date">End date <span class="text-secondary fw-normal">(optional)</span></label>
+        <input class="form-control" id="end_date" name="end_date" type="date" value="{{ form_values.end_date }}" data-calendar-end-date>
+      </div>
+      <div class="col-md-6" data-calendar-time-field>
+        <label class="form-label" for="start_time">Start time</label>
+        <input class="form-control" id="start_time" name="start_time" type="datetime-local" value="{{ form_values.start_time }}" data-calendar-start-time>
+      </div>
+      <div class="col-md-6" data-calendar-time-field>
+        <label class="form-label" for="end_time">End time <span class="text-secondary fw-normal">(optional)</span></label>
+        <input class="form-control" id="end_time" name="end_time" type="datetime-local" value="{{ form_values.end_time }}" data-calendar-end-time>
+      </div>
+      <div class="col-md-6" data-calendar-time-field>
+        <label class="form-label" for="timezone_name">Timezone</label>
+        <input class="form-control" id="timezone_name" name="timezone_name" maxlength="64" placeholder="Europe/Berlin" value="{{ form_values.timezone }}" data-calendar-timezone>
+        <div class="form-text">Use an IANA timezone, for example <code>Europe/Berlin</code>.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="document_id">Linked document <span class="text-secondary fw-normal">(optional)</span></label>
+        <select class="form-select" id="document_id" name="document_id">
+          <option value="">No linked document</option>
+          {% for document in documents %}<option value="{{ document.id }}"{% if form_values.document_id|string == document.id|string %} selected{% endif %}>{{ document.original_filename }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="reminder_setting">Reminder settings</label>
+        <select class="form-select" id="reminder_setting" disabled aria-describedby="reminder-help"><option>No reminder</option></select>
+        <div class="form-text" id="reminder-help">Reminder delivery is planned for MVP 8. This event will not send a reminder yet.</div>
+      </div>
+      {% if event %}
+        <div class="col-12"><div class="border rounded p-3 calendar-readonly"><span class="small text-secondary text-uppercase">Status</span><div class="mt-1"><span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span></div></div></div>
+        {% if event.source_evidence %}<div class="col-12"><details class="calendar-readonly border rounded p-3"><summary class="fw-semibold cursor-pointer">AI evidence (read-only)</summary><div class="pt-3"><q>{{ event.source_evidence.quote or event.source_evidence.original_phrase or 'Not available' }}</q>{% if event.source_evidence.page_number %}<p class="small text-secondary mt-2 mb-0">Page {{ event.source_evidence.page_number }}</p>{% endif %}</div></details></div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer d-flex flex-wrap justify-content-between gap-2"><a class="btn btn-outline-secondary" href="{% if event %}/calendar/events/{{ event.id }}{% else %}/calendar{% endif %}">Cancel</a><button class="btn btn-primary" type="submit">{% if event %}Save changes{% else %}Create event{% endif %}</button></div>
+</form>
+<script>
+(() => {
+  const form = document.querySelector("[data-calendar-event-form]");
+  if (!form) return;
+  const allDay = form.querySelector("[data-calendar-all-day]");
+  const dateFields = form.querySelectorAll("[data-calendar-date-field]");
+  const timeFields = form.querySelectorAll("[data-calendar-time-field]");
+  const startDate = form.querySelector("[data-calendar-start-date]");
+  const endDate = form.querySelector("[data-calendar-end-date]");
+  const startTime = form.querySelector("[data-calendar-start-time]");
+  const endTime = form.querySelector("[data-calendar-end-time]");
+  const zone = form.querySelector("[data-calendar-timezone]");
+  const toggle = () => {
+    const isAllDay = allDay.checked;
+    dateFields.forEach((field) => field.hidden = !isAllDay);
+    timeFields.forEach((field) => field.hidden = isAllDay);
+    startDate.required = isAllDay;
+    startTime.required = !isAllDay;
+    zone.required = !isAllDay;
+  };
+  const ranges = () => {
+    endDate.min = startDate.value;
+    endTime.min = startTime.value;
+  };
+  allDay.addEventListener("change", toggle);
+  startDate.addEventListener("input", ranges);
+  startTime.addEventListener("input", ranges);
+  form.addEventListener("submit", (event) => {
+    const invalidRange = allDay.checked ? endDate.value && endDate.value < startDate.value : endTime.value && endTime.value < startTime.value;
+    if (invalidRange) { event.preventDefault(); window.alert("End must not be earlier than start."); }
+    const startValue = allDay.checked ? startDate.value : startTime.value;
+    if (!invalidRange && startValue && new Date(startValue) < new Date(new Date().toDateString()) && !window.confirm("This event is in the past. Save it anyway?")) event.preventDefault();
+  });
+  toggle(); ranges();
+})();
+</script>
+{% endblock %}

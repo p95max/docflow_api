@@ -1,3 +1,4 @@
+from calendar import monthcalendar
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -43,12 +44,24 @@ from app.core.config import settings
 from app.core.timezones import DEFAULT_USER_TIMEZONE, validate_iana_timezone
 from app.db.session import get_db
 from app.models.user import User
+from app.models.calendar_event import (
+    CalendarEvent,
+    CalendarEventSource,
+    CalendarEventStatus,
+    CalendarEventType,
+)
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.document_index_job import DocumentIndexJobStatus
 from app.models.knowledge_message import KnowledgeMessageRole
 from app.schemas.document import DocumentCorrection, DocumentNoteUpdate
+from app.schemas.calendar_event import (
+    CalendarEventCreate,
+    CalendarEventUpdate,
+    CalendarRangeQuery,
+)
 from app.schemas.knowledge import KnowledgeConversationCreate, KnowledgeQuestionCreate
 from app.services.document_search import SortDirection, normalize_document_sort_field
+from app.services import calendar_events
 from app.services.document_index_jobs import enqueue_document_index_job
 from app.services.knowledge_conversations import (
     answer_conversation_question,
@@ -111,6 +124,8 @@ def _status_badge_class(value: object) -> str:
         "draft": "text-bg-secondary",
         "corrected": "text-bg-warning",
         "confirmed": "text-bg-success",
+        "suggested": "text-bg-info",
+        "cancelled": "text-bg-secondary",
     }.get(status_value, "text-bg-secondary")
 
 
@@ -426,6 +441,12 @@ def _render_document_detail(
             and document.file_size_bytes is None
         ),
         error=error,
+        related_calendar_events=calendar_events.list_events(
+            db=db,
+            owner_id=current_user.id,
+            user_timezone=_get_user_timezone_name(current_user),
+            query=CalendarRangeQuery(document_id=document_id),
+        ),
         status_code=status_code,
     )
 
@@ -1098,6 +1119,719 @@ def reindex_knowledge_document_submit(
     enqueue_document_index_job(db=db, document=document)
     return RedirectResponse(
         url="/knowledge?reindexed=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+def _calendar_month(value: str | None) -> date:
+    if value:
+        try:
+            parsed = datetime.strptime(value, "%Y-%m").date()
+            return parsed.replace(day=1)
+        except ValueError:
+            pass
+    return date.today().replace(day=1)
+
+
+def _shift_calendar_month(value: date, months: int) -> date:
+    month_number = value.year * 12 + value.month - 1 + months
+    return date(month_number // 12, month_number % 12 + 1, 1)
+
+
+def _calendar_month_bounds(value: date) -> tuple[date, date]:
+    next_month = _shift_calendar_month(value, 1)
+    return value, next_month - timedelta(days=1)
+
+
+def _calendar_event_day(event: CalendarEvent, timezone_name: str) -> date:
+    if event.all_day:
+        assert event.start_date is not None
+        return event.start_date
+    assert event.start_at is not None
+    return _to_user_timezone(event.start_at, timezone_name).date()
+
+
+def _calendar_query_url(
+    *,
+    month: date,
+    view: str,
+    event_type: CalendarEventType | None,
+    status_filter: CalendarEventStatus | None,
+    source: CalendarEventSource | None,
+    document_id: int | None,
+) -> str:
+    query = {
+        "month": month.strftime("%Y-%m"),
+        "view": view,
+        "event_type": event_type.value if event_type else None,
+        "status": status_filter.value if status_filter else None,
+        "source": source.value if source else None,
+        "document_id": document_id,
+    }
+    return "/calendar?" + urlencode(
+        {key: value for key, value in query.items() if value is not None}
+    )
+
+
+def _render_calendar_event_detail(
+    *,
+    request: Request,
+    db: Session,
+    current_user: User,
+    event_id: int,
+    error: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    try:
+        event = calendar_events.get_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+        )
+    except calendar_events.CalendarEventNotFoundError:
+        return _template_response(
+            request=request,
+            name="error.html",
+            current_user=current_user,
+            error="Calendar event not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return _template_response(
+        request=request,
+        name="calendar_event_detail.html",
+        current_user=current_user,
+        event=event,
+        error=error,
+        status_code=status_code,
+    )
+
+
+def _calendar_documents(*, db: Session, owner_id: int) -> list[Document]:
+    return list(
+        db.scalars(
+            select(Document)
+            .where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+            )
+            .order_by(Document.original_filename.asc(), Document.id.asc())
+        ).all()
+    )
+
+
+def _calendar_form_values(
+    *,
+    event: CalendarEvent | None,
+    timezone_name: str,
+    document_id: int | None = None,
+) -> dict[str, object]:
+    if event is None:
+        return {
+            "title": "",
+            "description": "",
+            "event_type": CalendarEventType.custom.value,
+            "all_day": True,
+            "start_date": date.today().isoformat(),
+            "end_date": "",
+            "start_time": "",
+            "end_time": "",
+            "timezone": timezone_name,
+            "document_id": document_id or "",
+        }
+
+    event_timezone = event.timezone or timezone_name
+    if event.all_day:
+        start_date = event.start_date.isoformat() if event.start_date else ""
+        end_date = event.end_date.isoformat() if event.end_date else ""
+        start_time = ""
+        end_time = ""
+    else:
+        assert event.start_at is not None
+        start_at = _to_user_timezone(event.start_at, event_timezone)
+        end_at = _to_user_timezone(event.end_at, event_timezone) if event.end_at else None
+        start_date = ""
+        end_date = ""
+        start_time = start_at.strftime("%Y-%m-%dT%H:%M")
+        end_time = end_at.strftime("%Y-%m-%dT%H:%M") if end_at else ""
+
+    return {
+        "title": event.title,
+        "description": event.description or "",
+        "event_type": event.event_type.value,
+        "all_day": event.all_day,
+        "start_date": start_date,
+        "end_date": end_date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "timezone": event_timezone,
+        "document_id": event.document_id or "",
+    }
+
+
+def _render_calendar_event_form(
+    *,
+    request: Request,
+    db: Session,
+    current_user: User,
+    event: CalendarEvent | None = None,
+    document_id: int | None = None,
+    values: dict[str, object] | None = None,
+    error: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    timezone_name = _get_user_timezone_name(current_user)
+    form_values = values or _calendar_form_values(
+        event=event,
+        timezone_name=timezone_name,
+        document_id=document_id,
+    )
+    start_value = str(form_values["start_date"] or form_values["start_time"] or "")
+    start_day = date.fromisoformat(start_value[:10]) if start_value else None
+    return _template_response(
+        request=request,
+        name="calendar_event_form.html",
+        current_user=current_user,
+        event=event,
+        form_values=form_values,
+        documents=_calendar_documents(db=db, owner_id=current_user.id),
+        calendar_event_types=CalendarEventType,
+        error=error,
+        is_past=bool(start_day and start_day < date.today()),
+        status_code=status_code,
+    )
+
+
+def _parse_calendar_event_form(
+    *,
+    title: str,
+    description: str,
+    event_type: CalendarEventType,
+    all_day: bool,
+    start_date: str,
+    end_date: str,
+    start_time: str,
+    end_time: str,
+    timezone_name: str,
+    document_id: str,
+    expected_sequence: int | None = None,
+) -> CalendarEventCreate | CalendarEventUpdate:
+    parsed_document_id = int(document_id) if document_id.strip() else None
+    if all_day:
+        values: dict[str, object] = {
+            "title": title,
+            "description": _blank_to_none(description),
+            "event_type": event_type,
+            "all_day": True,
+            "start_date": date.fromisoformat(start_date),
+            "end_date": date.fromisoformat(end_date) if end_date else None,
+            "start_at": None,
+            "end_at": None,
+            "timezone": None,
+            "document_id": parsed_document_id,
+        }
+    else:
+        zone = ZoneInfo(validate_iana_timezone(timezone_name))
+        start_at = datetime.fromisoformat(start_time).replace(tzinfo=zone)
+        end_at = (
+            datetime.fromisoformat(end_time).replace(tzinfo=zone)
+            if end_time
+            else None
+        )
+        values = {
+            "title": title,
+            "description": _blank_to_none(description),
+            "event_type": event_type,
+            "all_day": False,
+            "start_date": None,
+            "end_date": None,
+            "start_at": start_at,
+            "end_at": end_at,
+            "timezone": timezone_name,
+            "document_id": parsed_document_id,
+        }
+    if expected_sequence is None:
+        return CalendarEventCreate.model_validate(values)
+    return CalendarEventUpdate.model_validate(
+        {**values, "expected_sequence": expected_sequence}
+    )
+
+
+def _calendar_form_error(exc: Exception) -> str:
+    if isinstance(exc, calendar_events.CalendarEventValidationError):
+        return str(exc.errors[0].get("msg", "Invalid event."))
+    if isinstance(exc, ValidationError):
+        return str(exc.errors(include_url=False)[0].get("msg", "Invalid event."))
+    if isinstance(exc, ValueError):
+        return str(exc) or "Invalid event."
+    return "Invalid event."
+
+
+@router.get(
+    "/calendar",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def calendar_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    view: str = Query(default="month", pattern=r"^(month|agenda)$"),
+    event_type: CalendarEventType | None = None,
+    status_filter: CalendarEventStatus | None = Query(default=None, alias="status"),
+    source: CalendarEventSource | None = None,
+    document_id: int | None = Query(default=None, gt=0),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    active_month = _calendar_month(month)
+    start, end = _calendar_month_bounds(active_month)
+    timezone_name = _get_user_timezone_name(current_user)
+    events = calendar_events.list_events(
+        db=db,
+        owner_id=current_user.id,
+        user_timezone=timezone_name,
+        query=CalendarRangeQuery(
+            start=start,
+            end=end,
+            event_type=event_type,
+            status=status_filter,
+            source=source,
+            document_id=document_id,
+        ),
+    )
+    events.sort(key=lambda event: (_calendar_event_day(event, timezone_name), event.id))
+    events_by_day: dict[date, list[CalendarEvent]] = {}
+    for event in events:
+        events_by_day.setdefault(_calendar_event_day(event, timezone_name), []).append(event)
+
+    calendar_weeks = [
+        [
+            date(active_month.year, active_month.month, day_number)
+            if day_number
+            else None
+            for day_number in week
+        ]
+        for week in monthcalendar(active_month.year, active_month.month)
+    ]
+    documents = _calendar_documents(db=db, owner_id=current_user.id)
+    return _template_response(
+        request=request,
+        name="calendar.html",
+        current_user=current_user,
+        active_month=active_month,
+        today=date.today(),
+        view=view,
+        events=events,
+        events_by_day=events_by_day,
+        calendar_weeks=calendar_weeks,
+        calendar_weekdays=("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
+        calendar_event_types=CalendarEventType,
+        calendar_statuses=CalendarEventStatus,
+        calendar_sources=CalendarEventSource,
+        documents=documents,
+        filters={
+            "event_type": event_type.value if event_type else "",
+            "status": status_filter.value if status_filter else "",
+            "source": source.value if source else "",
+            "document_id": document_id,
+        },
+        previous_month_url=_calendar_query_url(
+            month=_shift_calendar_month(active_month, -1),
+            view=view,
+            event_type=event_type,
+            status_filter=status_filter,
+            source=source,
+            document_id=document_id,
+        ),
+        next_month_url=_calendar_query_url(
+            month=_shift_calendar_month(active_month, 1),
+            view=view,
+            event_type=event_type,
+            status_filter=status_filter,
+            source=source,
+            document_id=document_id,
+        ),
+        today_url=_calendar_query_url(
+            month=date.today().replace(day=1),
+            view=view,
+            event_type=event_type,
+            status_filter=status_filter,
+            source=source,
+            document_id=document_id,
+        ),
+    )
+
+
+@router.get(
+    "/calendar/new",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def new_calendar_event_page(
+    request: Request,
+    document_id: int | None = Query(default=None, gt=0),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    return _render_calendar_event_form(
+        request=request,
+        db=db,
+        current_user=current_user,
+        document_id=document_id,
+    )
+
+
+@router.post(
+    "/calendar/events",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def create_calendar_event_submit(
+    request: Request,
+    title: str = Form(...),
+    description: str = Form(""),
+    event_type: CalendarEventType = Form(...),
+    all_day: str | None = Form(default=None),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    start_time: str = Form(""),
+    end_time: str = Form(""),
+    timezone_name: str = Form(""),
+    document_id: str = Form(""),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    is_all_day = all_day is not None
+    values = {
+        "title": title,
+        "description": description,
+        "event_type": event_type.value,
+        "all_day": is_all_day,
+        "start_date": start_date,
+        "end_date": end_date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "timezone": timezone_name,
+        "document_id": document_id,
+    }
+    try:
+        payload = _parse_calendar_event_form(
+            title=title,
+            description=description,
+            event_type=event_type,
+            all_day=is_all_day,
+            start_date=start_date,
+            end_date=end_date,
+            start_time=start_time,
+            end_time=end_time,
+            timezone_name=timezone_name,
+            document_id=document_id,
+        )
+        assert isinstance(payload, CalendarEventCreate)
+        event = calendar_events.create_user_event(
+            db=db,
+            owner_id=current_user.id,
+            payload=payload,
+        )
+    except (ValidationError, ValueError, calendar_events.CalendarDocumentNotFoundError) as exc:
+        return _render_calendar_event_form(
+            request=request,
+            db=db,
+            current_user=current_user,
+            values=values,
+            error=_calendar_form_error(exc),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    return RedirectResponse(
+        url=f"/calendar/events/{event.id}?created=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get(
+    "/calendar/events/{event_id}",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def calendar_event_detail_page(
+    event_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    return _render_calendar_event_detail(
+        request=request,
+        db=db,
+        current_user=current_user,
+        event_id=event_id,
+    )
+
+
+@router.get(
+    "/calendar/events/{event_id}/edit",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def edit_calendar_event_page(
+    event_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        event = calendar_events.get_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+        )
+    except calendar_events.CalendarEventNotFoundError:
+        return _render_calendar_event_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event_id=event_id,
+            error="Calendar event not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return _render_calendar_event_form(
+        request=request,
+        db=db,
+        current_user=current_user,
+        event=event,
+    )
+
+
+@router.post(
+    "/calendar/events/{event_id}/edit",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def edit_calendar_event_submit(
+    event_id: int,
+    request: Request,
+    sequence: int = Form(..., ge=0),
+    title: str = Form(...),
+    description: str = Form(""),
+    event_type: CalendarEventType = Form(...),
+    all_day: str | None = Form(default=None),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    start_time: str = Form(""),
+    end_time: str = Form(""),
+    timezone_name: str = Form(""),
+    document_id: str = Form(""),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        event = calendar_events.get_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+        )
+    except calendar_events.CalendarEventNotFoundError:
+        return _render_calendar_event_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event_id=event_id,
+            error="Calendar event not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    is_all_day = all_day is not None
+    values = {
+        "title": title,
+        "description": description,
+        "event_type": event_type.value,
+        "all_day": is_all_day,
+        "start_date": start_date,
+        "end_date": end_date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "timezone": timezone_name,
+        "document_id": document_id,
+    }
+    try:
+        payload = _parse_calendar_event_form(
+            title=title,
+            description=description,
+            event_type=event_type,
+            all_day=is_all_day,
+            start_date=start_date,
+            end_date=end_date,
+            start_time=start_time,
+            end_time=end_time,
+            timezone_name=timezone_name,
+            document_id=document_id,
+            expected_sequence=sequence,
+        )
+        assert isinstance(payload, CalendarEventUpdate)
+        calendar_events.update_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+            payload=payload,
+        )
+    except (
+        ValidationError,
+        ValueError,
+        calendar_events.CalendarDocumentNotFoundError,
+        calendar_events.CalendarEventConflictError,
+        calendar_events.CalendarEventValidationError,
+    ) as exc:
+        return _render_calendar_event_form(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event=event,
+            values=values,
+            error=_calendar_form_error(exc),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    return RedirectResponse(
+        url=f"/calendar/events/{event_id}?saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/calendar/events/{event_id}/confirm",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def confirm_calendar_event_submit(
+    event_id: int,
+    request: Request,
+    sequence: int = Form(..., ge=0),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        calendar_events.confirm_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+            expected_sequence=sequence,
+        )
+    except (calendar_events.CalendarEventNotFoundError, calendar_events.CalendarEventConflictError) as exc:
+        return _render_calendar_event_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event_id=event_id,
+            error=str(exc),
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    return RedirectResponse(
+        url=f"/calendar/events/{event_id}?confirmed=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/calendar/events/{event_id}/dismiss",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def dismiss_calendar_suggestion_submit(
+    event_id: int,
+    request: Request,
+    sequence: int = Form(..., ge=0),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        calendar_events.cancel_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+            expected_sequence=sequence,
+        )
+    except (calendar_events.CalendarEventNotFoundError, calendar_events.CalendarEventConflictError) as exc:
+        return _render_calendar_event_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event_id=event_id,
+            error=str(exc),
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    return RedirectResponse(
+        url="/calendar?dismissed=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/documents/{document_id}/calendar/from-deadline",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def create_calendar_event_from_deadline_submit(
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    document = db.get(Document, document_id)
+    if (
+        document is None
+        or document.owner_id != current_user.id
+        or document.deleted_at is not None
+    ):
+        return _render_document_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            document_id=document_id,
+            error="Document not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if document.deadline is None:
+        return _render_document_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            document_id=document_id,
+            error="This document does not have a deadline to add to the calendar.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    event = calendar_events.create_user_event(
+        db=db,
+        owner_id=current_user.id,
+        payload=CalendarEventCreate(
+            title=f"Deadline: {document.original_filename}"[:255],
+            event_type=CalendarEventType.action_deadline,
+            start_date=document.deadline,
+            document_id=document.id,
+        ),
+    )
+    return RedirectResponse(
+        url=f"/calendar/events/{event.id}?created_from_deadline=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

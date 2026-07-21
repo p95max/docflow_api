@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Calendar · DocsFlow{% endblock %}
+{% block content %}
+<div class="workspace-page-head">
+  <div>
+    <p class="workspace-kicker">Planning workspace</p>
+    <h1>Calendar</h1>
+    <p class="text-secondary">Document deadlines and your calendar events in one place.</p>
+  </div>
+  <a class="btn btn-primary" href="/calendar/new">Add event</a>
+</div>
+
+{% if request.query_params.get("dismissed") == "1" %}
+  <div class="alert alert-success">Suggestion dismissed.</div>
+{% endif %}
+
+<details class="card shadow-sm mb-4 documents-filters"{% if filters.event_type or filters.status or filters.source or filters.document_id %} open{% endif %}>
+  <summary class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="fw-semibold">Filters</span>
+    <span class="small text-secondary documents-filters-toggle"><span class="documents-filters-show">Show filters</span><span class="documents-filters-hide">Hide filters</span></span>
+  </summary>
+  <form class="card-body" method="get" action="/calendar">
+    <input type="hidden" name="month" value="{{ active_month.strftime('%Y-%m') }}">
+    <input type="hidden" name="view" value="{{ view }}">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label" for="event_type">Event type</label>
+        <select class="form-select" id="event_type" name="event_type">
+          <option value="">All event types</option>
+          {% for value in calendar_event_types %}<option value="{{ value.value }}"{% if filters.event_type == value.value %} selected{% endif %}>{{ value.value|replace('_', ' ')|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="status">Status</label>
+        <select class="form-select" id="status" name="status">
+          <option value="">All statuses</option>
+          {% for value in calendar_statuses %}<option value="{{ value.value }}"{% if filters.status == value.value %} selected{% endif %}>{{ value.value|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="source">Source</label>
+        <select class="form-select" id="source" name="source">
+          <option value="">All sources</option>
+          {% for value in calendar_sources %}<option value="{{ value.value }}"{% if filters.source == value.value %} selected{% endif %}>{{ value.value|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="document_id">Document</label>
+        <select class="form-select" id="document_id" name="document_id">
+          <option value="">All documents</option>
+          {% for document in documents %}<option value="{{ document.id }}"{% if filters.document_id == document.id %} selected{% endif %}>{{ document.original_filename }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" type="submit">Apply filters</button>
+        <a class="btn btn-outline-secondary" href="/calendar?month={{ active_month.strftime('%Y-%m') }}&amp;view={{ view }}">Clear</a>
+      </div>
+    </div>
+  </form>
+</details>
+
+<section class="card shadow-sm calendar-shell" aria-labelledby="calendar-heading">
+  <div class="card-body">
+    <div class="calendar-toolbar">
+      <div class="btn-group" role="group" aria-label="Calendar navigation">
+        <a class="btn btn-outline-secondary" href="{{ previous_month_url }}" aria-label="Previous month">←</a>
+        <a class="btn btn-outline-secondary" href="{{ today_url }}">Today</a>
+        <a class="btn btn-outline-secondary" href="{{ next_month_url }}" aria-label="Next month">→</a>
+      </div>
+      <h2 class="h4 mb-0" id="calendar-heading">{{ active_month.strftime('%B %Y') }}</h2>
+      <div class="btn-group" role="group" aria-label="Calendar view">
+        <a class="btn {% if view == 'month' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="/calendar?month={{ active_month.strftime('%Y-%m') }}&amp;view=month{% if filters.event_type %}&amp;event_type={{ filters.event_type }}{% endif %}{% if filters.status %}&amp;status={{ filters.status }}{% endif %}{% if filters.source %}&amp;source={{ filters.source }}{% endif %}{% if filters.document_id %}&amp;document_id={{ filters.document_id }}{% endif %}">Month</a>
+        <a class="btn {% if view == 'agenda' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="/calendar?month={{ active_month.strftime('%Y-%m') }}&amp;view=agenda{% if filters.event_type %}&amp;event_type={{ filters.event_type }}{% endif %}{% if filters.status %}&amp;status={{ filters.status }}{% endif %}{% if filters.source %}&amp;source={{ filters.source }}{% endif %}{% if filters.document_id %}&amp;document_id={{ filters.document_id }}{% endif %}">Agenda</a>
+      </div>
+    </div>
+
+    {% if view == 'month' %}
+      <div class="calendar-month" role="grid" aria-label="{{ active_month.strftime('%B %Y') }}">
+        {% for weekday in calendar_weekdays %}<div class="calendar-weekday" role="columnheader">{{ weekday }}</div>{% endfor %}
+        {% for week in calendar_weeks %}
+          {% for day in week %}
+            <div class="calendar-day{% if not day %} is-empty{% endif %}{% if day == today %} is-today{% endif %}" role="gridcell">
+              {% if day %}
+                <div class="calendar-day-number">{{ day.day }}</div>
+                <div class="calendar-day-events">
+                  {% for event in events_by_day.get(day, []) %}
+                    <a class="calendar-event calendar-event-{{ event.status.value }}" href="/calendar/events/{{ event.id }}">
+                      <span>{{ event.title }}</span>
+                      <small>{{ event.status.value|replace('_', ' ') }}</small>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    {% elif events %}
+      <div class="calendar-agenda">
+        {% for event in events %}
+          <a class="calendar-agenda-event calendar-event-{{ event.status.value }}" href="/calendar/events/{{ event.id }}">
+            <time>{% if event.all_day %}{{ event.start_date }}{% else %}{{ event.start_at|local_datetime }}{% endif %}</time>
+            <span><strong>{{ event.title }}</strong><small>{{ event.event_type.value|replace('_', ' ') }} · {{ event.source.value }}</small></span>
+            <span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state text-center"><h2 class="h5">No events this month</h2><p class="text-secondary mb-0">Try another month or clear the filters.</p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

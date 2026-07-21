@@ -272,53 +272,53 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 11. Main Calendar Page
 
-- [ ] Add a `Calendar` item to the navbar
-- [ ] Add the `/calendar` route
-- [ ] Implement:
-  - [ ] Month view
-  - [ ] Agenda/list view
-- [ ] Do not implement drag-and-drop in the first release
-- [ ] Add navigation:
-  - [ ] Previous month
-  - [ ] Next month
-  - [ ] Today
-- [ ] Add filters:
-  - [ ] Event type
-  - [ ] Status
-  - [ ] Source
-  - [ ] Document
-- [ ] Use colors by status, not by document type
-- [ ] Display badges:
-  - [ ] AI suggested
-  - [ ] Confirmed
-  - [ ] Completed
-  - [ ] Cancelled
-- [ ] Open an event detail drawer or page when an event is selected
-- [ ] Add a document link to the event
-- [ ] Add a `Related calendar events` section to the document page
-- [ ] Add an `Add to calendar` button
-- [ ] Add a `Create event from deadline` button
-- [ ] Add a `Confirm suggestion` button
-- [ ] Add a `Dismiss suggestion` button
+- [x] Add a `Calendar` item to the navbar
+- [x] Add the `/calendar` route
+- [x] Implement:
+  - [x] Month view
+  - [x] Agenda/list view
+- [x] Do not implement drag-and-drop in the first release
+- [x] Add navigation:
+  - [x] Previous month
+  - [x] Next month
+  - [x] Today
+- [x] Add filters:
+  - [x] Event type
+  - [x] Status
+  - [x] Source
+  - [x] Document
+- [x] Use colors by status, not by document type
+- [x] Display badges:
+  - [x] AI suggested
+  - [x] Confirmed
+  - [x] Completed
+  - [x] Cancelled
+- [x] Open an event detail drawer or page when an event is selected
+- [x] Add a document link to the event
+- [x] Add a `Related calendar events` section to the document page
+- [x] Add an `Add to calendar` button
+- [x] Add a `Create event from deadline` button
+- [x] Add a `Confirm suggestion` button
+- [x] Add a `Dismiss suggestion` button
 
 ## 12. Event Form
 
-- [ ] Title field
-- [ ] Description field
-- [ ] Event type
-- [ ] All-day checkbox
-- [ ] Start date
-- [ ] End date
-- [ ] Start time
-- [ ] End time
-- [ ] Timezone
-- [ ] Document link
-- [ ] Status
-- [ ] Reminder settings
-- [ ] Display AI evidence as read-only data
-- [ ] Warn before changing an AI-generated event
-- [ ] Prevent `end < start`
-- [ ] Warn about events in the past
+- [x] Title field
+- [x] Description field
+- [x] Event type
+- [x] All-day checkbox
+- [x] Start date
+- [x] End date
+- [x] Start time
+- [x] End time
+- [x] Timezone
+- [x] Document link
+- [x] Status
+- [x] Reminder settings (shown as unavailable until MVP 8 delivery is implemented)
+- [x] Display AI evidence as read-only data
+- [x] Warn before changing an AI-generated event
+- [x] Prevent `end < start`
+- [x] Warn about events in the past
 
 ---
 

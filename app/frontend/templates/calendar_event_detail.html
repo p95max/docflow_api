@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} · Calendar · DocsFlow{% endblock %}
+{% block content %}
+<a class="text-decoration-none" href="/calendar">← Calendar</a>
+<div class="document-hero d-flex flex-wrap gap-3 justify-content-between align-items-start mt-3 mb-4">
+  <div>
+    <p class="workspace-kicker">Calendar event</p>
+    <h1 class="h2 mb-2">{{ event.title }}</h1>
+    <div class="d-flex flex-wrap gap-2"><span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span>{% if event.source.value == 'ai' %}<span class="badge text-bg-info">AI suggested</span>{% endif %}</div>
+  </div>
+  <a class="btn btn-outline-primary" href="/calendar/events/{{ event.id }}/edit">Edit event</a>
+  {% if event.status.value == 'suggested' %}
+    <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="/calendar/events/{{ event.id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="sequence" value="{{ event.sequence }}"><button class="btn btn-primary" type="submit">Confirm suggestion</button></form>
+      <form method="post" action="/calendar/events/{{ event.id }}/dismiss"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="sequence" value="{{ event.sequence }}"><button class="btn btn-outline-danger" type="submit">Dismiss suggestion</button></form>
+    </div>
+  {% endif %}
+</div>
+{% if request.query_params.get("confirmed") == "1" %}<div class="alert alert-success">Event confirmed.</div>{% endif %}
+{% if request.query_params.get("created_from_deadline") == "1" %}<div class="alert alert-success">Calendar event created from the document deadline.</div>{% endif %}
+{% if request.query_params.get("created") == "1" %}<div class="alert alert-success">Calendar event created.</div>{% endif %}
+{% if request.query_params.get("saved") == "1" %}<div class="alert alert-success">Event changes saved.</div>{% endif %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<section class="card shadow-sm"><div class="card-body"><dl class="row mb-0">
+  <dt class="col-sm-4 text-secondary">When</dt><dd class="col-sm-8">{% if event.all_day %}{{ event.start_date }}{% if event.end_date and event.end_date != event.start_date %} – {{ event.end_date }}{% endif %}{% else %}{{ event.start_at|local_datetime }}{% if event.end_at %} – {{ event.end_at|local_datetime }}{% endif %}{% endif %}</dd>
+  <dt class="col-sm-4 text-secondary">Type</dt><dd class="col-sm-8">{{ event.event_type.value|replace('_', ' ')|title }}</dd>
+  <dt class="col-sm-4 text-secondary">Source</dt><dd class="col-sm-8">{{ event.source.value|title }}</dd>
+  {% if event.document_id %}<dt class="col-sm-4 text-secondary">Document</dt><dd class="col-sm-8"><a href="/documents/{{ event.document_id }}">Open linked document</a></dd>{% endif %}
+  {% if event.description %}<dt class="col-sm-4 text-secondary">Description</dt><dd class="col-sm-8">{{ event.description }}</dd>{% endif %}
+  {% if event.source_evidence %}<dt class="col-sm-4 text-secondary">AI evidence</dt><dd class="col-sm-8"><q>{{ event.source_evidence.quote or event.source_evidence.original_phrase or 'Not available' }}</q>{% if event.source_evidence.page_number %}<div class="small text-secondary mt-1">Page {{ event.source_evidence.page_number }}</div>{% endif %}</dd>{% endif %}
+</dl></div></section>
+{% endblock %}
