@@ -8,7 +8,10 @@
     <h1 class="h2 mb-2">{{ event.title }}</h1>
     <div class="d-flex flex-wrap gap-2"><span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span>{% if event.source.value == 'ai' %}<span class="badge text-bg-info">AI suggested</span>{% endif %}</div>
   </div>
-  <a class="btn btn-outline-primary" href="/calendar/events/{{ event.id }}/edit">Edit event</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="/calendar/events/{{ event.id }}/download.ics">Add to Google Calendar</a>
+    <a class="btn btn-outline-primary" href="/calendar/events/{{ event.id }}/edit">Edit event</a>
+  </div>
   {% if event.status.value == 'suggested' %}
     <div class="d-flex flex-wrap gap-2">
       <form method="post" action="/calendar/events/{{ event.id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="sequence" value="{{ event.sequence }}"><button class="btn btn-primary" type="submit">Confirm suggestion</button></form>
@@ -29,4 +32,5 @@
   {% if event.description %}<dt class="col-sm-4 text-secondary">Description</dt><dd class="col-sm-8">{{ event.description }}</dd>{% endif %}
   {% if event.source_evidence %}<dt class="col-sm-4 text-secondary">AI evidence</dt><dd class="col-sm-8"><q>{{ event.source_evidence.quote or event.source_evidence.original_phrase or 'Not available' }}</q>{% if event.source_evidence.page_number %}<div class="small text-secondary mt-1">Page {{ event.source_evidence.page_number }}</div>{% endif %}</dd>{% endif %}
 </dl></div></section>
+<p class="small text-secondary mt-3 mb-0">Downloads a standard .ics file. You can import it into Google Calendar, Apple Calendar, or Outlook; DocsFlow does not connect to calendar accounts.</p>
 {% endblock %}

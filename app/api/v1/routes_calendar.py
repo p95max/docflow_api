@@ -20,9 +20,53 @@ from app.schemas.calendar_event import (
     CalendarRangeQuery,
 )
 from app.services import calendar_events
+from app.services.calendar_feeds import get_user_for_calendar_feed_token
+from app.services.icalendar import ICAL_CONTENT_TYPE, serialize_event_calendar, serialize_feed_calendar
 
 
 router = APIRouter()
+
+
+@router.get("/feed.ics", response_class=Response, response_model=None)
+def download_calendar_feed(
+    db: DbSession,
+    token: str = Query(..., min_length=20, max_length=512),
+) -> Response:
+    """Private subscription endpoint authenticated only by an opaque feed token."""
+    owner = get_user_for_calendar_feed_token(db=db, token=token)
+    if owner is None:
+        # Do not reveal whether a feed token once existed.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar feed not found.")
+    events = calendar_events.list_events(
+        db=db,
+        owner_id=owner.id,
+        user_timezone=owner.timezone,
+        query=CalendarRangeQuery(),
+    )
+    return _calendar_download_response(
+        content=serialize_feed_calendar(events),
+        filename="docsflow-calendar.ics",
+    )
+
+
+@router.get("/events/{event_id}.ics", response_class=Response, response_model=None)
+def download_calendar_event(
+    event_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> Response:
+    try:
+        event = calendar_events.get_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+        )
+    except calendar_events.CalendarEventNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from None
+    return _calendar_download_response(
+        content=serialize_event_calendar(event),
+        filename=f"docsflow-event-{event.id}.ics",
+    )
 
 
 @router.get("/events", response_model=CalendarEventListRead)
@@ -211,4 +255,16 @@ def _validation_error(errors: list[dict[object, object]]) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail=errors,
+    )
+
+
+def _calendar_download_response(*, content: str, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type=ICAL_CONTENT_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
     )

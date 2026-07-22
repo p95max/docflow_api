@@ -391,23 +391,23 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 16. ICS Export
 
-- [ ] Add `GET /api/v1/calendar/events/{id}.ics`
-- [ ] Add `GET /api/v1/calendar/feed.ics`
-- [ ] Add an `Add to Google Calendar` button that downloads a single-event `.ics` file
-- [ ] Keep `.ics` export provider-neutral: Google Calendar, Apple Calendar, and Outlook can import it
-- [ ] Do not add Google Calendar OAuth, account connections, or direct synchronization
-- [ ] Use `VALUE=DATE` for date-only events
-- [ ] Use UTC or `TZID` for datetime events
-- [ ] Use a stable `UID`
-- [ ] Increment `SEQUENCE` when the event changes
-- [ ] Add `DTSTAMP`
-- [ ] Escape special characters
-- [ ] Correctly fold long lines
-- [ ] Exclude deleted events
-- [ ] Optionally include cancelled events with `STATUS:CANCELLED`
-- [ ] Protect the private feed with a dedicated secret token
-- [ ] Add feed token revocation and regeneration
-- [ ] Do not place the access JWT in the calendar subscription URL
+- [x] Add `GET /api/v1/calendar/events/{id}.ics`
+- [x] Add `GET /api/v1/calendar/feed.ics`
+- [x] Add an `Add to Google Calendar` button that downloads a single-event `.ics` file
+- [x] Keep `.ics` export provider-neutral: Google Calendar, Apple Calendar, and Outlook can import it
+- [x] Do not add Google Calendar OAuth, account connections, or direct synchronization
+- [x] Use `VALUE=DATE` for date-only events
+- [x] Use UTC or `TZID` for datetime events
+- [x] Use a stable `UID`
+- [x] Increment `SEQUENCE` when the event changes
+- [x] Add `DTSTAMP`
+- [x] Escape special characters
+- [x] Correctly fold long lines
+- [x] Exclude deleted events
+- [x] Optionally include cancelled events with `STATUS:CANCELLED`
+- [x] Protect the private feed with a dedicated secret token
+- [x] Add feed token revocation and regeneration
+- [x] Do not place the access JWT in the calendar subscription URL
 
 ---
 

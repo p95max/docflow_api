@@ -26,6 +26,24 @@
           </div>
           <div><button class="btn btn-primary" type="submit" data-loading-label="Saving…">Save timezone</button></div>
         </form>
+        <hr class="my-4">
+        <section aria-labelledby="calendar-feed-title">
+          <p class="workspace-kicker">Calendar subscription</p>
+          <h2 class="h5" id="calendar-feed-title">Private calendar feed</h2>
+          <p class="text-secondary">Create a private .ics subscription URL for Google Calendar, Apple Calendar, or Outlook. Anyone with this link can read your calendar, so store it like a password.</p>
+          {% if request.query_params.get("calendar_feed_revoked") == "1" %}<div class="alert alert-success">Calendar feed link revoked.</div>{% endif %}
+          {% if calendar_feed_token %}
+            <div class="alert alert-warning">
+              <strong>Save this subscription URL now.</strong> It will not be shown again.
+              <label class="form-label mt-2" for="calendar-feed-url">Private feed URL</label>
+              <input class="form-control font-monospace" id="calendar-feed-url" type="text" value="{{ request.base_url }}api/v1/calendar/feed.ics?token={{ calendar_feed_token }}" readonly>
+            </div>
+          {% endif %}
+          <div class="d-flex flex-wrap gap-2">
+            <form method="post" action="/settings/calendar-feed-token" class="m-0"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-outline-primary" type="submit">{% if calendar_feed_configured %}Regenerate subscription link{% else %}Create subscription link{% endif %}</button></form>
+            {% if calendar_feed_configured %}<form method="post" action="/settings/calendar-feed-token/revoke" class="m-0"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-outline-danger" type="submit">Revoke link</button></form>{% endif %}
+          </div>
+        </section>
       </div>
     </div>
   </section>

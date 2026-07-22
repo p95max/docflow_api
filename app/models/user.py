@@ -24,6 +24,12 @@ class User(Base):
         Text,
         nullable=True,
     )
+    calendar_feed_token_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -143,6 +143,13 @@ delivery status; the navbar shows the unread count and `/notifications` lets a
 user mark one or all notifications as read. Email delivery and reminder
 settings in the event form are not implemented yet.
 
+Calendar events can also be downloaded as standard `.ics` files from their
+detail page. The same format works with Google Calendar, Apple Calendar, and
+Outlook without connecting DocsFlow to any calendar provider. In Settings, a
+user can create a private subscription URL, regenerate it (which revokes the
+old URL), or revoke it. Only an HMAC hash of this opaque feed token is stored;
+the access JWT is never placed in a subscription URL.
+
 ### Signed File URLs
 
 Document result responses include short-lived, signed URLs for inline preview
@@ -1050,7 +1057,8 @@ docker compose exec db psql -U docsflow -d docsflow \
 - standard-mode AI extraction requires `OPENAI_API_KEY`
 - Calendar reminders are delivered in-app; email transport and the UI for
   creating reminder settings are not implemented yet
-- External calendar synchronization and `.ics` feeds are not implemented yet
+- External calendar synchronization is not implemented; calendar exports use
+  provider-neutral `.ics` downloads and private feed URLs instead
 
 ## Contacts
 

@@ -49,10 +49,16 @@
               {% if unread_notification_count %}<span class="docsflow-notification-count">{{ unread_notification_count }}</span>{% endif %}
             </a>
             <a class="btn btn-sm btn-outline-light" href="/calendar">Calendar</a>
-            <a class="btn btn-sm btn-outline-light" href="/settings">Settings</a>
+            <details class="docsflow-ai-menu docsflow-settings-menu">
+              <summary class="btn btn-sm btn-outline-light docsflow-ai-menu-trigger" title="Settings and backups">
+                <span aria-hidden="true">&#9881;</span><span class="visually-hidden">Settings and backups</span>
+              </summary>
+              <div class="docsflow-ai-menu-panel">
+                <a class="docsflow-ai-menu-item" href="/settings"><span aria-hidden="true">&#9881;</span><span><strong>Settings</strong><small>Timezone and calendar feed</small></span></a>
+                <a class="docsflow-ai-menu-item" href="/backups"><span aria-hidden="true">&#128190;</span><span><strong>Backups</strong><small>Recovery archives</small></span></a>
+              </div>
+            </details>
             <a class="btn btn-sm btn-outline-light" href="/documents">Documents</a>
-            <a class="btn btn-sm btn-outline-light" href="/backups">Backups</a>
-            <a class="btn btn-sm btn-light" href="/documents/upload">Upload</a>
             <form method="post" action="/logout" class="m-0">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="btn btn-sm btn-outline-light" type="submit">Log out</button>

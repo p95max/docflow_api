@@ -70,6 +70,11 @@ from app.services.knowledge_conversations import (
     get_owned_conversation,
     list_conversations,
 )
+from app.services.calendar_feeds import (
+    generate_calendar_feed_token,
+    revoke_calendar_feed_token,
+)
+from app.services.icalendar import ICAL_CONTENT_TYPE, serialize_event_calendar
 from app.services.notifications import (
     NotificationNotFoundError,
     list_notifications,
@@ -871,6 +876,7 @@ def settings_page(
         current_user=current_user,
         timezone_value=current_user.timezone,
         updated=request.query_params.get("updated") == "1",
+        calendar_feed_configured=current_user.calendar_feed_token_hash is not None,
     )
 
 
@@ -904,6 +910,50 @@ def update_timezone_setting(
     update_user_timezone(db=db, user=current_user, timezone=payload.timezone)
     return RedirectResponse(
         url="/settings?updated=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/settings/calendar-feed-token",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def regenerate_calendar_feed_token_setting(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    token = generate_calendar_feed_token(db=db, user=current_user)
+    return _template_response(
+        request=request,
+        name="settings.html",
+        current_user=current_user,
+        timezone_value=current_user.timezone,
+        calendar_feed_configured=True,
+        calendar_feed_token=token,
+    )
+
+
+@router.post(
+    "/settings/calendar-feed-token/revoke",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def revoke_calendar_feed_token_setting(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    revoke_calendar_feed_token(db=db, user=current_user)
+    return RedirectResponse(
+        url="/settings?calendar_feed_revoked=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -1699,6 +1749,43 @@ def calendar_event_detail_page(
         db=db,
         current_user=current_user,
         event_id=event_id,
+    )
+
+
+@router.get(
+    "/calendar/events/{event_id}/download.ics",
+    response_model=None,
+)
+def download_calendar_event_web(
+    event_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Cookie-authenticated browser download for provider-neutral calendar import."""
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        event = calendar_events.get_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+        )
+    except calendar_events.CalendarEventNotFoundError:
+        return _template_response(
+            request=request,
+            name="error.html",
+            current_user=current_user,
+            error="Calendar event not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(
+        content=serialize_event_calendar(event),
+        media_type=ICAL_CONTENT_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="docsflow-event-{event.id}.ics"',
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
