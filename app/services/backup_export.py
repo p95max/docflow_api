@@ -14,12 +14,15 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
 from app.models.backup_job import BackupJob
+from app.models.calendar_event import CalendarEvent
 from app.models.document import Document
+from app.models.event_reminder import EventReminder
+from app.models.notification import Notification
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob
 from app.models.user import User
 
-BACKUP_SCHEMA_VERSION = 2
+BACKUP_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,29 @@ def build_backup_payload(
         model=AuditLog,
         document_ids=document_ids,
     )
+    calendar_events = list(
+        db.scalars(
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.owner_id == owner_id,
+                CalendarEvent.deleted_at.is_(None),
+            )
+            .order_by(CalendarEvent.id)
+        ).all()
+    )
+    event_ids = [event.id for event in calendar_events]
+    event_reminders = _load_by_event_ids(
+        db=db,
+        model=EventReminder,
+        event_ids=event_ids,
+    )
+    notifications = list(
+        db.scalars(
+            select(Notification)
+            .where(Notification.owner_id == owner_id)
+            .order_by(Notification.id)
+        ).all()
+    )
     backup_jobs = list(
         db.scalars(
             select(BackupJob)
@@ -104,6 +130,9 @@ def build_backup_payload(
         "openai_usage_logs": [_serialize_usage_log(log) for log in usage_logs],
         "audit_logs": [_serialize_audit_log(log) for log in audit_logs],
         "backup_jobs": [_serialize_backup_job(job) for job in backup_jobs],
+        "calendar_events": [_serialize_calendar_event(event) for event in calendar_events],
+        "event_reminders": [_serialize_event_reminder(reminder) for reminder in event_reminders],
+        "notifications": [_serialize_notification(notification) for notification in notifications],
     }
     record_counts = {name: len(items) for name, items in records.items()}
 
@@ -131,6 +160,19 @@ def _load_by_document_ids(
             .where(model.document_id.in_(document_ids))
             .order_by(model.id)
         ).all()
+    )
+
+
+def _load_by_event_ids(
+    *,
+    db: Session,
+    model: type[Any],
+    event_ids: list[int],
+) -> list[Any]:
+    if not event_ids:
+        return []
+    return list(
+        db.scalars(select(model).where(model.event_id.in_(event_ids)).order_by(model.id)).all()
     )
 
 
@@ -219,12 +261,70 @@ def _serialize_audit_log(log: AuditLog) -> dict[str, Any]:
     return {
         "id": log.id,
         "document_id": log.document_id,
+        "calendar_event_id": log.calendar_event_id,
         "user_id": log.user_id,
         "action": log.action,
         "field_name": log.field_name,
         "old_value": log.old_value,
         "new_value": log.new_value,
         "created_at": log.created_at,
+    }
+
+
+def _serialize_calendar_event(event: CalendarEvent) -> dict[str, Any]:
+    return {
+        "id": event.id,
+        "document_id": event.document_id,
+        "title": event.title,
+        "description": event.description,
+        "event_type": event.event_type,
+        "status": event.status,
+        "source": event.source,
+        "all_day": event.all_day,
+        "start_date": event.start_date,
+        "end_date": event.end_date,
+        "start_at": event.start_at,
+        "end_at": event.end_at,
+        "timezone": event.timezone,
+        "source_field": event.source_field,
+        "source_key": event.source_key,
+        "source_evidence": event.source_evidence,
+        "confidence_score": event.confidence_score,
+        "requires_review": event.requires_review,
+        "detached_from_source": event.detached_from_source,
+        "completed_at": event.completed_at,
+        "ical_uid": event.ical_uid,
+        "sequence": event.sequence,
+        "created_at": event.created_at,
+        "updated_at": event.updated_at,
+    }
+
+
+def _serialize_event_reminder(reminder: EventReminder) -> dict[str, Any]:
+    return {
+        "id": reminder.id,
+        "event_id": reminder.event_id,
+        "channel": reminder.channel,
+        "offset_minutes": reminder.offset_minutes,
+        "scheduled_for": reminder.scheduled_for,
+        "status": reminder.status,
+        "last_attempt_at": reminder.last_attempt_at,
+        "sent_at": reminder.sent_at,
+        "attempts": reminder.attempts,
+        "error_message": reminder.error_message,
+        "created_at": reminder.created_at,
+        "updated_at": reminder.updated_at,
+    }
+
+
+def _serialize_notification(notification: Notification) -> dict[str, Any]:
+    return {
+        "id": notification.id,
+        "event_id": notification.event_id,
+        "title": notification.title,
+        "body": notification.body,
+        "read_at": notification.read_at,
+        "created_at": notification.created_at,
     }
 
 

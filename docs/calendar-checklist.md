@@ -449,18 +449,18 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 21. Backup
 
-- [ ] Increment `BACKUP_SCHEMA_VERSION`
-- [ ] Include in backups:
-  - [ ] Calendar events
-  - [ ] Event reminders
-  - [ ] Notifications
-- [ ] Add record counts
-- [ ] Add a strict restore schema
-- [ ] Restore document-to-event relationships
-- [ ] Restore user-created events
-- [ ] Do not restore old pending reminders as overdue deliveries
-- [ ] Recalculate scheduled reminders after restore
-- [ ] Do not restore OAuth refresh tokens from recovery backups
+- [x] Increment `BACKUP_SCHEMA_VERSION`
+- [x] Include in backups:
+  - [x] Calendar events
+  - [x] Event reminders
+  - [x] Notifications
+- [x] Add record counts
+- [x] Add a strict restore schema
+- [x] Restore document-to-event relationships
+- [x] Restore user-created events
+- [x] Do not restore old pending reminders as overdue deliveries
+- [x] Recalculate scheduled reminders after restore
+- [x] Do not restore OAuth refresh tokens from recovery backups
 
 ---
 

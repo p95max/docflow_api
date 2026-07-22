@@ -1,7 +1,10 @@
 import gzip
 import hashlib
 import io
+import json
+import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import ValidationError
@@ -11,14 +14,25 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.document import Document, DocumentStatus
+from app.models.calendar_event import CalendarEvent
+from app.models.event_reminder import EventReminder, EventReminderStatus
+from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.recovery_backup import RecoveryBackupPayloadV2, RecoveryDocumentV2
+from app.schemas.recovery_backup import (
+    RecoveryBackupPayloadV2,
+    RecoveryBackupPayloadV3,
+    RecoveryDocumentV2,
+)
 from app.services.document_index_jobs import enqueue_document_index_job
+from app.services.reminder_scheduler import event_start_at_utc
 
 @dataclass(frozen=True)
 class RestoreResult:
     restored_documents: int
     skipped_documents: int
+    restored_calendar_events: int = 0
+    restored_reminders: int = 0
+    restored_notifications: int = 0
 
 
 def validate_backup_master_key() -> None:
@@ -79,22 +93,27 @@ def restore_recovery_backup(
     if len(encrypted_content) > settings.backup_restore_max_file_size_bytes:
         raise RuntimeError("Recovery backup file exceeds the allowed size.")
     try:
-        payload = RecoveryBackupPayloadV2.model_validate_json(
+        payload = _validate_recovery_payload(
             _decode_backup_json(
                 content=encrypted_content,
                 recovery_key=recovery_key,
                 allow_legacy=allow_legacy,
             )
         )
-    except ValidationError as exc:
+    except (ValidationError, ValueError, json.JSONDecodeError) as exc:
         raise RuntimeError(
-            "Recovery backup does not match the supported version 2 schema."
+            "Recovery backup does not match the supported version 2 schema or current version 3 schema."
         ) from exc
 
     if len(payload.records.documents) > settings.backup_restore_max_documents:
         raise RuntimeError("Recovery backup contains too many document records.")
 
     restored: list[Document] = []
+    document_map: dict[int, Document] = {}
+    event_map: dict[int, CalendarEvent] = {}
+    restored_events = 0
+    restored_reminders = 0
+    restored_notifications = 0
     skipped = 0
     try:
         for record in payload.records.documents:
@@ -114,10 +133,38 @@ def restore_recovery_backup(
                 )
             ):
                 skipped += 1
+                document_map[record.id] = db.scalar(
+                    select(Document).where(
+                        Document.owner_id == owner_id,
+                        Document.checksum_sha256 == checksum,
+                        Document.deleted_at.is_(None),
+                    )
+                )
                 continue
             document = _document_from_record(owner_id=owner_id, record=record)
             db.add(document)
+            db.flush()
             restored.append(document)
+            document_map[record.id] = document
+
+        if isinstance(payload, RecoveryBackupPayloadV3):
+            event_map, restored_events = _restore_calendar_events(
+                db=db,
+                owner_id=owner_id,
+                records=payload.records.calendar_events,
+                document_map=document_map,
+            )
+            restored_reminders = _restore_event_reminders(
+                db=db,
+                records=payload.records.event_reminders,
+                event_map=event_map,
+            )
+            restored_notifications = _restore_notifications(
+                db=db,
+                owner_id=owner_id,
+                records=payload.records.notifications,
+                event_map=event_map,
+            )
 
         db.commit()
     except RuntimeError:
@@ -126,12 +173,167 @@ def restore_recovery_backup(
     except (SQLAlchemyError, TypeError, ValueError, ArithmeticError) as exc:
         db.rollback()
         raise RuntimeError(
-            "Recovery backup could not be stored because its document data is invalid."
+            "Recovery backup could not be stored because its data is invalid."
         ) from exc
     for document in restored:
         if document.raw_text:
             enqueue_document_index_job(db=db, document=document)
-    return RestoreResult(restored_documents=len(restored), skipped_documents=skipped)
+    return RestoreResult(
+        restored_documents=len(restored),
+        skipped_documents=skipped,
+        restored_calendar_events=restored_events,
+        restored_reminders=restored_reminders,
+        restored_notifications=restored_notifications,
+    )
+
+
+def _validate_recovery_payload(content: bytes) -> RecoveryBackupPayloadV2 | RecoveryBackupPayloadV3:
+    decoded = json.loads(content)
+    if not isinstance(decoded, dict):
+        raise ValueError("Recovery payload must be an object.")
+    if decoded.get("schema_version") == 3:
+        return RecoveryBackupPayloadV3.model_validate(decoded)
+    if decoded.get("schema_version") == 2:
+        return RecoveryBackupPayloadV2.model_validate(decoded)
+    raise ValueError("Unsupported recovery schema version.")
+
+
+def _restore_calendar_events(
+    *,
+    db: Session,
+    owner_id: int,
+    records: list[object],
+    document_map: dict[int, Document],
+) -> tuple[dict[int, CalendarEvent], int]:
+    restored = 0
+    event_map: dict[int, CalendarEvent] = {}
+    for record in records:
+        restored_ical_uid = _restored_ical_uid(owner_id=owner_id, source_ical_uid=record.ical_uid)
+        existing = db.scalar(
+            select(CalendarEvent).where(
+                CalendarEvent.owner_id == owner_id,
+                CalendarEvent.ical_uid.in_([record.ical_uid, restored_ical_uid]),
+            )
+        )
+        if existing is not None:
+            event_map[record.id] = existing
+            continue
+        event = CalendarEvent(
+            owner_id=owner_id,
+            document_id=(document_map.get(record.document_id).id if record.document_id in document_map else None),
+            title=record.title,
+            description=record.description,
+            event_type=record.event_type,
+            status=record.status,
+            source=record.source,
+            all_day=record.all_day,
+            start_date=record.start_date,
+            end_date=record.end_date,
+            start_at=record.start_at,
+            end_at=record.end_at,
+            timezone=record.timezone,
+            source_field=record.source_field,
+            source_key=record.source_key,
+            source_evidence=record.source_evidence,
+            confidence_score=record.confidence_score,
+            requires_review=record.requires_review,
+            detached_from_source=record.detached_from_source,
+            completed_at=record.completed_at,
+            ical_uid=restored_ical_uid,
+            sequence=record.sequence,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+        db.add(event)
+        db.flush()
+        event_map[record.id] = event
+        restored += 1
+    return event_map, restored
+
+
+def _restored_ical_uid(*, owner_id: int, source_ical_uid: str) -> str:
+    """Avoid the global UID collision with the source account while remaining idempotent."""
+    value = uuid.uuid5(
+        uuid.NAMESPACE_URL,
+        f"docsflow-recovery:{owner_id}:{source_ical_uid}",
+    )
+    return f"{value}@docsflow"
+
+
+def _restore_event_reminders(*, db: Session, records: list[object], event_map: dict[int, CalendarEvent]) -> int:
+    restored = 0
+    now = datetime.now(UTC)
+    for record in records:
+        event = event_map.get(record.event_id)
+        if event is None:
+            continue
+        existing = db.scalar(
+            select(EventReminder).where(
+                EventReminder.event_id == event.id,
+                EventReminder.channel == record.channel,
+                EventReminder.offset_minutes == record.offset_minutes,
+            )
+        )
+        if existing is not None:
+            continue
+        status = record.status
+        scheduled_for = record.scheduled_for
+        attempts = record.attempts
+        error_message = record.error_message
+        if status in {EventReminderStatus.pending, EventReminderStatus.sending}:
+            scheduled_for = event_start_at_utc(event=event) - timedelta(minutes=record.offset_minutes)
+            attempts = 0
+            if scheduled_for <= now:
+                status = EventReminderStatus.cancelled
+                error_message = "Cancelled during recovery to prevent overdue delivery."
+            else:
+                status = EventReminderStatus.pending
+                error_message = None
+        db.add(
+            EventReminder(
+                event_id=event.id,
+                channel=record.channel,
+                offset_minutes=record.offset_minutes,
+                scheduled_for=scheduled_for,
+                status=status,
+                last_attempt_at=record.last_attempt_at if status not in {EventReminderStatus.pending, EventReminderStatus.cancelled} else None,
+                sent_at=record.sent_at,
+                attempts=attempts,
+                error_message=error_message,
+                created_at=record.created_at,
+                updated_at=record.updated_at,
+            )
+        )
+        restored += 1
+    return restored
+
+
+def _restore_notifications(*, db: Session, owner_id: int, records: list[object], event_map: dict[int, CalendarEvent]) -> int:
+    restored = 0
+    for record in records:
+        event = event_map.get(record.event_id) if record.event_id else None
+        existing = db.scalar(
+            select(Notification.id).where(
+                Notification.owner_id == owner_id,
+                Notification.title == record.title,
+                Notification.body == record.body,
+                Notification.created_at == record.created_at,
+            )
+        )
+        if existing is not None:
+            continue
+        db.add(
+            Notification(
+                owner_id=owner_id,
+                event_id=event.id if event else None,
+                title=record.title,
+                body=record.body,
+                read_at=record.read_at,
+                created_at=record.created_at,
+            )
+        )
+        restored += 1
+    return restored
 
 
 def _decode_backup_json(

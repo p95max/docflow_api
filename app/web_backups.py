@@ -457,8 +457,11 @@ async def restore_backup_submit(
         db=db,
         current_user=current_user,
         restore_result=(
-            f"Restored {result.restored_documents} document(s); "
-            f"skipped {result.skipped_documents} duplicate(s)."
+            f"Restored {result.restored_documents} document(s), "
+            f"{result.restored_calendar_events} calendar event(s), "
+            f"{result.restored_reminders} reminder(s), and "
+            f"{result.restored_notifications} notification(s); "
+            f"skipped {result.skipped_documents} duplicate document(s)."
         ),
     )
 

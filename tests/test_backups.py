@@ -95,7 +95,7 @@ def test_recovery_backup_excludes_credentials_and_keeps_document_text(
     payload = json.loads(gzip.decompress(archive.content))
     serialized = json.dumps(payload)
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["records"]["users"][0]["email"] == test_user.email
     assert payload["records"]["documents"][0]["storage_key"] == "1/invoice.pdf"
     document_payload = payload["records"]["documents"][0]

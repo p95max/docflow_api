@@ -242,8 +242,9 @@ python -m poetry run alembic upgrade head
 ### Recovery backups
 
 Backups on `/backups` are recovery archives: they contain document metadata,
-extracted text, optional personal notes, and structured extraction results, but
-not original PDF, JPG, or PNG files. Each archive is encrypted with a per-user
+extracted text, optional personal notes, structured extraction results,
+calendar events, reminders, and in-app notifications, but not original PDF,
+JPG, or PNG files. Each archive is encrypted with a per-user
 **Recovery Key** before it is uploaded to Google Drive. The key is displayed
 once after it is generated; save it in a password manager or another secure
 location.
@@ -269,6 +270,14 @@ its Recovery Key can read the backed-up document data, so keep them separately
 and securely. A compromise of both the database and `BACKUP_MASTER_KEY` can also
 expose the stored Recovery Key. Recovery archives preserve extracted text and
 document data, but not the original PDF, JPG, or PNG files.
+
+The current archive format is schema version 3 and contains record counts for
+each exported collection. Restore checks that schema strictly, reconnects
+calendar events to their restored documents, and also restores user-created
+events. Pending reminders are recalculated from the restored event time; a
+reminder whose scheduled time is already past is cancelled instead of being
+delivered late. Version 2 recovery archives remain supported. OAuth credentials
+and Google Drive refresh tokens are never included in recovery archives.
 
 DocsFlow stores only an encrypted copy of that key. Set a separate application
 master key before generating Recovery Keys or restoring backups:
