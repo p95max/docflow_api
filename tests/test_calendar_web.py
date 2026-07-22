@@ -230,10 +230,14 @@ def test_document_page_lists_related_events_and_creates_deadline_event(
     assert "Related calendar events" in page.text
     assert "Existing deadline" in page.text
     assert "Create event from deadline" in page.text
-    assert "Export ICS" in page.text
+    assert f'href="/calendar/events/{related.id}"' in page.text
+
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token
 
     created = client.post(
         f"/documents/{document.id}/calendar/from-deadline",
+        data={"csrf_token": csrf_token},
         follow_redirects=False,
     )
     assert created.status_code == status.HTTP_303_SEE_OTHER

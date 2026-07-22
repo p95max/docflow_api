@@ -277,7 +277,7 @@ def test_temporal_evidence_requests_page_aware_text_extraction(
     extraction = DocumentAIExtraction.model_validate(
         _document_extraction_data(temporal_events=[_event_data()])
     )
-    document = SimpleNamespace(id=123)
+    document = SimpleNamespace(id=123, storage_key="documents/source.pdf")
     expected_pages = [SimpleNamespace(page_number=1, text="source")]
     seen: list[object] = []
 

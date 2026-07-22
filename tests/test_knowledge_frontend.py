@@ -74,10 +74,10 @@ def test_knowledge_conversation_page_has_short_question_form(
 
     assert response.status_code == 200
     assert 'maxlength="300"' in response.text
-    assert "Which invoices are due this month?" in response.text
-    assert "Ask a concise question" in response.text
+    assert 'placeholder="Ask a concise question about your documents"' in response.text
+    assert "Ask a concise question (up to 300 characters)" in response.text
     assert f'action="/knowledge/conversations/{conversation.id}/delete"' in response.text
-    assert 'data-loading-label="Asking…"' in response.text
+    assert 'data-loading-label="Asking"' in response.text
     assert '<script data-form-feedback>' in response.text
 
 
@@ -110,9 +110,9 @@ def test_knowledge_conversation_can_be_deleted_from_conversation_list(
 def test_knowledge_message_timestamp_uses_berlin_time() -> None:
     timestamp = datetime(2026, 7, 14, 8, 43, tzinfo=timezone.utc)
 
-    assert web._format_berlin_datetime(timestamp) == "10:43 14-07-2026"
-    assert web._format_berlin_date(timestamp) == "14-07-2026"
-    assert web._format_berlin_time(timestamp) == "10:43"
+    assert web._format_user_datetime(timestamp, "Europe/Berlin") == "10:43 14-07-2026"
+    assert web._format_user_date(timestamp, "Europe/Berlin") == "14-07-2026"
+    assert web._format_user_time(timestamp, "Europe/Berlin") == "10:43"
 
 
 def test_knowledge_can_be_disabled_without_enqueuing_embeddings(
