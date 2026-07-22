@@ -18,7 +18,7 @@ from app.schemas.calendar_event import CalendarEventUpdate
 from app.services.calendar_events import cancel_event, delete_event, update_event
 from app.services.reminder_scheduler import (
     ReminderSchedulerMetrics,
-    configure_in_app_reminder,
+    configure_in_app_reminders,
     event_start_at_utc,
     process_due_reminders,
 )
@@ -49,7 +49,7 @@ def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
-def test_reminder_setting_creates_updates_and_removes_one_in_app_reminder(
+def test_reminder_settings_create_update_and_remove_multiple_in_app_reminders(
     db_session: Session,
     test_user: User,
 ) -> None:
@@ -57,17 +57,26 @@ def test_reminder_setting_creates_updates_and_removes_one_in_app_reminder(
     db_session.add(event)
     db_session.commit()
 
-    first = configure_in_app_reminder(db=db_session, event=event, offset_minutes=60)
-    repeated = configure_in_app_reminder(db=db_session, event=event, offset_minutes=60)
-    updated = configure_in_app_reminder(db=db_session, event=event, offset_minutes=24 * 60)
-    removed = configure_in_app_reminder(db=db_session, event=event, offset_minutes=None)
+    first = configure_in_app_reminders(
+        db=db_session,
+        event=event,
+        offset_minutes={0, 60, 24 * 60},
+    )
+    repeated = configure_in_app_reminders(
+        db=db_session,
+        event=event,
+        offset_minutes={0, 60, 24 * 60},
+    )
+    updated = configure_in_app_reminders(db=db_session, event=event, offset_minutes={24 * 60})
+    removed = configure_in_app_reminders(db=db_session, event=event, offset_minutes=set())
 
-    assert first is not None
-    assert repeated is not None and repeated.id == first.id
-    assert updated is not None and updated.offset_minutes == 24 * 60
-    assert removed is None
+    assert [reminder.offset_minutes for reminder in first] == [0, 60, 24 * 60]
+    assert [reminder.id for reminder in repeated] == [reminder.id for reminder in first]
+    assert [reminder.offset_minutes for reminder in updated] == [24 * 60]
+    assert removed == []
     reminders = list(db_session.scalars(select(EventReminder).where(EventReminder.event_id == event.id)))
     assert [reminder.status for reminder in reminders] == [
+        EventReminderStatus.cancelled,
         EventReminderStatus.cancelled,
         EventReminderStatus.cancelled,
     ]

@@ -272,8 +272,8 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert 'name="start_date"' in form.text
     assert 'name="start_time"' in form.text
     assert 'name="timezone_name"' in form.text
-    assert 'name="reminder_setting"' in form.text
-    assert "Creates an in-app notification" in form.text
+    assert 'name="reminder_settings"' in form.text
+    assert "Select any combination" in form.text
     csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
     assert csrf_token
     assert f'name="csrf_token" value="{csrf_token}"' in form.text
@@ -303,7 +303,7 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
             "end_time": "2026-08-10T10:15",
             "timezone_name": "Europe/Berlin",
             "document_id": str(document.id),
-            "reminder_setting": "60",
+            "reminder_settings": ["60", "1440"],
         },
         follow_redirects=False,
     )
@@ -325,6 +325,12 @@ def test_calendar_event_form_creates_timed_event_and_rejects_bad_range(
     assert reminder is not None
     assert reminder.offset_minutes == 60
     assert reminder.status == EventReminderStatus.pending
+    assert db_session.scalar(
+        select(EventReminder).where(
+            EventReminder.event_id == event.id,
+            EventReminder.offset_minutes == 1440,
+        )
+    ) is not None
     assert event.start_at.hour == 7
 
 

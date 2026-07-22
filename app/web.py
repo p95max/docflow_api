@@ -75,7 +75,7 @@ from app.services.calendar_feeds import (
     generate_calendar_feed_token,
     revoke_calendar_feed_token,
 )
-from app.services.reminder_scheduler import configure_in_app_reminder
+from app.services.reminder_scheduler import configure_in_app_reminders
 from app.services.icalendar import ICAL_CONTENT_TYPE, serialize_event_calendar
 from app.services.notifications import (
     NotificationNotFoundError,
@@ -475,12 +475,12 @@ def _blank_to_none(value: str | None) -> str | None:
     return stripped or None
 
 
-_REMINDER_SETTING_OFFSETS = {"": None, "0": 0, "60": 60, "1440": 24 * 60}
+_REMINDER_SETTING_OFFSETS = {"0": 0, "60": 60, "1440": 24 * 60}
 
 
-def _parse_reminder_setting(value: str) -> int | None:
+def _parse_reminder_settings(values: list[str]) -> set[int]:
     try:
-        return _REMINDER_SETTING_OFFSETS[value]
+        return {_REMINDER_SETTING_OFFSETS[value] for value in values}
     except KeyError as exc:
         raise ValueError("Choose a valid reminder setting.") from exc
 
@@ -1388,7 +1388,7 @@ def _calendar_form_values(
             "end_time": "",
             "timezone": timezone_name,
             "document_id": document_id or "",
-            "reminder_setting": "",
+            "reminder_settings": [],
         }
 
     event_timezone = event.timezone or timezone_name
@@ -1417,7 +1417,7 @@ def _calendar_form_values(
         "end_time": end_time,
         "timezone": event_timezone,
         "document_id": event.document_id or "",
-        "reminder_setting": "",
+        "reminder_settings": [],
     }
 
 
@@ -1441,14 +1441,15 @@ def _render_calendar_event_form(
         start_date=start_date,
     )
     if event is not None and values is None:
-        reminder = db.scalar(
-            select(EventReminder).where(
+        form_values["reminder_settings"] = [str(item.offset_minutes) for item in db.scalars(
+            select(EventReminder)
+            .where(
                 EventReminder.event_id == event.id,
                 EventReminder.channel == EventReminderChannel.in_app,
                 EventReminder.status == EventReminderStatus.pending,
             )
-        )
-        form_values["reminder_setting"] = str(reminder.offset_minutes) if reminder else ""
+            .order_by(EventReminder.offset_minutes)
+        ).all()]
     today = _calendar_today(timezone_name)
     start_value = str(form_values["start_date"] or form_values["start_time"] or "")
     start_day = date.fromisoformat(start_value[:10]) if start_value else None
@@ -1718,7 +1719,7 @@ def create_calendar_event_submit(
     end_time: str = Form(""),
     timezone_name: str = Form(""),
     document_id: str = Form(""),
-    reminder_setting: str = Form(""),
+    reminder_settings: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1736,7 +1737,7 @@ def create_calendar_event_submit(
         "end_time": end_time,
         "timezone": timezone_name,
         "document_id": document_id,
-        "reminder_setting": reminder_setting,
+        "reminder_settings": reminder_settings,
     }
     try:
         payload = _parse_calendar_event_form(
@@ -1757,10 +1758,10 @@ def create_calendar_event_submit(
             owner_id=current_user.id,
             payload=payload,
         )
-        configure_in_app_reminder(
+        configure_in_app_reminders(
             db=db,
             event=event,
-            offset_minutes=_parse_reminder_setting(reminder_setting),
+            offset_minutes=_parse_reminder_settings(reminder_settings),
         )
     except (ValidationError, ValueError, calendar_events.CalendarDocumentNotFoundError) as exc:
         return _render_calendar_event_form(
@@ -1891,7 +1892,7 @@ def edit_calendar_event_submit(
     end_time: str = Form(""),
     timezone_name: str = Form(""),
     document_id: str = Form(""),
-    reminder_setting: str = Form(""),
+    reminder_settings: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1925,7 +1926,7 @@ def edit_calendar_event_submit(
         "end_time": end_time,
         "timezone": timezone_name,
         "document_id": document_id,
-        "reminder_setting": reminder_setting,
+        "reminder_settings": reminder_settings,
     }
     try:
         payload = _parse_calendar_event_form(
@@ -1948,10 +1949,10 @@ def edit_calendar_event_submit(
             event_id=event_id,
             payload=payload,
         )
-        configure_in_app_reminder(
+        configure_in_app_reminders(
             db=db,
             event=event,
-            offset_minutes=_parse_reminder_setting(reminder_setting),
+            offset_minutes=_parse_reminder_settings(reminder_settings),
         )
     except (
         ValidationError,

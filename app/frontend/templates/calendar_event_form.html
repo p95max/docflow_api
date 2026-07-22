@@ -70,14 +70,15 @@
         </select>
       </div>
       <div class="col-12">
-        <label class="form-label" for="reminder_setting">Reminder settings</label>
-        <select class="form-select" id="reminder_setting" name="reminder_setting" aria-describedby="reminder-help">
-          <option value=""{% if not form_values.reminder_setting %} selected{% endif %}>No reminder</option>
-          <option value="0"{% if form_values.reminder_setting == '0' %} selected{% endif %}>At event time</option>
-          <option value="60"{% if form_values.reminder_setting == '60' %} selected{% endif %}>1 hour before</option>
-          <option value="1440"{% if form_values.reminder_setting == '1440' %} selected{% endif %}>1 day before</option>
-        </select>
-        <div class="form-text" id="reminder-help">Creates an in-app notification. Reminders are delivered every five minutes.</div>
+        <fieldset class="mb-0" aria-describedby="reminder-help">
+          <legend class="form-label mb-2">Reminders</legend>
+          <div class="d-flex flex-wrap gap-3">
+            <div class="form-check"><input class="form-check-input" id="reminder_0" name="reminder_settings" type="checkbox" value="0"{% if '0' in form_values.reminder_settings %} checked{% endif %}><label class="form-check-label" for="reminder_0">At event time</label></div>
+            <div class="form-check"><input class="form-check-input" id="reminder_60" name="reminder_settings" type="checkbox" value="60"{% if '60' in form_values.reminder_settings %} checked{% endif %}><label class="form-check-label" for="reminder_60">1 hour before</label></div>
+            <div class="form-check"><input class="form-check-input" id="reminder_1440" name="reminder_settings" type="checkbox" value="1440"{% if '1440' in form_values.reminder_settings %} checked{% endif %}><label class="form-check-label" for="reminder_1440">1 day before</label></div>
+          </div>
+          <div class="form-text" id="reminder-help">Select any combination. Each creates an in-app notification and is checked every five minutes.</div>
+        </fieldset>
       </div>
       {% if event %}
         <div class="col-12"><div class="border rounded p-3 calendar-readonly"><span class="small text-secondary text-uppercase">Status</span><div class="mt-1"><span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span></div></div></div>

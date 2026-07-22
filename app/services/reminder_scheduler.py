@@ -40,8 +40,23 @@ def configure_in_app_reminder(
     event: CalendarEvent,
     offset_minutes: int | None,
 ) -> EventReminder | None:
-    """Keep one pending in-app reminder matching the user's selected offset."""
-    if offset_minutes is not None and offset_minutes not in IN_APP_REMINDER_OFFSETS:
+    """Compatibility helper for configuring one in-app reminder."""
+    reminders = configure_in_app_reminders(
+        db=db,
+        event=event,
+        offset_minutes={offset_minutes} if offset_minutes is not None else set(),
+    )
+    return reminders[0] if reminders else None
+
+
+def configure_in_app_reminders(
+    *,
+    db: Session,
+    event: CalendarEvent,
+    offset_minutes: set[int],
+) -> list[EventReminder]:
+    """Keep the selected set of pending in-app reminders for an event."""
+    if not offset_minutes.issubset(IN_APP_REMINDER_OFFSETS):
         raise ValueError("Unsupported reminder setting.")
 
     pending = list(
@@ -53,36 +68,42 @@ def configure_in_app_reminder(
             )
         ).all()
     )
-    matching = next((item for item in pending if item.offset_minutes == offset_minutes), None)
-    if matching is not None:
-        return matching
     for reminder in pending:
-        reminder.status = EventReminderStatus.cancelled
-        reminder.error_message = "Reminder setting was changed."
-    if offset_minutes is None:
-        db.commit()
-        return None
+        if reminder.offset_minutes not in offset_minutes:
+            reminder.status = EventReminderStatus.cancelled
+            reminder.error_message = "Reminder setting was changed."
 
-    existing = db.scalar(
-        select(EventReminder).where(
-            EventReminder.event_id == event.id,
-            EventReminder.channel == EventReminderChannel.in_app,
-            EventReminder.offset_minutes == offset_minutes,
-        )
-    )
-    if existing is not None:
-        db.commit()
-        return existing
-    reminder = EventReminder(
-        event_id=event.id,
-        channel=EventReminderChannel.in_app,
-        offset_minutes=offset_minutes,
-        scheduled_for=event_start_at_utc(event=event) - timedelta(minutes=offset_minutes),
-    )
-    db.add(reminder)
+    reminders_by_offset = {reminder.offset_minutes: reminder for reminder in pending}
+    selected: list[EventReminder] = []
+    for offset in sorted(offset_minutes):
+        reminder = reminders_by_offset.get(offset)
+        if reminder is None:
+            reminder = db.scalar(
+                select(EventReminder).where(
+                    EventReminder.event_id == event.id,
+                    EventReminder.channel == EventReminderChannel.in_app,
+                    EventReminder.offset_minutes == offset,
+                )
+            )
+        if reminder is None:
+            reminder = EventReminder(
+                event_id=event.id,
+                channel=EventReminderChannel.in_app,
+                offset_minutes=offset,
+                scheduled_for=event_start_at_utc(event=event) - timedelta(minutes=offset),
+            )
+            db.add(reminder)
+        elif reminder.status == EventReminderStatus.cancelled and reminder.sent_at is None:
+            reminder.scheduled_for = event_start_at_utc(event=event) - timedelta(minutes=offset)
+            reminder.status = EventReminderStatus.pending
+            reminder.attempts = 0
+            reminder.last_attempt_at = None
+            reminder.error_message = None
+        selected.append(reminder)
     db.commit()
-    db.refresh(reminder)
-    return reminder
+    for reminder in selected:
+        db.refresh(reminder)
+    return selected
 
 
 class ReminderSchedulerMetrics(BaseModel):
