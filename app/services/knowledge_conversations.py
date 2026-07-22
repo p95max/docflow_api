@@ -157,11 +157,20 @@ def answer_conversation_question(
             document_ids=[document_id] if document_id is not None else None,
             limit=settings.knowledge_retrieval_limit,
         )
-        retrieved_sources = [
-            result
-            for result in search_results
-            if result.score >= settings.knowledge_min_similarity
-        ]
+        # A document explicitly selected by the user is authoritative scope.
+        # Short referential questions ("what about this document?") often have
+        # weak vector similarity, but the best chunks from that one file are
+        # still the correct grounded context. Global search keeps its threshold
+        # to avoid drawing unrelated files into an answer.
+        retrieved_sources = (
+            search_results
+            if document_id is not None
+            else [
+                result
+                for result in search_results
+                if result.score >= settings.knowledge_min_similarity
+            ]
+        )
 
         if not retrieved_sources:
             return _persist_answer(

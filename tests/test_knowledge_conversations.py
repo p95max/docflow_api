@@ -202,6 +202,45 @@ def test_document_scope_is_forwarded_to_retrieval(
     assert captured["document_ids"] == [7]
 
 
+def test_selected_document_uses_its_best_chunks_for_a_generic_question(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conversation = create_conversation(
+        db=db_session,
+        owner_id=test_user.id,
+        title="Selected invoice",
+    )
+    low_similarity_result = _search_result().model_copy(update={"score": 0.01})
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "search_document_chunks",
+        lambda **_: [low_similarity_result],
+    )
+    monkeypatch.setattr(
+        knowledge_conversations,
+        "create_openai_client",
+        lambda: _FakeClient(
+            {
+                "answer": "This is an invoice for 950 USD.",
+                "source_chunk_ids": [42],
+            }
+        ),
+    )
+
+    _, assistant_message = answer_conversation_question(
+        db=db_session,
+        owner_id=test_user.id,
+        conversation_id=conversation.id,
+        question="What about this document?",
+        document_id=7,
+    )
+
+    assert assistant_message.content == "This is an invoice for 950 USD."
+    assert [source.chunk_id for source in assistant_message.sources] == [42]
+
+
 def test_invented_source_id_is_not_saved_or_returned(
     db_session: Session,
     test_user: User,
