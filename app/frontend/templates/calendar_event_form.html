@@ -80,6 +80,17 @@
           <div class="form-text" id="reminder-help">Select any combination. Each creates an in-app notification and is checked every five minutes.</div>
         </fieldset>
       </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" id="email_reminders" name="email_reminders" type="checkbox" value="true"{% if form_values.email_reminders %} checked{% endif %}{% if not email_reminders_available %} disabled{% endif %} aria-describedby="email-reminder-help">
+          <label class="form-check-label" for="email_reminders">Also send selected reminders by email</label>
+        </div>
+        {% if email_reminders_available %}
+          <div class="form-text" id="email-reminder-help">Alerts will be sent to: {{ current_user.email }}. Email is an additional copy of the selected in-app reminders.</div>
+        {% else %}
+          <div class="form-text" id="email-reminder-help">Email delivery is unavailable. Configure SMTP with <code>EMAIL_REMINDERS_ENABLED=true</code> and enable email reminders in Settings.</div>
+        {% endif %}
+      </div>
       {% if event %}
         <div class="col-12"><div class="border rounded p-3 calendar-readonly"><span class="small text-secondary text-uppercase">Status</span><div class="mt-1"><span class="badge {{ event.status|status_badge_class }}">{{ event.status.value }}</span></div></div></div>
         {% if event.source_evidence %}<div class="col-12"><details class="calendar-readonly border rounded p-3"><summary class="fw-semibold cursor-pointer">AI evidence (read-only)</summary><div class="pt-3"><q>{{ event.source_evidence.quote or event.source_evidence.original_phrase or 'Not available' }}</q>{% if event.source_evidence.page_number %}<p class="small text-secondary mt-2 mb-0">Page {{ event.source_evidence.page_number }}</p>{% endif %}</div></details></div>{% endif %}

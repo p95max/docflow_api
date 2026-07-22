@@ -18,10 +18,13 @@ from app.schemas.calendar_event import CalendarEventUpdate
 from app.services.calendar_events import cancel_event, delete_event, update_event
 from app.services.reminder_scheduler import (
     ReminderSchedulerMetrics,
+    configure_email_reminders,
     configure_in_app_reminders,
     event_start_at_utc,
     process_due_reminders,
 )
+from app.services.email_reminders import FakeEmailReminderDeliverer
+from app.core.config import settings
 from app.worker import celery_app
 
 
@@ -80,6 +83,128 @@ def test_reminder_settings_create_update_and_remove_multiple_in_app_reminders(
         EventReminderStatus.cancelled,
         EventReminderStatus.cancelled,
     ]
+
+
+def test_email_reminders_are_created_only_for_future_selected_offsets(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "email_reminders_enabled", True)
+    monkeypatch.setattr(settings, "email_reminders_from_address", "reminders@example.com")
+    monkeypatch.setattr(settings, "email_reminders_smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "public_app_base_url", "https://docsflow.example.com")
+    event = _event(owner=test_user, start_date=date(2026, 8, 2))
+    db_session.add(event)
+    db_session.commit()
+
+    in_app = configure_in_app_reminders(db=db_session, event=event, offset_minutes={60, 1440})
+    email = configure_email_reminders(
+        db=db_session,
+        event=event,
+        offset_minutes={60, 1440},
+        recipient_email=test_user.email,
+        now=datetime(2026, 7, 20, 8, 0, tzinfo=UTC),
+    )
+    past_event = _event(owner=test_user, start_date=date(2026, 7, 20))
+    db_session.add(past_event)
+    db_session.commit()
+    skipped = configure_email_reminders(
+        db=db_session,
+        event=past_event,
+        offset_minutes={0, 60, 1440},
+        recipient_email=test_user.email,
+        now=datetime(2026, 7, 20, 8, 0, tzinfo=UTC),
+    )
+
+    assert [item.channel for item in in_app] == [EventReminderChannel.in_app] * 2
+    assert [item.offset_minutes for item in email] == [60, 1440]
+    assert all(item.recipient_email == test_user.email for item in email)
+    assert skipped == []
+    assert list(
+        db_session.scalars(
+            select(EventReminder).where(
+                EventReminder.event_id == past_event.id,
+                EventReminder.channel == EventReminderChannel.email,
+            )
+        )
+    ) == []
+
+
+def test_email_delivery_records_provider_acceptance_without_affecting_in_app(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime(2026, 7, 20, 8, 0, tzinfo=UTC)
+    event = _event(owner=test_user, start_date=date(2026, 7, 21))
+    email = EventReminder(
+        event=event,
+        channel=EventReminderChannel.email,
+        recipient_email=test_user.email,
+        offset_minutes=60,
+        scheduled_for=now,
+    )
+    in_app = _reminder(event=event, scheduled_for=now)
+    db_session.add_all([email, in_app])
+    db_session.commit()
+    monkeypatch.setattr(settings, "public_app_base_url", "https://docsflow.example.com")
+    fake = FakeEmailReminderDeliverer()
+    monkeypatch.setattr(
+        "app.services.reminder_scheduler.get_email_reminder_deliverer",
+        lambda: fake,
+    )
+
+    metrics = process_due_reminders(
+        db=db_session,
+        now=now,
+        max_attempts=3,
+        retry_base_seconds=60,
+        batch_size=10,
+    )
+
+    db_session.refresh(email)
+    db_session.refresh(in_app)
+    assert metrics.sent == 2
+    assert email.status == EventReminderStatus.sent
+    assert email.provider_message_id == f"fake-event-reminder-{email.id}"
+    assert in_app.status == EventReminderStatus.sent
+    assert len(fake.delivered) == 1
+    assert "https://docsflow.example.com/calendar/events/" in fake.delivered[0].text_body
+
+
+def test_event_update_reschedules_and_cancellation_stops_email_reminders(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "email_reminders_enabled", True)
+    monkeypatch.setattr(settings, "email_reminders_from_address", "reminders@example.com")
+    monkeypatch.setattr(settings, "email_reminders_smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "public_app_base_url", "https://docsflow.example.com")
+    event = _event(owner=test_user, start_date=date(2040, 8, 2))
+    db_session.add(event)
+    db_session.commit()
+    email = configure_email_reminders(
+        db=db_session,
+        event=event,
+        offset_minutes={60},
+        recipient_email=test_user.email,
+        now=datetime(2039, 1, 1, tzinfo=UTC),
+    )[0]
+
+    update_event(
+        db=db_session,
+        owner_id=test_user.id,
+        event_id=event.id,
+        payload=CalendarEventUpdate(start_date=date(2040, 8, 4)),
+    )
+    db_session.refresh(email)
+    assert _as_utc(email.scheduled_for) == datetime(2040, 8, 3, 21, tzinfo=UTC)
+
+    cancel_event(db=db_session, owner_id=test_user.id, event_id=event.id)
+    db_session.refresh(email)
+    assert email.status == EventReminderStatus.cancelled
 
 
 def test_scheduler_sends_due_reminder_once(
@@ -189,7 +314,7 @@ def test_scheduler_never_marks_unconfigured_delivery_as_sent(
     assert metrics.sent == 0
     assert metrics.delayed == 1
     assert reminder.status == EventReminderStatus.pending
-    assert "not configured" in (reminder.error_message or "")
+    assert "disabled or incomplete" in (reminder.error_message or "")
 
 
 def test_scheduler_creates_one_in_app_notification_for_a_due_reminder(

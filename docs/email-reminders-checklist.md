@@ -46,21 +46,21 @@ The email address is the signed-in account address. Disable the control with a c
 
 ## 4. Scheduling and delivery
 
-- [ ] Extend reminder configuration so selected offsets create both `in_app` and `email` records when the optional checkbox is enabled.
-- [ ] Preserve in-app delivery when email is disabled or fails.
-- [ ] Deliver only future reminders; never send missed reminders retroactively.
-- [ ] Send only to the owner-approved recipient address.
-- [ ] Keep the email concise: event title, date/time, timezone, reminder offset, and one direct authenticated link to that specific DocsFlow event; do not include document raw text or unnecessary extracted data.
-- [ ] Build matching plain-text and HTML email versions.
-- [ ] Escape all event/document-derived content in HTML email.
-- [ ] Create an email design system aligned with the DocsFlow interface: dark surface palette, teal accent, compact typography, clear event card, and recognizable DocsFlow header/footer.
+- [x] Extend reminder configuration so selected offsets create both `in_app` and `email` records when the optional checkbox is enabled.
+- [x] Preserve in-app delivery when email is disabled or fails.
+- [x] Deliver only future reminders; never send missed reminders retroactively.
+- [x] Send only to the owner-approved recipient address.
+- [x] Keep the email concise: event title, date/time, timezone, reminder offset, and one direct authenticated link to that specific DocsFlow event; do not include document raw text or unnecessary extracted data.
+- [x] Build matching plain-text and HTML email versions.
+- [x] Escape all event/document-derived content in HTML email.
+- [x] Create an email design system aligned with the DocsFlow interface: dark surface palette, teal accent, compact typography, clear event card, and recognizable DocsFlow header/footer.
 - [ ] Verify the HTML email remains readable in clients that block dark-mode styles; keep the plain-text alternative complete and usable.
 - [ ] Test the template in major email clients and at narrow mobile widths.
-- [ ] Add a stable provider idempotency key to prevent duplicate sends on retries.
-- [ ] Mark a reminder as `sent` only after provider acceptance.
-- [ ] Retry temporary failures with bounded exponential backoff; stop after the configured maximum.
-- [ ] Cancel pending email reminders when the event is deleted, cancelled, or completed.
-- [ ] Recalculate pending email reminders when event date, time, or timezone changes.
+- [x] Add a stable provider idempotency key to prevent duplicate sends on retries.
+- [x] Mark a reminder as `sent` only after provider acceptance.
+- [x] Retry temporary failures with bounded exponential backoff; stop after the configured maximum.
+- [x] Cancel pending email reminders when the event is deleted, cancelled, or completed.
+- [x] Recalculate pending email reminders when event date, time, or timezone changes.
 
 ## 5. Calendar form and event detail
 
@@ -78,7 +78,7 @@ The email address is the signed-in account address. Disable the control with a c
 
 - [ ] Show the account email used for reminders in Settings.
 - [ ] Let the user change the notification email in Settings, then verify the new address before using it for reminders.
-- [ ] Add an optional global email-reminder preference if approved.
+- [x] Add an optional global email-reminder preference if approved.
 - [ ] Explain that event titles and dates may be disclosed to the configured mailbox.
 - [ ] Require a valid active account email before enabling email reminders.
 - [ ] Decide whether email verification is required.

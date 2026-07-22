@@ -75,7 +75,11 @@ from app.services.calendar_feeds import (
     generate_calendar_feed_token,
     revoke_calendar_feed_token,
 )
-from app.services.reminder_scheduler import configure_in_app_reminders
+from app.services.reminder_scheduler import (
+    configure_email_reminders,
+    configure_in_app_reminders,
+    disable_email_reminders_for_owner,
+)
 from app.services.icalendar import ICAL_CONTENT_TYPE, serialize_event_calendar
 from app.services.notifications import (
     NotificationNotFoundError,
@@ -888,6 +892,7 @@ def settings_page(
         current_user=current_user,
         timezone_value=current_user.timezone,
         updated=request.query_params.get("updated") == "1",
+        email_reminders_updated=request.query_params.get("email_reminders_updated") == "1",
         calendar_feed_configured=current_user.calendar_feed_token_hash is not None,
     )
 
@@ -922,6 +927,31 @@ def update_timezone_setting(
     update_user_timezone(db=db, user=current_user, timezone=payload.timezone)
     return RedirectResponse(
         url="/settings?updated=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/settings/email-reminders",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def update_email_reminder_setting(
+    request: Request,
+    email_reminders_enabled: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+
+    current_user.email_reminders_enabled = email_reminders_enabled is not None
+    if not current_user.email_reminders_enabled:
+        disable_email_reminders_for_owner(db=db, owner_id=current_user.id)
+    db.commit()
+    return RedirectResponse(
+        url="/settings?email_reminders_updated=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -1345,10 +1375,9 @@ def _render_calendar_event_detail(
                 select(EventReminder)
                 .where(
                     EventReminder.event_id == event.id,
-                    EventReminder.channel == EventReminderChannel.in_app,
                     EventReminder.status == EventReminderStatus.pending,
                 )
-                .order_by(EventReminder.offset_minutes)
+                .order_by(EventReminder.offset_minutes, EventReminder.channel)
             ).all()
         ),
         error=error,
@@ -1389,6 +1418,7 @@ def _calendar_form_values(
             "timezone": timezone_name,
             "document_id": document_id or "",
             "reminder_settings": [],
+            "email_reminders": False,
         }
 
     event_timezone = event.timezone or timezone_name
@@ -1418,6 +1448,7 @@ def _calendar_form_values(
         "timezone": event_timezone,
         "document_id": event.document_id or "",
         "reminder_settings": [],
+        "email_reminders": False,
     }
 
 
@@ -1450,6 +1481,13 @@ def _render_calendar_event_form(
             )
             .order_by(EventReminder.offset_minutes)
         ).all()]
+        form_values["email_reminders"] = db.scalar(
+            select(EventReminder.id).where(
+                EventReminder.event_id == event.id,
+                EventReminder.channel == EventReminderChannel.email,
+                EventReminder.status == EventReminderStatus.pending,
+            )
+        ) is not None
     today = _calendar_today(timezone_name)
     start_value = str(form_values["start_date"] or form_values["start_time"] or "")
     start_day = date.fromisoformat(start_value[:10]) if start_value else None
@@ -1464,6 +1502,10 @@ def _render_calendar_event_form(
         calendar_today=today.isoformat(),
         error=error,
         is_past=bool(start_day and start_day < today),
+        email_reminders_available=(
+            settings.email_reminder_delivery_available
+            and current_user.email_reminders_enabled
+        ),
         status_code=status_code,
     )
 
@@ -1720,6 +1762,7 @@ def create_calendar_event_submit(
     timezone_name: str = Form(""),
     document_id: str = Form(""),
     reminder_settings: list[str] = Form(default=[]),
+    email_reminders: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1738,6 +1781,7 @@ def create_calendar_event_submit(
         "timezone": timezone_name,
         "document_id": document_id,
         "reminder_settings": reminder_settings,
+        "email_reminders": email_reminders is not None,
     }
     try:
         payload = _parse_calendar_event_form(
@@ -1762,6 +1806,16 @@ def create_calendar_event_submit(
             db=db,
             event=event,
             offset_minutes=_parse_reminder_settings(reminder_settings),
+        )
+        configure_email_reminders(
+            db=db,
+            event=event,
+            offset_minutes=(
+                _parse_reminder_settings(reminder_settings)
+                if email_reminders is not None
+                else set()
+            ),
+            recipient_email=current_user.email,
         )
     except (ValidationError, ValueError, calendar_events.CalendarDocumentNotFoundError) as exc:
         return _render_calendar_event_form(
@@ -1893,6 +1947,7 @@ def edit_calendar_event_submit(
     timezone_name: str = Form(""),
     document_id: str = Form(""),
     reminder_settings: list[str] = Form(default=[]),
+    email_reminders: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1927,6 +1982,7 @@ def edit_calendar_event_submit(
         "timezone": timezone_name,
         "document_id": document_id,
         "reminder_settings": reminder_settings,
+        "email_reminders": email_reminders is not None,
     }
     try:
         payload = _parse_calendar_event_form(
@@ -1953,6 +2009,16 @@ def edit_calendar_event_submit(
             db=db,
             event=event,
             offset_minutes=_parse_reminder_settings(reminder_settings),
+        )
+        configure_email_reminders(
+            db=db,
+            event=event,
+            offset_minutes=(
+                _parse_reminder_settings(reminder_settings)
+                if email_reminders is not None
+                else set()
+            ),
+            recipient_email=current_user.email,
         )
     except (
         ValidationError,

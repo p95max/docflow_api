@@ -17,6 +17,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, object_session
 
 from app.core.timezones import DEFAULT_USER_TIMEZONE, validate_iana_timezone
+from app.core.config import settings
 from app.models.calendar_event import CalendarEvent, CalendarEventStatus
 from app.models.event_reminder import (
     EventReminder,
@@ -25,6 +26,10 @@ from app.models.event_reminder import (
 )
 from app.services.notifications import create_notification
 from app.services.audit import add_calendar_audit_log
+from app.services.email_reminders import (
+    build_email_reminder_message,
+    get_email_reminder_deliverer,
+)
 
 
 class ReminderDeliveryUnavailable(RuntimeError):
@@ -106,6 +111,108 @@ def configure_in_app_reminders(
     return selected
 
 
+def configure_email_reminders(
+    *,
+    db: Session,
+    event: CalendarEvent,
+    offset_minutes: set[int],
+    recipient_email: str,
+    now: datetime | None = None,
+) -> list[EventReminder]:
+    """Keep only selected, future email reminders for the event owner.
+
+    In-app reminders are intentionally untouched. An unconfigured transport or
+    a past calculated delivery time cannot leave an email row waiting to send.
+    """
+    if not offset_minutes.issubset(IN_APP_REMINDER_OFFSETS):
+        raise ValueError("Unsupported reminder setting.")
+    owner = event.owner
+    approved_recipient = (owner.email if owner is not None else "").strip().casefold()
+    normalized_recipient = recipient_email.strip().casefold()
+    if not approved_recipient or normalized_recipient != approved_recipient:
+        raise ValueError("Email reminders must use the event owner's account email.")
+
+    current_time = _as_utc(now)
+    pending = list(
+        db.scalars(
+            select(EventReminder).where(
+                EventReminder.event_id == event.id,
+                EventReminder.channel == EventReminderChannel.email,
+                EventReminder.status.in_([EventReminderStatus.pending, EventReminderStatus.sending]),
+            )
+        ).all()
+    )
+    requested = (
+        offset_minutes
+        if settings.email_reminder_delivery_available and owner is not None and owner.email_reminders_enabled
+        else set()
+    )
+    for reminder in pending:
+        calculated = event_start_at_utc(event=event) - timedelta(minutes=reminder.offset_minutes)
+        if reminder.offset_minutes not in requested or calculated <= current_time:
+            reminder.status = EventReminderStatus.cancelled
+            reminder.error_message = (
+                "Email reminder is no longer selected or its send time has passed."
+            )
+
+    pending_by_offset = {reminder.offset_minutes: reminder for reminder in pending}
+    selected: list[EventReminder] = []
+    for offset in sorted(requested):
+        scheduled_for = event_start_at_utc(event=event) - timedelta(minutes=offset)
+        if scheduled_for <= current_time:
+            continue
+        reminder = pending_by_offset.get(offset)
+        if reminder is None:
+            reminder = db.scalar(
+                select(EventReminder).where(
+                    EventReminder.event_id == event.id,
+                    EventReminder.channel == EventReminderChannel.email,
+                    EventReminder.offset_minutes == offset,
+                )
+            )
+        if reminder is None:
+            reminder = EventReminder(
+                event_id=event.id,
+                channel=EventReminderChannel.email,
+                recipient_email=recipient_email.strip(),
+                offset_minutes=offset,
+                scheduled_for=scheduled_for,
+            )
+            db.add(reminder)
+        elif reminder.status == EventReminderStatus.cancelled and reminder.sent_at is None:
+            reminder.recipient_email = recipient_email.strip()
+            reminder.scheduled_for = scheduled_for
+            reminder.status = EventReminderStatus.pending
+            reminder.attempts = 0
+            reminder.last_attempt_at = None
+            reminder.error_message = None
+        selected.append(reminder)
+    db.commit()
+    for reminder in selected:
+        db.refresh(reminder)
+    return selected
+
+
+def disable_email_reminders_for_owner(*, db: Session, owner_id: int) -> int:
+    """Cancel unsent email copies after the account-level preference is disabled."""
+    reminders = list(
+        db.scalars(
+            select(EventReminder)
+            .join(CalendarEvent)
+            .where(
+                CalendarEvent.owner_id == owner_id,
+                EventReminder.channel == EventReminderChannel.email,
+                EventReminder.status.in_([EventReminderStatus.pending, EventReminderStatus.sending]),
+            )
+            .with_for_update(of=EventReminder)
+        )
+    )
+    for reminder in reminders:
+        reminder.status = EventReminderStatus.cancelled
+        reminder.error_message = "Email reminders were disabled in account settings."
+    return len(reminders)
+
+
 class ReminderSchedulerMetrics(BaseModel):
     """Structured per-run counters suitable for logs and external metrics."""
 
@@ -168,7 +275,8 @@ def deliver_reminder(reminder: EventReminder, event: CalendarEvent) -> None:
 
     The in-app record and the ``sent`` status are committed together. This
     prevents a retry from creating a second notification after a failed commit.
-    Email remains deliberately unavailable until a mail transport is configured.
+    Email is sent only through the configured provider and receives a stable
+    trace identifier after provider acceptance.
     """
     if reminder.channel == EventReminderChannel.in_app:
         db = object_session(reminder)
@@ -181,6 +289,19 @@ def deliver_reminder(reminder: EventReminder, event: CalendarEvent) -> None:
             title=f"Reminder: {event.title}",
             body=_reminder_notification_body(event),
         )
+        return
+    if reminder.channel == EventReminderChannel.email:
+        if event.owner is None or not event.owner.email_reminders_enabled:
+            raise ReminderDeliveryUnavailable("Email reminders are disabled in account settings.")
+        deliverer = get_email_reminder_deliverer()
+        if deliverer is None:
+            raise ReminderDeliveryUnavailable(
+                "Email reminder delivery is disabled or incomplete."
+            )
+        result = deliverer.deliver(
+            build_email_reminder_message(reminder=reminder, event=event)
+        )
+        reminder.provider_message_id = result.provider_message_id
         return
     raise ReminderDeliveryUnavailable(
         f"{reminder.channel.value} reminder delivery is not configured yet."
@@ -226,8 +347,14 @@ def reschedule_event_reminders(*, db: Session, event: CalendarEvent) -> int:
             .with_for_update(of=EventReminder)
         )
     )
+    current_time = datetime.now(UTC)
     for reminder in reminders:
-        reminder.scheduled_for = reminder_scheduled_for(event=event, reminder=reminder)
+        scheduled_for = reminder_scheduled_for(event=event, reminder=reminder)
+        if reminder.channel == EventReminderChannel.email and scheduled_for <= current_time:
+            reminder.status = EventReminderStatus.cancelled
+            reminder.error_message = "Email reminder send time has passed after event update."
+            continue
+        reminder.scheduled_for = scheduled_for
         reminder.status = EventReminderStatus.pending
         reminder.attempts = 0
         reminder.last_attempt_at = None

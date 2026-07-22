@@ -27,6 +27,22 @@
           <div><button class="btn btn-primary" type="submit" data-loading-label="Saving…">Save timezone</button></div>
         </form>
         <hr class="my-4">
+        <section aria-labelledby="email-reminder-title">
+          <p class="workspace-kicker">Notifications</p>
+          <h2 class="h5" id="email-reminder-title">Email reminders</h2>
+          {% if email_reminders_updated %}<div class="alert alert-success">Email reminder preference saved.</div>{% endif %}
+          <p class="text-secondary">Allow email copies of calendar reminders that you explicitly enable on an event. In-app reminders continue to work independently.</p>
+          <form method="post" action="/settings/email-reminders">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" id="email_reminders_enabled" name="email_reminders_enabled" type="checkbox" value="true"{% if current_user.email_reminders_enabled %} checked{% endif %}>
+              <label class="form-check-label" for="email_reminders_enabled">Allow email reminders for this account</label>
+            </div>
+            <button class="btn btn-outline-primary" type="submit">Save email preference</button>
+          </form>
+          <p class="form-text mb-0 mt-2">Turning this off cancels unsent email reminders. It never disables in-app notifications.</p>
+        </section>
+        <hr class="my-4">
         <section aria-labelledby="calendar-feed-title">
           <p class="workspace-kicker">Calendar subscription</p>
           <h2 class="h5" id="calendar-feed-title">Private calendar feed</h2>
