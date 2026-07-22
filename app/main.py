@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,8 +11,21 @@ from app.web import FRONTEND_DIR, router as web_router
 from app.web_backups import router as web_backups_router
 from app.web_document_ai import router as web_document_ai_router
 
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    issues = settings.email_reminder_configuration_issues()
+    if issues and settings.email_reminders_enabled:
+        # Configuration names only: never expose SMTP credentials in logs.
+        logger.warning("Email reminders are disabled: missing or unsafe configuration: %s", ", ".join(issues))
+    yield
+
 app = FastAPI(
     title="DocsFlow API",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

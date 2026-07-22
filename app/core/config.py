@@ -1,5 +1,6 @@
 import json
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,6 +47,20 @@ class Settings(BaseSettings):
     reminder_max_attempts: int = Field(default=3, ge=1, le=20)
     reminder_retry_base_seconds: int = Field(default=60, ge=1, le=86_400)
     reminder_scheduler_batch_size: int = Field(default=100, ge=1, le=1_000)
+
+    # Email reminders are opt-in at deployment level and remain unavailable until
+    # all required SMTP settings are present. Values are deliberately kept as
+    # plain configuration fields; they are never persisted with reminders.
+    email_reminders_enabled: bool = False
+    email_reminders_provider: Literal["smtp"] = "smtp"
+    email_reminders_from_address: str | None = None
+    email_reminders_from_name: str = "DocsFlow Reminders"
+    email_reminders_smtp_host: str | None = None
+    email_reminders_smtp_port: int = Field(default=587, ge=1, le=65_535)
+    email_reminders_smtp_username: str | None = None
+    email_reminders_smtp_password: str | None = None
+    email_reminders_smtp_use_starttls: bool = True
+    public_app_base_url: str | None = None
 
     document_processing_soft_time_limit_seconds: int = 60
     document_processing_hard_time_limit_seconds: int = 90
@@ -145,6 +160,48 @@ class Settings(BaseSettings):
                 "AUTOMATIC_BACKUP_WEEKDAY must be one of mon, tue, wed, thu, fri, sat, sun"
             )
         return normalized
+
+    @field_validator("public_app_base_url")
+    @classmethod
+    def validate_public_app_base_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("PUBLIC_APP_BASE_URL must be an absolute HTTP(S) URL")
+        if parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+            raise ValueError("PUBLIC_APP_BASE_URL must not contain a path, query, or fragment")
+        return normalized
+
+    def email_reminder_configuration_issues(self) -> tuple[str, ...]:
+        """Return safe, non-secret reasons why email delivery is unavailable."""
+        if not self.email_reminders_enabled:
+            return ("EMAIL_REMINDERS_ENABLED is false",)
+
+        missing: list[str] = []
+        if not self.email_reminders_from_address:
+            missing.append("EMAIL_REMINDERS_FROM_ADDRESS")
+        if not self.email_reminders_smtp_host:
+            missing.append("EMAIL_REMINDERS_SMTP_HOST")
+        if not self.public_app_base_url:
+            missing.append("PUBLIC_APP_BASE_URL")
+        username_set = bool(self.email_reminders_smtp_username)
+        password_set = bool(self.email_reminders_smtp_password)
+        if username_set != password_set:
+            missing.append("both SMTP username and password")
+
+        if self.public_app_base_url and self.app_env.casefold() not in {"local", "test"}:
+            hostname = (urlparse(self.public_app_base_url).hostname or "").casefold()
+            if hostname in {"localhost", "127.0.0.1", "::1"} or hostname.endswith(
+                ".app.github.dev"
+            ):
+                missing.append("a non-local PUBLIC_APP_BASE_URL outside development")
+        return tuple(missing)
+
+    @property
+    def email_reminder_delivery_available(self) -> bool:
+        return not self.email_reminder_configuration_issues()
 
     @model_validator(mode="after")
     def validate_deployment_security(self) -> "Settings":

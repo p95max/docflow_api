@@ -36,13 +36,13 @@ The email address is the signed-in account address. Disable the control with a c
 
 ## 3. Email provider abstraction
 
-- [ ] Define an `EmailReminderDeliverer` interface independent of a provider.
-- [ ] Choose the first provider: SMTP, Resend, Postmark, or another transactional service.
-- [ ] Add environment variables for provider credentials, sender address, sender name, and enable flag.
-- [ ] Add a configured public application base URL for direct event links; never generate production email links from a Codespaces or localhost URL.
-- [ ] Validate configuration at startup without logging secrets.
-- [ ] Keep email delivery disabled by default when configuration is incomplete.
-- [ ] Provide a safe fake deliverer for automated tests.
+- [x] Define an `EmailReminderDeliverer` interface independent of a provider.
+- [x] Choose the first provider: SMTP, using Python's standard library and no provider SDK.
+- [x] Add environment variables for provider credentials, sender address, sender name, and enable flag.
+- [x] Add a configured public application base URL for direct event links; never generate production email links from a Codespaces or localhost URL.
+- [x] Validate configuration at startup without logging secrets.
+- [x] Keep email delivery disabled by default when configuration is incomplete.
+- [x] Provide a safe fake deliverer for automated tests.
 
 ## 4. Scheduling and delivery
 
