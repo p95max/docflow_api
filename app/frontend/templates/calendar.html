@@ -84,7 +84,10 @@
           {% for day in week %}
             <div class="calendar-day{% if not day %} is-empty{% endif %}{% if day == today %} is-today{% endif %}" role="gridcell">
               {% if day %}
-                <div class="calendar-day-number">{{ day.day }}</div>
+                <div class="calendar-day-header">
+                  <div class="calendar-day-number">{{ day.day }}</div>
+                  <a class="calendar-day-add" href="/calendar/new?start_date={{ day.isoformat() }}" aria-label="Add event on {{ day.isoformat() }}" title="Add event">+</a>
+                </div>
                 <div class="calendar-day-events">
                   {% for event in events_by_day.get(day, []) %}
                     <a class="calendar-event calendar-event-{{ event.status.value }}" href="/calendar/events/{{ event.id }}">

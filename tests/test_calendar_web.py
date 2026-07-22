@@ -66,6 +66,7 @@ def test_calendar_page_renders_month_agenda_filters_and_event_detail_link(
     assert 'name="document_id"' in response.text
     assert "Pay invoice" in response.text
     assert f'href="/calendar/events/{event.id}"' in response.text
+    assert 'href="/calendar/new?start_date=2026-08-04"' in response.text
     assert "drag" not in response.text.lower()
 
     agenda = client.get("/calendar?month=2026-08&view=agenda&source=ai")
@@ -228,7 +229,7 @@ def test_document_page_lists_related_events_and_creates_deadline_event(
     assert "Related calendar events" in page.text
     assert "Existing deadline" in page.text
     assert "Create event from deadline" in page.text
-    assert "Add to calendar" in page.text
+    assert "Export ICS" in page.text
 
     created = client.post(
         f"/documents/{document.id}/calendar/from-deadline",

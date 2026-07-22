@@ -1351,6 +1351,7 @@ def _calendar_form_values(
     event: CalendarEvent | None,
     timezone_name: str,
     document_id: int | None = None,
+    start_date: date | None = None,
 ) -> dict[str, object]:
     if event is None:
         return {
@@ -1358,7 +1359,7 @@ def _calendar_form_values(
             "description": "",
             "event_type": CalendarEventType.custom.value,
             "all_day": True,
-            "start_date": _calendar_today(timezone_name).isoformat(),
+            "start_date": (start_date or _calendar_today(timezone_name)).isoformat(),
             "end_date": "",
             "start_time": "",
             "end_time": "",
@@ -1402,6 +1403,7 @@ def _render_calendar_event_form(
     current_user: User,
     event: CalendarEvent | None = None,
     document_id: int | None = None,
+    start_date: date | None = None,
     values: dict[str, object] | None = None,
     error: str | None = None,
     status_code: int = status.HTTP_200_OK,
@@ -1411,6 +1413,7 @@ def _render_calendar_event_form(
         event=event,
         timezone_name=timezone_name,
         document_id=document_id,
+        start_date=start_date,
     )
     today = _calendar_today(timezone_name)
     start_value = str(form_values["start_date"] or form_values["start_time"] or "")
@@ -1648,6 +1651,7 @@ def calendar_page(
 def new_calendar_event_page(
     request: Request,
     document_id: int | None = Query(default=None, gt=0),
+    start_date: date | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1658,6 +1662,7 @@ def new_calendar_event_page(
         db=db,
         current_user=current_user,
         document_id=document_id,
+        start_date=start_date,
     )
 
 

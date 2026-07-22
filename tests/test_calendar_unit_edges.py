@@ -7,7 +7,7 @@ from app.models.calendar_event import CalendarEventType
 from app.schemas.ai_processing import TemporalEventExtraction
 from app.schemas.calendar_event import CalendarEventCreate
 from app.services.document_calendar_projection import _source_key
-from app.web import _parse_local_calendar_datetime
+from app.web import _calendar_form_values, _parse_local_calendar_datetime
 
 
 @pytest.mark.parametrize(
@@ -66,3 +66,14 @@ def test_projection_source_key_is_stable_for_equivalent_timed_instants() -> None
     assert _source_key(document_id=42, candidate=candidate) == (
         "document:42:appointment:2026-08-01T08:00:00+00:00"
     )
+
+
+def test_new_calendar_form_uses_the_day_selected_in_the_month_view() -> None:
+    values = _calendar_form_values(
+        event=None,
+        timezone_name="Europe/Berlin",
+        start_date=date(2026, 8, 12),
+    )
+
+    assert values["all_day"] is True
+    assert values["start_date"] == "2026-08-12"
