@@ -11,6 +11,7 @@ def _settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "app_secret_key": "test-secret-key-that-is-longer-than-thirty-two-characters",
         "database_url": "sqlite+pysqlite:///:memory:",
+        "init_test_user": False,
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)
