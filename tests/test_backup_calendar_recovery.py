@@ -105,6 +105,7 @@ def test_v3_backup_restores_calendar_records_without_overdue_reminders(
     )
 
     assert result.restored_documents == 1
+    assert result.schema_version == 3
     assert result.restored_calendar_events == 3
     assert result.restored_reminders == 2
     assert result.restored_notifications == 2

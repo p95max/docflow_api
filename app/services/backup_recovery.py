@@ -30,6 +30,7 @@ from app.services.reminder_scheduler import event_start_at_utc
 class RestoreResult:
     restored_documents: int
     skipped_documents: int
+    schema_version: int = 2
     restored_calendar_events: int = 0
     restored_reminders: int = 0
     restored_notifications: int = 0
@@ -181,6 +182,7 @@ def restore_recovery_backup(
     return RestoreResult(
         restored_documents=len(restored),
         skipped_documents=skipped,
+        schema_version=payload.schema_version,
         restored_calendar_events=restored_events,
         restored_reminders=restored_reminders,
         restored_notifications=restored_notifications,

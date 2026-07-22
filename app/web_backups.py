@@ -21,6 +21,7 @@ from app.services.backup_jobs import (
     list_backup_jobs,
 )
 from app.services.backup_recovery import (
+    RestoreResult,
     decrypt_recovery_archive,
     generate_recovery_key,
     get_recovery_key,
@@ -456,14 +457,21 @@ async def restore_backup_submit(
         request=request,
         db=db,
         current_user=current_user,
-        restore_result=(
-            f"Restored {result.restored_documents} document(s), "
-            f"{result.restored_calendar_events} calendar event(s), "
-            f"{result.restored_reminders} reminder(s), and "
-            f"{result.restored_notifications} notification(s); "
-            f"skipped {result.skipped_documents} duplicate document(s)."
-        ),
+        restore_result=_restore_result_message(result),
     )
+
+
+def _restore_result_message(result: RestoreResult) -> str:
+    message = (
+        f"Archive v{result.schema_version}: restored {result.restored_documents} document(s), "
+        f"{result.restored_calendar_events} calendar event(s), "
+        f"{result.restored_reminders} reminder(s), and "
+        f"{result.restored_notifications} notification(s); "
+        f"skipped {result.skipped_documents} duplicate document(s)."
+    )
+    if result.schema_version < 3:
+        message += " This older archive does not contain calendar events, reminders, or notifications."
+    return message
 
 
 @router.get(

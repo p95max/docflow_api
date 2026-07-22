@@ -211,7 +211,7 @@ def test_restore_recovery_backup_restores_text_and_queues_indexing(
 
     assert response.status_code == 200
     assert (
-        "Restored 1 document(s), 0 calendar event(s), 0 reminder(s), and "
+        "Archive v3: restored 1 document(s), 0 calendar event(s), 0 reminder(s), and "
         "0 notification(s); skipped 0 duplicate document(s)."
     ) in response.text
     assert "Original PDF, JPG and PNG files were not restored" in response.text
