@@ -468,20 +468,20 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 22. Unit Tests
 
-- [ ] Date-only validation
-- [ ] Datetime validation
-- [ ] Timezone validation
-- [ ] DST spring-forward
-- [ ] DST fall-back
-- [ ] `end >= start`
-- [ ] Source key generation
-- [ ] Duplicate prevention
-- [ ] Projection idempotency
-- [ ] Reconciliation
-- [ ] Manual override protection
-- [ ] Reminder scheduling
-- [ ] Reminder idempotency
-- [ ] ICS generation
+- [x] Date-only validation
+- [x] Datetime validation
+- [x] Timezone validation
+- [x] DST spring-forward
+- [x] DST fall-back
+- [x] `end >= start`
+- [x] Source key generation
+- [x] Duplicate prevention
+- [x] Projection idempotency
+- [x] Reconciliation
+- [x] Manual override protection
+- [x] Reminder scheduling
+- [x] Reminder idempotency
+- [x] ICS generation
 
 ## 23. Integration Tests
 
