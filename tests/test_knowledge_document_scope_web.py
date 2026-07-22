@@ -122,3 +122,38 @@ def test_confidential_document_can_be_explicitly_queued_for_ai_analysis(
     assert response.headers["location"] == "/knowledge?analyzed=1"
     assert captured["document_id"] == document.id
     assert captured["current_user"] is test_user
+
+
+def test_knowledge_page_offers_retry_for_failed_recovered_ai_analysis(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document = Document(
+        owner_id=test_user.id,
+        original_filename="restored-letter.pdf",
+        status=DocumentStatus.failed,
+        processing_mode=ProcessingMode.standard,
+        storage_key=None,
+        raw_text="Recovered letter text",
+    )
+    db_session.add(document)
+    db_session.commit()
+
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            client.cookies.set(
+                SESSION_COOKIE_NAME,
+                create_access_token(subject=str(test_user.id)),
+            )
+            page = client.get("/knowledge")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert page.status_code == status.HTTP_200_OK
+    assert "AI analysis failed. You can retry it using the recovered text." in page.text
+    assert f'action="/documents/{document.id}/reprocess"' in page.text
+    assert "Retry AI analysis" in page.text

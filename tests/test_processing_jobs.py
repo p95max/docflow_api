@@ -718,6 +718,50 @@ def test_process_document_task_runs_ai_processing_for_standard_document(
     assert usage_logs[0].total_tokens == 150
 
 
+def test_process_recovered_text_with_ai_without_original_file(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_task_session(monkeypatch=monkeypatch, db_session=db_session)
+    monkeypatch.setattr(document_tasks, "enqueue_document_index_job", lambda **_: None)
+    document = Document(
+        owner_id=test_user.id,
+        original_filename="restored-letter.pdf",
+        status=DocumentStatus.uploaded,
+        processing_mode=ProcessingMode.standard,
+        content_type="application/pdf",
+        storage_key=None,
+        raw_text="Recovered document text that the user explicitly approved for AI analysis.",
+    )
+    db_session.add(document)
+    db_session.flush()
+    job = create_processing_job(db=db_session, document=document)
+    db_session.commit()
+    monkeypatch.setattr(
+        document_tasks,
+        "extract_text_from_document",
+        lambda **_: pytest.fail("A recovery-only document must use its stored raw text."),
+    )
+    captured: dict[str, str] = {}
+
+    def fake_ai_processing(*, raw_text: str, original_filename: str) -> StandardAIProcessingResult:
+        captured["raw_text"] = raw_text
+        captured["original_filename"] = original_filename
+        return _fake_ai_processing_result()
+
+    monkeypatch.setattr(document_tasks, "run_standard_ai_processing", fake_ai_processing)
+
+    result = process_document_task.apply(args=(job.id,), throw=True)
+
+    db_session.refresh(document)
+    db_session.refresh(job)
+    assert result.successful()
+    assert captured["raw_text"].startswith("Recovered document text")
+    assert document.status == DocumentStatus.completed
+    assert job.status == ProcessingJobStatus.completed
+
+
 def test_process_document_task_skips_ai_processing_for_confidential_document(
     db_session: Session,
     test_user: User,

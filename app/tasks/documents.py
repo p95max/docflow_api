@@ -69,9 +69,12 @@ def process_document_task(self, job_id: int) -> None:
                 job=job,
                 document=document,
                 attempts=self.request.retries + 1,
+                preserve_recovered_text=(
+                    not document.storage_key and bool((document.raw_text or "").strip())
+                ),
             )
 
-            extracted_text = extract_text_from_document(document=document)
+            extracted_text = _text_for_processing(document=document)
 
             document.raw_text = extracted_text
 
@@ -151,6 +154,7 @@ def _mark_job_running(
     job: ProcessingJob,
     document: Document,
     attempts: int,
+    preserve_recovered_text: bool = False,
 ) -> None:
     now = datetime.now(UTC)
 
@@ -160,7 +164,10 @@ def _mark_job_running(
     job.finished_at = None
     job.error_message = None
 
-    _reset_document_processing_result(document)
+    _reset_document_processing_result(
+        document,
+        preserve_raw_text=preserve_recovered_text,
+    )
     document.status = DocumentStatus.processing
 
     db.commit()
@@ -343,7 +350,21 @@ def _source_pages_for_evidence(
         and not ai_result.extracted_data.temporal_events
     ):
         return None
+    # Recovery archives intentionally omit original files. Their stored text is
+    # still valid evidence for page-one validation, but there is no file from
+    # which page-level extraction can be repeated.
+    if not document.storage_key:
+        return None
     return extract_text_pages_from_document(document)
+
+
+def _text_for_processing(*, document: Document) -> str:
+    """Use restored extracted text when the recovery archive has no source file."""
+    if document.storage_key:
+        return extract_text_from_document(document=document)
+    if document.raw_text and document.raw_text.strip():
+        return document.raw_text
+    raise ValueError("Original file is unavailable and recovered text is empty.")
 
 
 def _run_validation_fallback_if_needed(
@@ -432,9 +453,14 @@ def _serialize_validation_result(
     return validation_result.model_dump(mode="json")
 
 
-def _reset_document_processing_result(document: Document) -> None:
+def _reset_document_processing_result(
+    document: Document,
+    *,
+    preserve_raw_text: bool = False,
+) -> None:
     """Remove stale results before a new processing attempt."""
-    document.raw_text = None
+    if not preserve_raw_text:
+        document.raw_text = None
 
     document.document_type = None
     document.ai_extracted_data = None
