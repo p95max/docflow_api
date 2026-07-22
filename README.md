@@ -133,7 +133,9 @@ multiple related events, and users may create events without a document.
   complete, and cancel operations
 - IANA user timezones; timed events are stored in UTC while date-only events
   remain dates. The web form rejects nonexistent and ambiguous DST local times.
-- Calendar audit logs and optimistic locking through an event sequence number
+- Calendar audit logs and optimistic locking through an event sequence number.
+  Reminder creation and successful in-app delivery are also logged. Audit
+  values redact token-like secrets and are bounded to 4 KB per old/new value.
 
 Celery Beat runs the reminder scheduler every five minutes. It claims due
 reminders safely, records retries with exponential backoff, and cancels unsent

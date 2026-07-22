@@ -1,10 +1,11 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, Text, event, func, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.core.audit import sanitize_audit_value
 
 
 class EventReminderChannel(str, enum.Enum):
@@ -83,3 +84,29 @@ class EventReminder(Base):
     )
 
     event = relationship("CalendarEvent", back_populates="reminders")
+
+
+@event.listens_for(EventReminder, "after_insert")
+def record_created_reminder_audit(_mapper: object, connection: object, target: EventReminder) -> None:
+    """Audit every persisted reminder, including reminders created outside web routes."""
+    from app.models.audit_log import AuditLog
+    from app.models.calendar_event import CalendarEvent
+
+    owner_id = connection.execute(
+        select(CalendarEvent.owner_id).where(CalendarEvent.id == target.event_id)
+    ).scalar_one()
+    connection.execute(
+        AuditLog.__table__.insert().values(
+            calendar_event_id=target.event_id,
+            user_id=owner_id,
+            action="calendar_reminder_created",
+            new_value=sanitize_audit_value(
+                {
+                    "channel": target.channel.value,
+                    "offset_minutes": target.offset_minutes,
+                    "scheduled_for": target.scheduled_for,
+                    "status": target.status.value,
+                }
+            ),
+        )
+    )

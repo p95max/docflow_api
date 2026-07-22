@@ -1,10 +1,12 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.tasks.reminders as reminder_tasks
 from app.models.calendar_event import CalendarEvent, CalendarEventStatus, CalendarEventType
+from app.models.audit_log import AuditLog
 from app.models.event_reminder import (
     EventReminder,
     EventReminderChannel,
@@ -188,6 +190,14 @@ def test_scheduler_creates_one_in_app_notification_for_a_due_reminder(
     assert notifications[0].owner_id == test_user.id
     assert notifications[0].event_id == event.id
     assert notifications[0].title == "Reminder: Pay invoice"
+    audit_actions = list(
+        db_session.scalars(
+            select(AuditLog.action)
+            .where(AuditLog.calendar_event_id == event.id)
+            .order_by(AuditLog.id)
+        )
+    )
+    assert audit_actions == ["calendar_reminder_created", "calendar_reminder_sent"]
 
 
 def test_cancel_and_delete_event_cancel_unsent_reminders(

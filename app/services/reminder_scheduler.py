@@ -24,6 +24,7 @@ from app.models.event_reminder import (
     EventReminderStatus,
 )
 from app.services.notifications import create_notification
+from app.services.audit import add_calendar_audit_log
 
 
 class ReminderDeliveryUnavailable(RuntimeError):
@@ -269,6 +270,18 @@ def _deliver_claimed_reminder(
         reminder.status = EventReminderStatus.sent
         reminder.sent_at = now
         reminder.error_message = None
+        add_calendar_audit_log(
+            db=db,
+            user_id=event.owner_id,
+            calendar_event_id=event.id,
+            action="calendar_reminder_sent",
+            new_value={
+                "reminder_id": reminder.id,
+                "channel": reminder.channel.value,
+                "attempts": reminder.attempts,
+                "sent_at": now,
+            },
+        )
         metrics.sent += 1
     db.commit()
 

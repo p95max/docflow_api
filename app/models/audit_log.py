@@ -2,8 +2,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
+from app.core.audit import sanitize_audit_value
 from app.db.base import Base
 
 
@@ -42,3 +43,7 @@ class AuditLog(Base):
     document = relationship("Document", back_populates="audit_logs")
     calendar_event = relationship("CalendarEvent", back_populates="audit_logs")
     user = relationship("User", back_populates="audit_logs")
+
+    @validates("old_value", "new_value")
+    def sanitize_values(self, _key: str, value: Any | None) -> Any | None:
+        return sanitize_audit_value(value) if value is not None else None

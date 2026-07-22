@@ -421,13 +421,13 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 - [ ] Log:
   - [x] Event created
   - [x] Event updated
-  - [x] Event confirmed
-  - [x] Event completed
-  - [x] Event cancelled
-  - [ ] Reminder created
-  - [ ] Reminder sent
-- [ ] Do not store secret tokens in the audit log
-- [ ] Limit the size of old/new JSON values
+- [x] Event confirmed
+- [x] Event completed
+- [x] Event cancelled
+- [x] Reminder created
+- [x] Reminder sent
+- [x] Do not store secret tokens in the audit log
+- [x] Limit the size of old/new JSON values
 
 ## 20. Security
 
