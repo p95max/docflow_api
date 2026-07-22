@@ -36,8 +36,6 @@ def test_enabled_email_reminders_require_safe_complete_configuration() -> None:
         "PUBLIC_APP_BASE_URL",
     )
 
-
-def test_production_rejects_local_or_codespaces_public_email_url() -> None:
     configuration = _settings(
         app_env="production",
         app_debug=False,
