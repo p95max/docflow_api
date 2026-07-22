@@ -16,6 +16,11 @@
       Indexing was queued. Refresh this page to see its final status.
     </div>
   {% endif %}
+  {% if analyzed %}
+    <div class="alert alert-warning" role="status">
+      AI analysis was queued. This document is now in standard mode and its extracted text will be sent to OpenAI.
+    </div>
+  {% endif %}
 
   {% if error %}
     <div class="alert alert-danger" role="alert">{{ error }}</div>
@@ -104,7 +109,12 @@
                       {% endif %}
                     </td>
                     <td class="text-end">
-                      {% if document.processing_mode.value == "standard" and document.status.value == "completed" and document.raw_text %}
+                      {% if document.processing_mode.value == "confidential" and document.status.value == "completed" and document.raw_text %}
+                        <form method="post" action="/knowledge/documents/{{ document.id }}/analyze-with-ai" onsubmit="return window.confirm('Warning: AI analysis will send the extracted document text to OpenAI and switch this document from confidential to standard mode.');">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                          <button class="btn btn-sm btn-outline-warning" type="submit">Analyze with AI</button>
+                        </form>
+                      {% elif document.processing_mode.value == "standard" and document.status.value == "completed" and document.raw_text %}
                         {% if document.index_job and document.index_job.status.value in ("pending", "running") %}
                           <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Indexing…</button>
                         {% else %}

@@ -74,3 +74,51 @@ def test_conversation_document_selector_limits_the_submitted_scope(
     assert "selected-invoice.pdf" in page.text
     assert response.status_code == status.HTTP_303_SEE_OTHER
     assert captured["document_id"] == document.id
+
+
+def test_confidential_document_can_be_explicitly_queued_for_ai_analysis(
+    db_session: Session,
+    test_user: User,
+    monkeypatch,
+) -> None:
+    document = Document(
+        owner_id=test_user.id,
+        original_filename="private-letter.pdf",
+        status=DocumentStatus.completed,
+        processing_mode=ProcessingMode.confidential,
+        raw_text="Private letter text",
+    )
+    db_session.add(document)
+    db_session.commit()
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        web,
+        "api_analyze_document_with_ai",
+        lambda **kwargs: captured.update(kwargs),
+    )
+
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            csrf_token = "knowledge-ai-analysis-csrf-token"
+            client.cookies.set(CSRF_COOKIE_NAME, csrf_token)
+            client.headers["X-CSRF-Token"] = csrf_token
+            client.cookies.set(
+                SESSION_COOKIE_NAME,
+                create_access_token(subject=str(test_user.id)),
+            )
+            response = client.post(
+                f"/knowledge/documents/{document.id}/analyze-with-ai",
+                data={"csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == status.HTTP_303_SEE_OTHER
+    assert response.headers["location"] == "/knowledge?analyzed=1"
+    assert captured["document_id"] == document.id
+    assert captured["current_user"] is test_user

@@ -30,6 +30,9 @@ from sqlalchemy.orm import Session, object_session, selectinload
 from app.api.v1.routes_document_deletion import (
     delete_document as api_delete_document,
 )
+from app.api.v1.routes_document_ai_analysis import (
+    analyze_document_with_ai as api_analyze_document_with_ai,
+)
 from app.api.v1.routes_documents import (
     confirm_document_extraction as api_confirm_document_extraction,
     correct_document_result as api_correct_document_result,
@@ -594,6 +597,7 @@ def _render_knowledge_page(
         documents=_list_knowledge_documents(db=db, owner_id=current_user.id),
         title_value=title_value,
         reindexed=request.query_params.get("reindexed") == "1",
+        analyzed=request.query_params.get("analyzed") == "1",
         error=error,
         status_code=status_code,
     )
@@ -1331,6 +1335,67 @@ def reindex_knowledge_document_submit(
     enqueue_document_index_job(db=db, document=document)
     return RedirectResponse(
         url="/knowledge?reindexed=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/knowledge/documents/{document_id}/analyze-with-ai",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def analyze_confidential_document_with_ai_submit(
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    if not settings.knowledge_enabled:
+        return _knowledge_disabled_response(
+            request=request,
+            current_user=current_user,
+        )
+
+    document = db.get(Document, document_id)
+    if (
+        document is None
+        or document.owner_id != current_user.id
+        or document.deleted_at is not None
+    ):
+        return _render_knowledge_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Document not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if document.processing_mode != ProcessingMode.confidential:
+        return _render_knowledge_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error="Only confidential documents can be switched to AI analysis here.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    try:
+        api_analyze_document_with_ai(
+            document_id=document_id,
+            db=db,
+            current_user=current_user,
+        )
+    except HTTPException as exc:
+        return _render_knowledge_page(
+            request=request,
+            db=db,
+            current_user=current_user,
+            error=_exception_message(exc),
+            status_code=exc.status_code,
+        )
+    return RedirectResponse(
+        url="/knowledge?analyzed=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
