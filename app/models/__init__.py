@@ -10,6 +10,7 @@ from app.models.knowledge_conversation import KnowledgeConversation
 from app.models.knowledge_message import KnowledgeMessage
 from app.models.knowledge_message_source import KnowledgeMessageSource
 from app.models.openai_usage_log import OpenAIUsageLog
+from app.models.notification import Notification
 from app.models.processing_job import ProcessingJob
 from app.models.user import User
 
@@ -26,6 +27,7 @@ __all__ = [
     "KnowledgeMessage",
     "KnowledgeMessageSource",
     "OpenAIUsageLog",
+    "Notification",
     "ProcessingJob",
     "User",
 ]

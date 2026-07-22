@@ -58,6 +58,7 @@ from app.models.knowledge_message_source import (  # noqa: F401, E402
     KnowledgeMessageSource,
 )
 from app.models.openai_usage_log import OpenAIUsageLog  # noqa: F401, E402
+from app.models.notification import Notification  # noqa: F401, E402
 
 # Import all SQLAlchemy models before Base.metadata.create_all().
 from app.models.document import Document  # noqa: F401, E402

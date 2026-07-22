@@ -187,6 +187,7 @@ class CalendarEvent(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    notifications = relationship("Notification", back_populates="event")
 
     @validates("start_at", "end_at")
     def normalize_event_timestamp(self, _key: str, value: datetime | None) -> datetime | None:

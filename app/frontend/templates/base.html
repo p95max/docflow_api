@@ -44,6 +44,10 @@
                 {% endif %}
               </div>
             </details>
+            <a class="btn btn-sm btn-outline-light docsflow-notifications-link" href="/notifications" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}">
+              <span aria-hidden="true">&#128276;</span><span class="visually-hidden">Notifications</span>
+              {% if unread_notification_count %}<span class="docsflow-notification-count">{{ unread_notification_count }}</span>{% endif %}
+            </a>
             <a class="btn btn-sm btn-outline-light" href="/calendar">Calendar</a>
             <a class="btn btn-sm btn-outline-light" href="/settings">Settings</a>
             <a class="btn btn-sm btn-outline-light" href="/documents">Documents</a>

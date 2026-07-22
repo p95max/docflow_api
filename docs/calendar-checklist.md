@@ -371,19 +371,19 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 15. In-App Notifications
 
-- [ ] Create `notifications`
-- [ ] Add fields:
-  - [ ] `owner_id`
-  - [ ] `event_id`
-  - [ ] `title`
-  - [ ] `body`
-  - [ ] `read_at`
-  - [ ] `created_at`
-- [ ] Add a notification icon to the navbar
-- [ ] Add an unread count
-- [ ] Add the `/notifications` page
-- [ ] Add mark-as-read
-- [ ] Add mark-all-as-read
+- [x] Create `notifications`
+- [x] Add fields:
+  - [x] `owner_id`
+  - [x] `event_id`
+  - [x] `title`
+  - [x] `body`
+  - [x] `read_at`
+  - [x] `created_at`
+- [x] Add a notification icon to the navbar
+- [x] Add an unread count
+- [x] Add the `/notifications` page
+- [x] Add mark-as-read
+- [x] Add mark-all-as-read
 
 ---
 

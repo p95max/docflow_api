@@ -14,11 +14,16 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core.timezones import DEFAULT_USER_TIMEZONE, validate_iana_timezone
 from app.models.calendar_event import CalendarEvent, CalendarEventStatus
-from app.models.event_reminder import EventReminder, EventReminderStatus
+from app.models.event_reminder import (
+    EventReminder,
+    EventReminderChannel,
+    EventReminderStatus,
+)
+from app.services.notifications import create_notification
 
 
 class ReminderDeliveryUnavailable(RuntimeError):
@@ -83,7 +88,24 @@ def process_due_reminders(
 
 
 def deliver_reminder(reminder: EventReminder, event: CalendarEvent) -> None:
-    """Delivery extension point for MVP 8.1 notifications and optional email."""
+    """Deliver supported channels in the scheduler transaction.
+
+    The in-app record and the ``sent`` status are committed together. This
+    prevents a retry from creating a second notification after a failed commit.
+    Email remains deliberately unavailable until a mail transport is configured.
+    """
+    if reminder.channel == EventReminderChannel.in_app:
+        db = object_session(reminder)
+        if db is None:
+            raise ReminderDeliveryUnavailable("Reminder is detached from its database session.")
+        create_notification(
+            db=db,
+            owner_id=event.owner_id,
+            event_id=event.id,
+            title=f"Reminder: {event.title}",
+            body=_reminder_notification_body(event),
+        )
+        return
     raise ReminderDeliveryUnavailable(
         f"{reminder.channel.value} reminder delivery is not configured yet."
     )
@@ -295,3 +317,11 @@ def _as_utc(value: datetime | None) -> datetime:
 def _safe_delivery_error(exc: Exception) -> str:
     message = str(exc).strip() or exc.__class__.__name__
     return message[:1000]
+
+
+def _reminder_notification_body(event: CalendarEvent) -> str:
+    if event.all_day and event.start_date is not None:
+        return f"{event.title} is scheduled for {event.start_date.isoformat()}."
+    if event.start_at is not None:
+        return f"{event.title} starts at {event.start_at.isoformat()}."
+    return f"{event.title} is due now."

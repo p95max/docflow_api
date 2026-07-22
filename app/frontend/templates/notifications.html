@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Notifications · DocsFlow{% endblock %}
+{% block content %}
+<div class="document-hero d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <p class="workspace-kicker">Inbox</p>
+    <h1 class="h2 mb-1">Notifications</h1>
+    <p class="text-secondary mb-0">Calendar reminders and important updates for your account.</p>
+  </div>
+  {% if unread_notification_count %}
+    <form method="post" action="/notifications/read-all" class="m-0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-outline-primary" type="submit">Mark all as read</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if notifications %}
+  <section class="notification-list" aria-label="Notifications">
+    {% for notification in notifications %}
+      <article class="notification-item{% if notification.read_at is none %} is-unread{% endif %}">
+        <div class="notification-item-main">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h2 class="h6 mb-0">{{ notification.title }}</h2>
+            {% if notification.read_at is none %}<span class="notification-unread-dot" aria-label="Unread"></span>{% endif %}
+          </div>
+          <p class="mb-1">{{ notification.body }}</p>
+          <div class="small text-secondary">
+            {{ notification.created_at|local_datetime }}
+            {% if notification.event_id %} · <a href="/calendar/events/{{ notification.event_id }}">Open event</a>{% endif %}
+          </div>
+        </div>
+        {% if notification.read_at is none %}
+          <form method="post" action="/notifications/{{ notification.id }}/read" class="m-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Mark as read</button>
+          </form>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <section class="empty-state"><h2 class="h5">You’re all caught up</h2><p class="mb-0 text-secondary">New calendar reminders will appear here.</p></section>
+{% endif %}
+{% endblock %}

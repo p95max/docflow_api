@@ -79,3 +79,9 @@ class User(Base):
         back_populates="owner",
         cascade="all, delete-orphan",
     )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )

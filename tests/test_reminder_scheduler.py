@@ -10,6 +10,7 @@ from app.models.event_reminder import (
     EventReminderChannel,
     EventReminderStatus,
 )
+from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.calendar_event import CalendarEventUpdate
 from app.services.calendar_events import cancel_event, delete_event, update_event
@@ -136,6 +137,7 @@ def test_scheduler_never_marks_unconfigured_delivery_as_sent(
 ) -> None:
     now = datetime(2026, 7, 20, 8, 0, tzinfo=UTC)
     reminder = _reminder(event=_event(owner=test_user), scheduled_for=now)
+    reminder.channel = EventReminderChannel.email
     db_session.add(reminder)
     db_session.commit()
 
@@ -152,6 +154,40 @@ def test_scheduler_never_marks_unconfigured_delivery_as_sent(
     assert metrics.delayed == 1
     assert reminder.status == EventReminderStatus.pending
     assert "not configured" in (reminder.error_message or "")
+
+
+def test_scheduler_creates_one_in_app_notification_for_a_due_reminder(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    now = datetime(2026, 7, 20, 8, 0, tzinfo=UTC)
+    event = _event(owner=test_user)
+    reminder = _reminder(event=event, scheduled_for=now)
+    db_session.add(reminder)
+    db_session.commit()
+
+    metrics = process_due_reminders(
+        db=db_session,
+        now=now,
+        max_attempts=3,
+        retry_base_seconds=60,
+        batch_size=10,
+    )
+    process_due_reminders(
+        db=db_session,
+        now=now + timedelta(minutes=5),
+        max_attempts=3,
+        retry_base_seconds=60,
+        batch_size=10,
+    )
+
+    notifications = list(db_session.query(Notification).all())
+    assert metrics.sent == 1
+    assert reminder.status == EventReminderStatus.sent
+    assert len(notifications) == 1
+    assert notifications[0].owner_id == test_user.id
+    assert notifications[0].event_id == event.id
+    assert notifications[0].title == "Reminder: Pay invoice"
 
 
 def test_cancel_and_delete_event_cancel_unsent_reminders(

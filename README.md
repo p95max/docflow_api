@@ -137,9 +137,11 @@ multiple related events, and users may create events without a document.
 
 Celery Beat runs the reminder scheduler every five minutes. It claims due
 reminders safely, records retries with exponential backoff, and cancels unsent
-reminders when an event changes to cancelled, completed, or deleted. The
-notification UI and email transport are intentionally delivered in later MVP
-steps, so the event form still does not create reminder settings.
+reminders when an event changes to cancelled, completed, or deleted. Due
+in-app reminders create an owner-scoped notification atomically with the
+delivery status; the navbar shows the unread count and `/notifications` lets a
+user mark one or all notifications as read. Email delivery and reminder
+settings in the event form are not implemented yet.
 
 ### Signed File URLs
 
@@ -337,6 +339,7 @@ app/
     document.py
     calendar_event.py
     event_reminder.py
+    notification.py
     audit_log.py
     document_chunk.py
     backup_job.py
@@ -485,6 +488,7 @@ knowledge_messages
 knowledge_message_sources
 calendar_events
 event_reminders
+notifications
 google_drive_connections
 backup_jobs
 alembic_version
@@ -1044,8 +1048,8 @@ docker compose exec db psql -U docsflow -d docsflow \
 - Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
 - Confidential RAG is intentionally not enabled until the documented local-only embedding and LLM design is implemented
 - standard-mode AI extraction requires `OPENAI_API_KEY`
-- Calendar reminders are scheduled safely, but no user-facing notification or
-  email transport is configured until the later notification delivery work
+- Calendar reminders are delivered in-app; email transport and the UI for
+  creating reminder settings are not implemented yet
 - External calendar synchronization and `.ics` feeds are not implemented yet
 
 ## Contacts

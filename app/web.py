@@ -25,7 +25,7 @@ from jinja2.runtime import Context
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, object_session, selectinload
 
 from app.api.v1.routes_document_deletion import (
     delete_document as api_delete_document,
@@ -69,6 +69,13 @@ from app.services.knowledge_conversations import (
     delete_conversation,
     get_owned_conversation,
     list_conversations,
+)
+from app.services.notifications import (
+    NotificationNotFoundError,
+    list_notifications,
+    mark_all_notifications_as_read,
+    mark_notification_as_read,
+    unread_notification_count,
 )
 from app.schemas.user import UserCreate, UserTimezoneUpdate
 from app.services.security import create_access_token, decode_access_token
@@ -335,6 +342,12 @@ def _template_response(
     **context: object,
 ) -> HTMLResponse:
     csrf_token = request.cookies.get(CSRF_COOKIE_NAME) or secrets.token_urlsafe(32)
+    user_session = object_session(current_user) if current_user is not None else None
+    notification_count = (
+        unread_notification_count(db=user_session, owner_id=current_user.id)
+        if user_session is not None and current_user is not None
+        else 0
+    )
     response = templates.TemplateResponse(
         request=request,
         name=name,
@@ -346,6 +359,7 @@ def _template_response(
             "display_timezone": _get_user_timezone_name(current_user),
             "csrf_token": csrf_token,
             "ai_usage": _get_ai_usage_summary(current_user),
+            "unread_notification_count": notification_count,
             **context,
         },
         status_code=status_code,
@@ -386,6 +400,56 @@ def _exception_message(exc: HTTPException) -> str:
     if isinstance(exc.detail, dict):
         return str(exc.detail.get("message") or exc.detail)
     return str(exc.detail)
+
+
+@router.get("/notifications", response_class=HTMLResponse, response_model=None)
+def notifications_page(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    return _template_response(
+        request=request,
+        name="notifications.html",
+        current_user=current_user,
+        notifications=list_notifications(db=db, owner_id=current_user.id),
+    )
+
+
+@router.post("/notifications/{notification_id}/read", response_model=None)
+async def read_notification(
+    notification_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_csrf),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        mark_notification_as_read(
+            db=db,
+            owner_id=current_user.id,
+            notification_id=notification_id,
+        )
+    except NotificationNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found.")
+    return RedirectResponse(url="/notifications", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/notifications/read-all", response_model=None)
+async def read_all_notifications(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_csrf),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    mark_all_notifications_as_read(db=db, owner_id=current_user.id)
+    return RedirectResponse(url="/notifications", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def _relative_url(value: str | None) -> str | None:
