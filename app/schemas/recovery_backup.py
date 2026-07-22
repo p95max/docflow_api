@@ -135,6 +135,8 @@ class RecoveryEventReminderV3(BaseModel):
     id: int = Field(gt=0)
     event_id: int = Field(gt=0)
     channel: EventReminderChannel
+    recipient_email: str | None = Field(default=None, max_length=320)
+    provider_message_id: str | None = Field(default=None, max_length=255)
     offset_minutes: int = Field(ge=0)
     scheduled_for: datetime
     status: EventReminderStatus

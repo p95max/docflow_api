@@ -51,6 +51,8 @@ class EventReminder(Base):
         Enum(EventReminderChannel, name="event_reminder_channel"),
         nullable=False,
     )
+    recipient_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     offset_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[EventReminderStatus] = mapped_column(

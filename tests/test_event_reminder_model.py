@@ -30,7 +30,9 @@ def test_event_reminder_has_expected_defaults_and_event_relationship(
     event = _event(owner_id=test_user.id)
     reminder = EventReminder(
         event=event,
-        channel=EventReminderChannel.in_app,
+        channel=EventReminderChannel.email,
+        recipient_email="alerts@example.com",
+        provider_message_id="provider-message-123",
         offset_minutes=60,
         scheduled_for=datetime(2026, 8, 1, 8, 0, tzinfo=UTC),
     )
@@ -39,6 +41,8 @@ def test_event_reminder_has_expected_defaults_and_event_relationship(
 
     assert reminder.status == EventReminderStatus.pending
     assert reminder.attempts == 0
+    assert reminder.recipient_email == "alerts@example.com"
+    assert reminder.provider_message_id == "provider-message-123"
     assert reminder.event is event
     assert event.reminders == [reminder]
 

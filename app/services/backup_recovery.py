@@ -339,6 +339,8 @@ def _restore_event_reminders(*, db: Session, records: list[object], event_map: d
             EventReminder(
                 event_id=event.id,
                 channel=record.channel,
+                recipient_email=record.recipient_email,
+                provider_message_id=record.provider_message_id,
                 offset_minutes=record.offset_minutes,
                 scheduled_for=scheduled_for,
                 status=status,

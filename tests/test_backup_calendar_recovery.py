@@ -61,6 +61,8 @@ def test_v3_backup_restores_calendar_records_without_overdue_reminders(
             EventReminder(
                 event_id=linked_event.id,
                 channel=EventReminderChannel.in_app,
+                recipient_email="alerts@example.com",
+                provider_message_id="provider-message-123",
                 offset_minutes=60,
                 scheduled_for=datetime.now(UTC) + timedelta(days=9),
                 status=EventReminderStatus.pending,
@@ -94,6 +96,8 @@ def test_v3_backup_restores_calendar_records_without_overdue_reminders(
     assert payload["record_counts"]["event_reminders"] == 2
     assert payload["record_counts"]["notifications"] == 2
     assert "refresh_token" not in json.dumps(payload)
+    assert payload["records"]["event_reminders"][0]["recipient_email"] == "alerts@example.com"
+    assert payload["records"]["event_reminders"][0]["provider_message_id"] == "provider-message-123"
 
     monkeypatch.setattr(backup_recovery, "enqueue_document_index_job", lambda **_: None)
     recovery_key = Fernet.generate_key().decode("utf-8")
@@ -120,6 +124,8 @@ def test_v3_backup_restores_calendar_records_without_overdue_reminders(
         .filter(CalendarEvent.owner_id == test_user.id)
     }
     assert restored_reminders["Linked invoice"].status == EventReminderStatus.pending
+    assert restored_reminders["Linked invoice"].recipient_email == "alerts@example.com"
+    assert restored_reminders["Linked invoice"].provider_message_id == "provider-message-123"
     expected_schedule = event_start_at_utc(event=restored_events["Linked invoice"]) - timedelta(minutes=60)
     actual_schedule = restored_reminders["Linked invoice"].scheduled_for
     if actual_schedule.tzinfo is None:  # SQLite returns datetimes without timezone information.

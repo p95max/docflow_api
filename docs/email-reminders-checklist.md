@@ -17,22 +17,22 @@ The email address is the signed-in account address. Disable the control with a c
 
 ## 1. Product decisions
 
-- [ ] Confirm email reminders are opt-in per event; in-app reminders remain independent.
-- [ ] Confirm supported offsets: at event time, 1 hour before, and 1 day before.
-- [ ] Decide whether to snapshot the recipient email at creation (recommended) or read it from the account at send time.
-- [ ] Do not create an immediately overdue email for a past event without an explicit user warning.
-- [ ] Decide whether Settings needs a global opt-out for email reminders.
-- [ ] Define supported languages and sender identity for the first release.
-- [ ] Use a clear, action-oriented subject format, for example `Reminder: Pay invoice — today`.
+- [x] Confirm email reminders are opt-in per event; in-app reminders remain independent.
+- [x] Confirm supported offsets: at event time, 1 hour before, and 1 day before.
+- [x] Snapshot the recipient email when the reminder is created; changing the account email affects only newly created reminders.
+- [x] Do not create email reminders for an event whose calculated send time is already in the past.
+- [x] Do not add a global email-reminder opt-out in the first release; the per-event email checkbox is the user control.
+- [x] Use English email content initially and the sender display name `DocsFlow Reminders`; the sender address remains deployment configuration.
+- [x] Use a clear, action-oriented subject format, for example `Reminder: Pay invoice — today`.
 
 ## 2. Data model and migrations
 
-- [ ] Add an email-recipient field to `event_reminders` if the recipient is snapshotted.
-- [ ] Add a provider message-ID field for traceability and support.
-- [ ] Keep `(event_id, channel, offset_minutes)` idempotent for the email channel.
-- [ ] Add indexes needed to claim pending email reminders efficiently.
-- [ ] Create an Alembic migration with downgrade and PostgreSQL/SQLite coverage.
-- [ ] Never store SMTP/API credentials or OAuth tokens in reminder records or recovery archives.
+- [x] Add an email-recipient field to `event_reminders` if the recipient is snapshotted.
+- [x] Add a provider message-ID field for traceability and support.
+- [x] Keep `(event_id, channel, offset_minutes)` idempotent for the email channel.
+- [x] Add indexes needed to claim pending email reminders efficiently.
+- [x] Create an Alembic migration with downgrade and PostgreSQL/SQLite coverage.
+- [x] Never store SMTP/API credentials or OAuth tokens in reminder records or recovery archives.
 
 ## 3. Email provider abstraction
 

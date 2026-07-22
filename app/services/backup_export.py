@@ -305,6 +305,8 @@ def _serialize_event_reminder(reminder: EventReminder) -> dict[str, Any]:
         "id": reminder.id,
         "event_id": reminder.event_id,
         "channel": reminder.channel,
+        "recipient_email": reminder.recipient_email,
+        "provider_message_id": reminder.provider_message_id,
         "offset_minutes": reminder.offset_minutes,
         "scheduled_for": reminder.scheduled_for,
         "status": reminder.status,
