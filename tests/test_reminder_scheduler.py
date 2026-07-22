@@ -18,6 +18,7 @@ from app.schemas.calendar_event import CalendarEventUpdate
 from app.services.calendar_events import cancel_event, delete_event, update_event
 from app.services.reminder_scheduler import (
     ReminderSchedulerMetrics,
+    configure_in_app_reminder,
     event_start_at_utc,
     process_due_reminders,
 )
@@ -46,6 +47,30 @@ def _reminder(*, event: CalendarEvent, scheduled_for: datetime) -> EventReminder
 
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def test_reminder_setting_creates_updates_and_removes_one_in_app_reminder(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    event = _event(owner=test_user, start_date=date(2026, 8, 1))
+    db_session.add(event)
+    db_session.commit()
+
+    first = configure_in_app_reminder(db=db_session, event=event, offset_minutes=60)
+    repeated = configure_in_app_reminder(db=db_session, event=event, offset_minutes=60)
+    updated = configure_in_app_reminder(db=db_session, event=event, offset_minutes=24 * 60)
+    removed = configure_in_app_reminder(db=db_session, event=event, offset_minutes=None)
+
+    assert first is not None
+    assert repeated is not None and repeated.id == first.id
+    assert updated is not None and updated.offset_minutes == 24 * 60
+    assert removed is None
+    reminders = list(db_session.scalars(select(EventReminder).where(EventReminder.event_id == event.id)))
+    assert [reminder.status for reminder in reminders] == [
+        EventReminderStatus.cancelled,
+        EventReminderStatus.cancelled,
+    ]
 
 
 def test_scheduler_sends_due_reminder_once(

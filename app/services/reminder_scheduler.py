@@ -31,6 +31,60 @@ class ReminderDeliveryUnavailable(RuntimeError):
     """Raised while no delivery implementation exists for a reminder channel."""
 
 
+IN_APP_REMINDER_OFFSETS = frozenset({0, 60, 24 * 60})
+
+
+def configure_in_app_reminder(
+    *,
+    db: Session,
+    event: CalendarEvent,
+    offset_minutes: int | None,
+) -> EventReminder | None:
+    """Keep one pending in-app reminder matching the user's selected offset."""
+    if offset_minutes is not None and offset_minutes not in IN_APP_REMINDER_OFFSETS:
+        raise ValueError("Unsupported reminder setting.")
+
+    pending = list(
+        db.scalars(
+            select(EventReminder).where(
+                EventReminder.event_id == event.id,
+                EventReminder.channel == EventReminderChannel.in_app,
+                EventReminder.status.in_([EventReminderStatus.pending, EventReminderStatus.sending]),
+            )
+        ).all()
+    )
+    matching = next((item for item in pending if item.offset_minutes == offset_minutes), None)
+    if matching is not None:
+        return matching
+    for reminder in pending:
+        reminder.status = EventReminderStatus.cancelled
+        reminder.error_message = "Reminder setting was changed."
+    if offset_minutes is None:
+        db.commit()
+        return None
+
+    existing = db.scalar(
+        select(EventReminder).where(
+            EventReminder.event_id == event.id,
+            EventReminder.channel == EventReminderChannel.in_app,
+            EventReminder.offset_minutes == offset_minutes,
+        )
+    )
+    if existing is not None:
+        db.commit()
+        return existing
+    reminder = EventReminder(
+        event_id=event.id,
+        channel=EventReminderChannel.in_app,
+        offset_minutes=offset_minutes,
+        scheduled_for=event_start_at_utc(event=event) - timedelta(minutes=offset_minutes),
+    )
+    db.add(reminder)
+    db.commit()
+    db.refresh(reminder)
+    return reminder
+
+
 class ReminderSchedulerMetrics(BaseModel):
     """Structured per-run counters suitable for logs and external metrics."""
 
