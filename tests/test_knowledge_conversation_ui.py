@@ -71,6 +71,7 @@ def test_conversation_marks_unread_assistant_messages_and_collapses_sources(
     assert "knowledge-message-assistant-new" in response.text
     assert ">New</span>" in response.text
     assert "Sources (1)" in response.text
+    assert "Based on: <span>invoice.pdf</span>" in response.text
     assert "Show source excerpt" in response.text
     assert f'href="/documents/{document.id}"' in response.text
     assert "<details" in response.text

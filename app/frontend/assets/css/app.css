@@ -338,6 +338,8 @@ table td, table th { vertical-align: middle; }
 .knowledge-message-assistant { background: #172131; border-bottom-left-radius: 4px; }
 .knowledge-message-assistant-new { border-color: #76d8ff; box-shadow: 0 0 0 1px rgba(118, 216, 255, 0.18) !important; }
 .knowledge-message-user .knowledge-message-author, .knowledge-message-user time, .knowledge-message-user .knowledge-message-content { color: #effff9 !important; }
+.knowledge-answer-document { color: var(--docsflow-muted); }
+.knowledge-answer-document span:first-child { color: var(--docsflow-accent); font-weight: 700; }
 .knowledge-composer { position: sticky; bottom: 1rem; z-index: 1; background: rgba(21, 28, 41, 0.96); }
 .knowledge-composer .card-body { padding: 0.85rem 1rem; }
 .knowledge-question-input { min-height: 4.75rem; resize: vertical; }
