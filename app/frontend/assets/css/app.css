@@ -218,6 +218,8 @@ table td, table th { vertical-align: middle; }
 .docsflow-ai-menu-item strong { font-size: 0.8rem; }
 .docsflow-ai-menu-item small { margin-top: 0.14rem; color: var(--docsflow-muted); font-size: 0.7rem; }
 .docsflow-ai-menu-item.is-disabled { opacity: 0.5; }
+.docsflow-menu-logout { color: #ffb7bd; }
+.docsflow-menu-logout:hover { color: #ffe0e3; background: rgba(233, 91, 104, 0.12); }
 .ai-usage-button { display: inline-flex; gap: 0.38rem; align-items: center; }
 .ai-usage-button-label { display: inline-grid; width: 1.2rem; height: 1.2rem; place-items: center; color: #092119; font-size: 0.56rem; font-weight: 900; letter-spacing: -0.05em; background: #f7c86b; border-radius: 50%; }
 .ai-usage-model { max-width: 7.8rem; overflow: hidden; font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
