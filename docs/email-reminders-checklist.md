@@ -23,6 +23,7 @@ The email address is the signed-in account address. Disable the control with a c
 - [ ] Do not create an immediately overdue email for a past event without an explicit user warning.
 - [ ] Decide whether Settings needs a global opt-out for email reminders.
 - [ ] Define supported languages and sender identity for the first release.
+- [ ] Use a clear, action-oriented subject format, for example `Reminder: Pay invoice — today`.
 
 ## 2. Data model and migrations
 
@@ -38,6 +39,7 @@ The email address is the signed-in account address. Disable the control with a c
 - [ ] Define an `EmailReminderDeliverer` interface independent of a provider.
 - [ ] Choose the first provider: SMTP, Resend, Postmark, or another transactional service.
 - [ ] Add environment variables for provider credentials, sender address, sender name, and enable flag.
+- [ ] Add a configured public application base URL for direct event links; never generate production email links from a Codespaces or localhost URL.
 - [ ] Validate configuration at startup without logging secrets.
 - [ ] Keep email delivery disabled by default when configuration is incomplete.
 - [ ] Provide a safe fake deliverer for automated tests.
@@ -46,6 +48,7 @@ The email address is the signed-in account address. Disable the control with a c
 
 - [ ] Extend reminder configuration so selected offsets create both `in_app` and `email` records when the optional checkbox is enabled.
 - [ ] Preserve in-app delivery when email is disabled or fails.
+- [ ] Deliver only future reminders; never send missed reminders retroactively.
 - [ ] Send only to the owner-approved recipient address.
 - [ ] Keep the email concise: event title, date/time, timezone, reminder offset, and one direct authenticated link to that specific DocsFlow event; do not include document raw text or unnecessary extracted data.
 - [ ] Build matching plain-text and HTML email versions.
@@ -65,6 +68,7 @@ The email address is the signed-in account address. Disable the control with a c
 - [ ] Add the optional `Also send selected reminders by email` checkbox.
 - [ ] Show the exact recipient: `Alerts will be sent to: <account email>`.
 - [ ] Add a tooltip: email is an additional copy of the selected in-app reminders.
+- [ ] Build the direct event link from the configured public application base URL.
 - [ ] Disable the checkbox with an explanation when email delivery is unavailable.
 - [ ] On edit, preselect email delivery only when pending email reminders exist.
 - [ ] On event detail, show channels and offsets separately, for example `1 hour before · In-app + email`.
@@ -73,6 +77,7 @@ The email address is the signed-in account address. Disable the control with a c
 ## 6. Account settings and consent
 
 - [ ] Show the account email used for reminders in Settings.
+- [ ] Let the user change the notification email in Settings, then verify the new address before using it for reminders.
 - [ ] Add an optional global email-reminder preference if approved.
 - [ ] Explain that event titles and dates may be disclosed to the configured mailbox.
 - [ ] Require a valid active account email before enabling email reminders.
