@@ -8,7 +8,12 @@ celery_app = Celery(
     "docsflow",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.documents", "app.tasks.backups", "app.tasks.knowledge"],
+    include=[
+        "app.tasks.documents",
+        "app.tasks.backups",
+        "app.tasks.knowledge",
+        "app.tasks.reminders",
+    ],
 )
 
 celery_app.conf.update(
@@ -23,14 +28,23 @@ celery_app.conf.update(
     task_eager_propagates=True,
 )
 
-if settings.automatic_backups_enabled:
-    celery_app.conf.beat_schedule = {
-        "weekly-automatic-recovery-backups": {
-            "task": "backups.schedule_automatic_backups",
-            "schedule": crontab(
-                minute=0,
-                hour=settings.automatic_backup_hour,
-                day_of_week=settings.automatic_backup_weekday,
-            ),
-        }
+celery_app.conf.beat_schedule = {
+    "calendar-due-reminders": {
+        "task": "calendar.schedule_due_reminders",
+        "schedule": crontab(minute="*/5"),
     }
+}
+
+if settings.automatic_backups_enabled:
+    celery_app.conf.beat_schedule.update(
+        {
+            "weekly-automatic-recovery-backups": {
+                "task": "backups.schedule_automatic_backups",
+                "schedule": crontab(
+                    minute=0,
+                    hour=settings.automatic_backup_hour,
+                    day_of_week=settings.automatic_backup_weekday,
+                ),
+            }
+        }
+    )

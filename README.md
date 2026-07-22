@@ -135,9 +135,11 @@ multiple related events, and users may create events without a document.
   remain dates. The web form rejects nonexistent and ambiguous DST local times.
 - Calendar audit logs and optimistic locking through an event sequence number
 
-The `event_reminders` persistence model is available, but reminder scheduling
-and delivery are not yet enabled. The event form therefore shows reminders as
-unavailable.
+Celery Beat runs the reminder scheduler every five minutes. It claims due
+reminders safely, records retries with exponential backoff, and cancels unsent
+reminders when an event changes to cancelled, completed, or deleted. The
+notification UI and email transport are intentionally delivered in later MVP
+steps, so the event form still does not create reminder settings.
 
 ### Signed File URLs
 
@@ -1042,8 +1044,8 @@ docker compose exec db psql -U docsflow -d docsflow \
 - Set `KNOWLEDGE_ENABLED=false` to disable Knowledge Base access and embedding work
 - Confidential RAG is intentionally not enabled until the documented local-only embedding and LLM design is implemented
 - standard-mode AI extraction requires `OPENAI_API_KEY`
-- Calendar reminders are stored but not delivered yet: the scheduler,
-  notifications, email delivery, and reminder recalculation are planned work
+- Calendar reminders are scheduled safely, but no user-facing notification or
+  email transport is configured until the later notification delivery work
 - External calendar synchronization and `.ics` feeds are not implemented yet
 
 ## Contacts

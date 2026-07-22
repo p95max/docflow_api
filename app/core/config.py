@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://redis:6379/1"
     celery_task_always_eager: bool = False
 
+    reminder_max_attempts: int = Field(default=3, ge=1, le=20)
+    reminder_retry_base_seconds: int = Field(default=60, ge=1, le=86_400)
+    reminder_scheduler_batch_size: int = Field(default=100, ge=1, le=1_000)
+
     document_processing_soft_time_limit_seconds: int = 60
     document_processing_hard_time_limit_seconds: int = 90
     document_processing_max_retries: int = 3

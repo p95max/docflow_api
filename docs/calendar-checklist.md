@@ -353,21 +353,21 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 14. Reminder Scheduler
 
-- [ ] Add the Celery task `calendar.schedule_due_reminders`
-- [ ] Add periodic execution through Celery Beat
-- [ ] MVP frequency: every 5 minutes
-- [ ] Select reminders using `SELECT ... FOR UPDATE SKIP LOCKED`
-- [ ] Never deliver the same reminder twice
-- [ ] Add retries with backoff
-- [ ] Add a maximum attempt count
-- [ ] Cancel reminders when an event is cancelled or deleted
-- [ ] Recalculate reminders when an event date changes
-- [ ] Respect the user's timezone
-- [ ] Add metrics:
-  - [ ] Queued
-  - [ ] Sent
-  - [ ] Failed
-  - [ ] Delayed
+- [x] Add the Celery task `calendar.schedule_due_reminders`
+- [x] Add periodic execution through Celery Beat
+- [x] MVP frequency: every 5 minutes
+- [x] Select reminders using `SELECT ... FOR UPDATE SKIP LOCKED`
+- [x] Never deliver the same reminder twice
+- [x] Add retries with backoff
+- [x] Add a maximum attempt count
+- [x] Cancel reminders when an event is cancelled or deleted
+- [x] Recalculate reminders when an event date changes
+- [x] Respect the user's timezone
+- [x] Add metrics:
+  - [x] Queued
+  - [x] Sent
+  - [x] Failed
+  - [x] Delayed
 
 ## 15. In-App Notifications
 

@@ -22,6 +22,10 @@ from app.schemas.calendar_event import (
     CalendarEventUpdate,
     CalendarRangeQuery,
 )
+from app.services.reminder_scheduler import (
+    cancel_event_reminders,
+    reschedule_event_reminders,
+)
 
 
 class CalendarEventNotFoundError(LookupError):
@@ -160,6 +164,8 @@ def update_event(
     event.sequence += 1
     if event.source == CalendarEventSource.ai:
         event.detached_from_source = True
+    if set(changes).intersection({"all_day", "start_date", "start_at", "timezone"}):
+        reschedule_event_reminders(db=db, event=event)
     _add_audit_log(
         db=db,
         event=event,
@@ -182,6 +188,11 @@ def delete_event(
     _ensure_sequence(event=event, expected_sequence=expected_sequence)
     event.deleted_at = datetime.now(UTC)
     event.sequence += 1
+    cancel_event_reminders(
+        db=db,
+        event=event,
+        reason="The calendar event was deleted.",
+    )
     _add_audit_log(
         db=db,
         event=event,
@@ -240,6 +251,11 @@ def complete_event(
     event.status = CalendarEventStatus.completed
     event.completed_at = datetime.now(UTC)
     event.sequence += 1
+    cancel_event_reminders(
+        db=db,
+        event=event,
+        reason="The calendar event was completed.",
+    )
     _add_audit_log(
         db=db,
         event=event,
@@ -269,6 +285,11 @@ def cancel_event(
     old_value = _event_audit_state(event)
     event.status = CalendarEventStatus.cancelled
     event.sequence += 1
+    cancel_event_reminders(
+        db=db,
+        event=event,
+        reason="The calendar event was cancelled.",
+    )
     _add_audit_log(
         db=db,
         event=event,
