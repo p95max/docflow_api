@@ -13,6 +13,9 @@
 {% if request.query_params.get("dismissed") == "1" %}
   <div class="alert alert-success">Suggestion dismissed.</div>
 {% endif %}
+{% if request.query_params.get("deleted") == "1" %}
+  <div class="alert alert-success">Calendar event deleted.</div>
+{% endif %}
 
 <details class="card shadow-sm mb-4 documents-filters"{% if filters.event_type or filters.status or filters.source or filters.document_id %} open{% endif %}>
   <summary class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">

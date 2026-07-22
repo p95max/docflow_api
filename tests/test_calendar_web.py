@@ -164,6 +164,39 @@ def test_calendar_detail_confirms_and_dismisses_suggestion(
     assert dismissed.status == CalendarEventStatus.cancelled
 
 
+def test_calendar_detail_deletes_event_after_browser_confirmation(
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    event = CalendarEvent(
+        owner_id=test_user.id,
+        title="Remove this event",
+        event_type=CalendarEventType.custom,
+        start_date=date(2026, 8, 8),
+        source_evidence={},
+    )
+    db_session.add(event)
+    db_session.commit()
+    _login(client, test_user)
+
+    detail = client.get(f"/calendar/events/{event.id}")
+    assert detail.status_code == status.HTTP_200_OK
+    assert f'action="/calendar/events/{event.id}/delete"' in detail.text
+    assert "Delete this calendar event? This cannot be undone." in detail.text
+
+    response = client.post(
+        f"/calendar/events/{event.id}/delete",
+        data={"sequence": str(event.sequence)},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == status.HTTP_303_SEE_OTHER
+    assert response.headers["location"] == "/calendar?deleted=1"
+    db_session.refresh(event)
+    assert event.deleted_at is not None
+
+
 def test_document_page_lists_related_events_and_creates_deadline_event(
     client: TestClient,
     db_session: Session,

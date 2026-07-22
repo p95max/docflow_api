@@ -349,6 +349,13 @@ table td, table th { vertical-align: middle; }
 .backup-download-option:hover, .backup-download-option:focus-visible { color: #fff; background: rgba(123, 161, 218, 0.16); }
 .backup-download-option small { white-space: normal; }
 
+/* A dropdown cannot escape a horizontally scrollable table. On wide screens the
+   backup table fits its workspace, so keep overflow visible for its action menu. */
+@media (min-width: 768px) {
+  .backup-table-card { overflow: visible !important; }
+  .backup-table-responsive { overflow: visible; }
+}
+
 .backup-setup { overflow: hidden; background: var(--docsflow-surface); border: 1px solid var(--docsflow-line); border-radius: 12px; }
 .backup-setup-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 0.65rem; padding: 0.95rem 1.1rem; cursor: pointer; list-style: none; }
 .backup-setup-toggle::-webkit-details-marker { display: none; }
