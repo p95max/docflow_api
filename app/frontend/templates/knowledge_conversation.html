@@ -40,8 +40,8 @@
               </h2>
               <time class="small text-secondary" datetime="{{ message.created_at.isoformat() }}">{{ message.created_at|local_time }}</time>
             </div>
-            {% if message.role.value == "assistant" and message.sources %}
-              <div class="knowledge-answer-document small mb-2">Based on: <span>{{ message.sources[0].filename }}</span>{% if message.sources|length > 1 %} <span class="text-secondary">and {{ message.sources|length - 1 }} more source{% if message.sources|length > 2 %}s{% endif %}</span>{% endif %}</div>
+            {% if message.role.value == "assistant" and message.scoped_document %}
+              <div class="knowledge-answer-document small mb-2">Scoped to: <span>{{ message.scoped_document.original_filename }}</span></div>
             {% endif %}
             <div class="knowledge-message-content">{{ message.content }}</div>
             {% if message.sources %}

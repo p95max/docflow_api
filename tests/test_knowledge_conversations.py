@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 import app.services.knowledge_conversations as knowledge_conversations
 from app.models.knowledge_message import KnowledgeMessage, KnowledgeMessageRole
+from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.user import User
 from app.schemas.knowledge import KnowledgeQuestionCreate, SemanticSearchResult
@@ -60,6 +61,19 @@ def _search_result() -> SemanticSearchResult:
         document_date=date(2016, 11, 26),
         deadline=date(2016, 12, 26),
     )
+
+
+def _add_scoped_document(db_session: Session, user: User) -> None:
+    db_session.add(
+        Document(
+            id=7,
+            owner_id=user.id,
+            original_filename="invoice.pdf",
+            status=DocumentStatus.completed,
+            processing_mode=ProcessingMode.standard,
+        )
+    )
+    db_session.commit()
 
 
 def test_question_schema_enforces_one_sentence() -> None:
@@ -158,6 +172,7 @@ def test_document_scope_is_forwarded_to_retrieval(
     test_user: User,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _add_scoped_document(db_session, test_user)
     conversation = create_conversation(
         db=db_session,
         owner_id=test_user.id,
@@ -207,6 +222,7 @@ def test_selected_document_uses_its_best_chunks_for_a_generic_question(
     test_user: User,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _add_scoped_document(db_session, test_user)
     conversation = create_conversation(
         db=db_session,
         owner_id=test_user.id,
@@ -238,6 +254,7 @@ def test_selected_document_uses_its_best_chunks_for_a_generic_question(
     )
 
     assert assistant_message.content == "This is an invoice for 950 USD."
+    assert assistant_message.scoped_document_id == 7
     assert [source.chunk_id for source in assistant_message.sources] == [42]
 
 

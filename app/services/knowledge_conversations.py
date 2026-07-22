@@ -79,7 +79,10 @@ def get_owned_conversation(
         .options(
             selectinload(KnowledgeConversation.messages).selectinload(
                 KnowledgeMessage.sources
-            )
+            ),
+            selectinload(KnowledgeConversation.messages).selectinload(
+                KnowledgeMessage.scoped_document
+            ),
         )
         .where(
             KnowledgeConversation.id == conversation_id,
@@ -177,8 +180,9 @@ def answer_conversation_question(
                 db=db,
                 conversation=conversation,
                 user_message=user_message,
-                answer=NO_ANSWER_MESSAGE,
-                sources=[],
+                    answer=NO_ANSWER_MESSAGE,
+                    sources=[],
+                    scoped_document_id=document_id,
             )
 
         enforce_openai_usage_quota(db=db, owner_id=owner_id)
@@ -222,6 +226,7 @@ def answer_conversation_question(
             answer=answer.answer.strip(),
             sources=selected_sources,
             response=response,
+            scoped_document_id=document_id,
         )
     except Exception:
         db.rollback()
@@ -236,11 +241,13 @@ def _persist_answer(
     answer: str,
     sources: list[SemanticSearchResult],
     response: Any | None = None,
+    scoped_document_id: int | None = None,
 ) -> tuple[KnowledgeMessage, KnowledgeMessage]:
     assistant_message = KnowledgeMessage(
         conversation_id=conversation.id,
         role=KnowledgeMessageRole.assistant,
         content=answer,
+        scoped_document_id=scoped_document_id,
     )
     db.add(assistant_message)
     db.flush()

@@ -24,6 +24,11 @@ class KnowledgeMessage(Base):
         nullable=False,
         index=True,
     )
+    scoped_document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     role: Mapped[KnowledgeMessageRole] = mapped_column(
         Enum(KnowledgeMessageRole, name="knowledge_message_role"),
         nullable=False,
@@ -36,6 +41,7 @@ class KnowledgeMessage(Base):
     )
 
     conversation = relationship("KnowledgeConversation", back_populates="messages")
+    scoped_document = relationship("Document", foreign_keys=[scoped_document_id])
     sources = relationship(
         "KnowledgeMessageSource",
         back_populates="message",
