@@ -339,6 +339,11 @@ table td, table th { vertical-align: middle; }
 .knowledge-message-assistant-new { border-color: #76d8ff; box-shadow: 0 0 0 1px rgba(118, 216, 255, 0.18) !important; }
 .knowledge-message-user .knowledge-message-author, .knowledge-message-user time, .knowledge-message-user .knowledge-message-content { color: #effff9 !important; }
 .knowledge-composer { position: sticky; bottom: 1rem; z-index: 1; background: rgba(21, 28, 41, 0.96); }
+.knowledge-composer .card-body { padding: 0.85rem 1rem; }
+.knowledge-question-input { min-height: 4.75rem; resize: vertical; }
+.knowledge-composer-controls { display: flex; gap: 0.65rem; align-items: flex-start; margin-top: 0.65rem; }
+.knowledge-document-scope { flex: 1 1 18rem; min-width: 0; }
+.knowledge-composer-controls .btn { flex: 0 0 auto; }
 .source-card { background: rgba(7, 13, 23, 0.35); border-color: var(--docsflow-line) !important; }
 
 .conversation-delete-button { display: inline-flex; width: 2rem; height: 2rem; padding: 0; align-items: center; justify-content: center; }
@@ -390,6 +395,8 @@ form[aria-busy="true"] { opacity: 0.75; }
   .ai-usage-model { display: none; }
   .preview-frame { min-height: 28rem; }
   .knowledge-message { max-width: 93%; }
+  .knowledge-composer-controls { align-items: stretch; flex-direction: column; }
+  .knowledge-composer-controls .btn { width: 100%; }
   .workspace-page-head { align-items: flex-start; }
   .calendar-toolbar { align-items: flex-start; flex-direction: column; }
   .calendar-agenda-event { grid-template-columns: 1fr; gap: 0.45rem; }
