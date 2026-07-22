@@ -74,8 +74,8 @@ def test_knowledge_conversation_page_has_short_question_form(
 
     assert response.status_code == 200
     assert 'maxlength="300"' in response.text
-    assert "Which invoices are due this month?" in response.text
-    assert "Ask a concise question" in response.text
+    assert 'placeholder="Ask a concise question about your documents"' in response.text
+    assert "Ask a concise question (up to 300 characters)" in response.text
     assert f'action="/knowledge/conversations/{conversation.id}/delete"' in response.text
     assert 'data-loading-label="Asking"' in response.text
     assert '<script data-form-feedback>' in response.text
