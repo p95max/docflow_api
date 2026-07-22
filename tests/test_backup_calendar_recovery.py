@@ -142,6 +142,19 @@ def test_v3_backup_restores_calendar_records_without_overdue_reminders(
     assert repeated.restored_reminders == 0
     assert repeated.restored_notifications == 0
 
+    deleted_event = restored_events["Personal deadline"]
+    deleted_event.deleted_at = datetime.now(UTC)
+    db_session.commit()
+    reactivated = restore_recovery_backup(
+        db=db_session,
+        owner_id=test_user.id,
+        encrypted_content=encrypt_recovery_archive(content=archive.content, recovery_key=recovery_key),
+        recovery_key=recovery_key,
+    )
+    db_session.refresh(deleted_event)
+    assert reactivated.restored_calendar_events == 1
+    assert deleted_event.deleted_at is None
+
 
 def test_v3_restore_schema_rejects_unknown_calendar_fields(
     db_session: Session,

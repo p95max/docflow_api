@@ -218,6 +218,14 @@ def _restore_calendar_events(
             )
         )
         if existing is not None:
+            if existing.deleted_at is not None:
+                _restore_deleted_calendar_event(
+                    event=existing,
+                    record=record,
+                    document_map=document_map,
+                )
+                db.flush()
+                restored += 1
             event_map[record.id] = existing
             continue
         event = CalendarEvent(
@@ -251,6 +259,42 @@ def _restore_calendar_events(
         event_map[record.id] = event
         restored += 1
     return event_map, restored
+
+
+def _restore_deleted_calendar_event(
+    *,
+    event: CalendarEvent,
+    record: object,
+    document_map: dict[int, Document],
+) -> None:
+    """Reactivate a soft-deleted event when its archived UID is restored."""
+    event.document_id = (
+        document_map[record.document_id].id
+        if record.document_id in document_map
+        else None
+    )
+    event.title = record.title
+    event.description = record.description
+    event.event_type = record.event_type
+    event.status = record.status
+    event.source = record.source
+    event.all_day = record.all_day
+    event.start_date = record.start_date
+    event.end_date = record.end_date
+    event.start_at = record.start_at
+    event.end_at = record.end_at
+    event.timezone = record.timezone
+    event.source_field = record.source_field
+    event.source_key = record.source_key
+    event.source_evidence = record.source_evidence
+    event.confidence_score = record.confidence_score
+    event.requires_review = record.requires_review
+    event.detached_from_source = record.detached_from_source
+    event.completed_at = record.completed_at
+    event.sequence = record.sequence
+    event.created_at = record.created_at
+    event.updated_at = record.updated_at
+    event.deleted_at = None
 
 
 def _restored_ical_uid(*, owner_id: int, source_ical_uid: str) -> str:
