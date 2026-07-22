@@ -48,7 +48,8 @@
   {% if restore_result %}
     <div class="alert alert-success" role="alert">
       {{ restore_result }} Original PDF, JPG and PNG files were not restored;
-      restored documents contain their extracted content and fields only.
+      restored documents contain their extracted content and fields only, while
+      calendar records are restored from v3 archives.
     </div>
   {% endif %}
 
@@ -167,7 +168,7 @@
     <div class="card-body">
       <h2 class="h6">3. Create backup</h2>
       {% if google_drive_connection and recovery_key_configured %}
-        <p class="text-secondary">Your encrypted recovery archive will be uploaded to Google Drive.</p>
+        <p class="text-secondary">Your encrypted recovery archive with document data, calendar events, reminders and notifications will be uploaded to Google Drive.</p>
         <form method="post" action="/backups/run">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="btn btn-primary" type="submit">Create backup</button>
@@ -183,7 +184,7 @@
   <details class="card shadow-sm mb-4">
     <summary class="card-header cursor-pointer">Restore recovery backup</summary>
     <div class="card-body">
-      <p class="text-secondary">Restores document records, extracted text and fields without original PDF, JPG or PNG files. After recovery, previews and original-file downloads are unavailable. Standard documents are indexed again automatically.</p>
+      <p class="text-secondary">Restores document records, extracted text and fields, plus calendar events, reminders and notifications from v3 archives. Original PDF, JPG and PNG files are not included, so previews and original-file downloads remain unavailable. Standard documents are indexed again automatically.</p>
       <form method="post" action="/backups/restore" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="mb-3">
@@ -367,16 +368,14 @@
   <div class="card shadow-sm mt-4">
     <div class="card-body">
       <h2 class="h6">Backup scope</h2>
-      <p class="text-secondary mb-0">
-        Recovery backups preserve document records, extracted text and fields so
-        they can be restored after a database loss. They are uploaded to
-        <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as
-        encrypted <code>.json.gz.enc</code> files. Original PDF, JPG and PNG
-        files are not included, so restored documents have no preview or
-        original-file download. DocsFlow keeps up to {{ backup_max_retained }} completed
-        manual archives and {{ backup_max_retained }} completed automatic archives; older
-        archives of the same type are removed automatically.
-      </p>
+      <p class="text-secondary mb-2">Each encrypted recovery archive saves:</p>
+      <ul class="text-secondary mb-3 ps-3">
+        <li>document metadata, extracted text, AI result and personal note;</li>
+        <li>calendar events, including links to restored documents;</li>
+        <li>event reminders and in-app notifications.</li>
+      </ul>
+      <p class="text-secondary mb-3">It does <strong>not</strong> save original PDF, JPG or PNG files, document previews, OAuth credentials, or Google Drive refresh tokens. Restored documents therefore have no preview or original-file download.</p>
+      <p class="text-secondary mb-0">Archives are uploaded to <code>/{{ google_drive_folder_name }}</code> in the Google Drive root as encrypted <code>.json.gz.enc</code> files. DocsFlow keeps up to {{ backup_max_retained }} completed manual archives and {{ backup_max_retained }} completed automatic archives; older archives of the same type are removed automatically.</p>
     </div>
   </div>
 

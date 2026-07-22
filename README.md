@@ -241,13 +241,20 @@ python -m poetry run alembic upgrade head
 
 ### Recovery backups
 
-Backups on `/backups` are recovery archives: they contain document metadata,
-extracted text, optional personal notes, structured extraction results,
-calendar events, reminders, and in-app notifications, but not original PDF,
-JPG, or PNG files. Each archive is encrypted with a per-user
-**Recovery Key** before it is uploaded to Google Drive. The key is displayed
-once after it is generated; save it in a password manager or another secure
-location.
+Backups on `/backups` are encrypted recovery archives. Each archive is
+encrypted with a per-user **Recovery Key** before upload to Google Drive. The
+key is displayed once after it is generated; save it in a password manager or
+another secure location.
+
+Schema v3 archives save:
+
+- document metadata, extracted text, structured AI results, and personal notes;
+- calendar events and their links to documents;
+- event reminders and in-app notifications.
+
+They never save original PDF, JPG, or PNG files, document previews, OAuth
+credentials, or Google Drive refresh tokens. A restored document therefore has
+its extracted content and fields, but no preview or original-file download.
 
 For the first backup, use this sequence:
 
