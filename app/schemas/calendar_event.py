@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import unicodedata
 from datetime import date, datetime
 from typing import Any
 
@@ -29,7 +30,7 @@ class _CalendarEventFields(BaseModel):
     @field_validator("title")
     @classmethod
     def title_must_not_be_blank(cls, value: str) -> str:
-        normalized = value.strip()
+        normalized = _sanitize_calendar_text(value, preserve_newlines=False).strip()
         if not normalized:
             raise ValueError("Title must not be blank.")
         return normalized
@@ -39,7 +40,7 @@ class _CalendarEventFields(BaseModel):
     def normalize_blank_description(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        return value.strip() or None
+        return _sanitize_calendar_text(value, preserve_newlines=True).strip() or None
 
     @field_validator("timezone")
     @classmethod
@@ -108,7 +109,7 @@ class CalendarEventUpdate(BaseModel):
     def update_title_must_not_be_blank(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        normalized = value.strip()
+        normalized = _sanitize_calendar_text(value, preserve_newlines=False).strip()
         if not normalized:
             raise ValueError("Title must not be blank.")
         return normalized
@@ -118,7 +119,7 @@ class CalendarEventUpdate(BaseModel):
     def normalize_update_description(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        return value.strip() or None
+        return _sanitize_calendar_text(value, preserve_newlines=True).strip() or None
 
     @field_validator("timezone")
     @classmethod
@@ -226,3 +227,19 @@ class CalendarEventComplete(BaseModel):
     expected_sequence: int | None = Field(default=None, ge=0)
 
     model_config = ConfigDict(extra="forbid")
+
+
+def _sanitize_calendar_text(value: str, *, preserve_newlines: bool) -> str:
+    """Keep event text plain and bounded before it reaches HTML or ICS output."""
+    normalized = unicodedata.normalize("NFKC", value)
+    sanitized: list[str] = []
+    for character in normalized:
+        if character in {"\n", "\r"}:
+            sanitized.append("\n" if preserve_newlines else " ")
+        elif character == "\t":
+            sanitized.append(" ")
+        elif unicodedata.category(character).startswith("C"):
+            continue
+        else:
+            sanitized.append(character)
+    return "".join(sanitized)

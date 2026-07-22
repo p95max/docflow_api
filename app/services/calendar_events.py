@@ -26,6 +26,7 @@ from app.services.reminder_scheduler import (
     cancel_event_reminders,
     reschedule_event_reminders,
 )
+from app.services.rate_limits import enforce_calendar_write_rate_limit
 
 
 class CalendarEventNotFoundError(LookupError):
@@ -107,6 +108,7 @@ def create_user_event(
     owner_id: int,
     payload: CalendarEventCreate,
 ) -> CalendarEvent:
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_owned_document(db=db, owner_id=owner_id, document_id=payload.document_id)
     event = CalendarEvent(
         owner_id=owner_id,
@@ -142,6 +144,7 @@ def update_event(
     payload: CalendarEventUpdate,
 ) -> CalendarEvent:
     event = get_event(db=db, owner_id=owner_id, event_id=event_id)
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_sequence(event=event, expected_sequence=payload.expected_sequence)
     event_values = _validated_update_values(event=event, payload=payload)
     _ensure_owned_document(
@@ -185,6 +188,7 @@ def delete_event(
     expected_sequence: int | None = None,
 ) -> None:
     event = get_event(db=db, owner_id=owner_id, event_id=event_id)
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_sequence(event=event, expected_sequence=expected_sequence)
     event.deleted_at = datetime.now(UTC)
     event.sequence += 1
@@ -210,6 +214,7 @@ def confirm_event(
     expected_sequence: int | None = None,
 ) -> CalendarEvent:
     event = get_event(db=db, owner_id=owner_id, event_id=event_id)
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_sequence(event=event, expected_sequence=expected_sequence)
     if event.status == CalendarEventStatus.cancelled:
         raise CalendarEventConflictError("Event is cancelled.")
@@ -241,6 +246,7 @@ def complete_event(
     expected_sequence: int | None = None,
 ) -> CalendarEvent:
     event = get_event(db=db, owner_id=owner_id, event_id=event_id)
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_sequence(event=event, expected_sequence=expected_sequence)
     if event.status == CalendarEventStatus.cancelled:
         raise CalendarEventConflictError("Event is cancelled.")
@@ -276,6 +282,7 @@ def cancel_event(
     expected_sequence: int | None = None,
 ) -> CalendarEvent:
     event = get_event(db=db, owner_id=owner_id, event_id=event_id)
+    enforce_calendar_write_rate_limit(user_id=owner_id)
     _ensure_sequence(event=event, expected_sequence=expected_sequence)
     if event.status == CalendarEventStatus.completed:
         raise CalendarEventConflictError("Event is completed.")

@@ -121,6 +121,17 @@ def enforce_knowledge_question_rate_limit(*, user_id: int) -> None:
     )
 
 
+def enforce_calendar_write_rate_limit(*, user_id: int) -> None:
+    """Bound state-changing calendar actions for one authenticated account."""
+    enforce_rate_limit(
+        scope="calendar-write-user",
+        identity=str(user_id),
+        requests=settings.calendar_write_rate_limit_requests,
+        window_seconds=settings.calendar_write_rate_limit_window_seconds,
+        detail="Calendar write rate limit exceeded. Please try again later.",
+    )
+
+
 def enforce_openai_usage_quota(*, db: Session, owner_id: int) -> None:
     """Bound per-user OpenAI requests and already-recorded token usage."""
     if not settings.rate_limit_enabled:

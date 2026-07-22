@@ -8,6 +8,9 @@ from app.core.config import settings
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.user import User
+from app.models.calendar_event import CalendarEventType
+from app.schemas.calendar_event import CalendarEventCreate
+from app.services.calendar_events import create_user_event
 
 
 class FakeRedis:
@@ -77,6 +80,31 @@ def test_question_limit_is_per_user(
         rate_limits.enforce_knowledge_question_rate_limit(user_id=7)
 
     assert exc_info.value.status_code == 429
+
+
+def test_calendar_writes_are_rate_limited_for_api_and_html_service_paths(
+    db_session: Session,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_fake_redis(monkeypatch)
+    monkeypatch.setattr(settings, "calendar_write_rate_limit_requests", 1)
+    payload = CalendarEventCreate(
+        title="First event",
+        event_type=CalendarEventType.custom,
+        start_date="2026-08-01",
+    )
+    create_user_event(db=db_session, owner_id=test_user.id, payload=payload)
+
+    with pytest.raises(HTTPException) as exc_info:
+        create_user_event(
+            db=db_session,
+            owner_id=test_user.id,
+            payload=payload.model_copy(update={"title": "Second event"}),
+        )
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.headers == {"Retry-After": "60"}
 
 
 def test_openai_token_quota_counts_legacy_document_usage(

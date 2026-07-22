@@ -431,17 +431,17 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 20. Security
 
-- [ ] Verify ownership in every query
-- [ ] Use CSRF protection for web forms
-- [ ] Add rate limiting to write endpoints
-- [ ] Use soft deletion
-- [ ] Protect private ICS feed tokens
-- [ ] Do not expose another user's events through document relationships
-- [ ] Verify permissions when navigating from an event to a document
-- [ ] Sanitize titles and descriptions
-- [ ] Limit field lengths
-- [ ] Do not render AI descriptions as HTML
-- [ ] Add IDOR security tests
+- [x] Verify ownership in every query
+- [x] Use CSRF protection for web forms
+- [x] Add rate limiting to write endpoints
+- [x] Use soft deletion
+- [x] Protect private ICS feed tokens
+- [x] Do not expose another user's events through document relationships
+- [x] Verify permissions when navigating from an event to a document
+- [x] Sanitize titles and descriptions
+- [x] Limit field lengths
+- [x] Do not render AI descriptions as HTML
+- [x] Add IDOR security tests
 
 ---
 

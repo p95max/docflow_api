@@ -152,6 +152,11 @@ user can create a private subscription URL, regenerate it (which revokes the
 old URL), or revoke it. Only an HMAC hash of this opaque feed token is stored;
 the access JWT is never placed in a subscription URL.
 
+Calendar writes are owner-scoped, CSRF-protected in the HTML interface, and
+rate-limited per account (60 writes per minute by default). Event titles and
+descriptions are normalized as plain text, length-bounded, and rendered with
+Jinja auto-escaping; they are never treated as HTML.
+
 ### Signed File URLs
 
 Document result responses include short-lived, signed URLs for inline preview

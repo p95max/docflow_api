@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     semantic_search_rate_limit_window_seconds: int = Field(default=60, ge=1)
     knowledge_question_rate_limit_requests: int = Field(default=10, ge=1)
     knowledge_question_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    calendar_write_rate_limit_requests: int = Field(default=60, ge=1)
+    calendar_write_rate_limit_window_seconds: int = Field(default=60, ge=1)
     openai_daily_request_quota: int = Field(default=200, ge=1)
     openai_daily_token_quota: int = Field(default=500_000, ge=1)
 

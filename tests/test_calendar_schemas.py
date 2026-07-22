@@ -100,6 +100,31 @@ def test_update_schema_validates_supplied_values_only() -> None:
     assert payload.start_at == datetime(2026, 8, 1, 8, tzinfo=UTC)
 
 
+def test_event_text_is_plain_normalized_and_bounded() -> None:
+    payload = CalendarEventCreate(
+        title="  Pay\x00\tinvoice  ",
+        description=" line one\x00\r\nline two\t ",
+        event_type=CalendarEventType.payment_due,
+        start_date="2026-08-01",
+    )
+    assert payload.title == "Pay invoice"
+    assert payload.description == "line one\n\nline two"
+
+    with pytest.raises(ValidationError):
+        CalendarEventCreate(
+            title="x" * 256,
+            event_type=CalendarEventType.custom,
+            start_date="2026-08-01",
+        )
+    with pytest.raises(ValidationError):
+        CalendarEventCreate(
+            title="Valid",
+            description="x" * 10_001,
+            event_type=CalendarEventType.custom,
+            start_date="2026-08-01",
+        )
+
+
 def test_update_schema_rejects_invalid_supplied_range() -> None:
     with pytest.raises(ValidationError, match="end_at must not be earlier"):
         CalendarEventUpdate(
