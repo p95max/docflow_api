@@ -51,7 +51,7 @@ from app.models.calendar_event import (
     CalendarEventType,
 )
 from app.models.document import Document, DocumentStatus, ProcessingMode
-from app.models.document_index_job import DocumentIndexJobStatus
+from app.models.document_index_job import DocumentIndexJob, DocumentIndexJobStatus
 from app.models.knowledge_message import KnowledgeMessageRole
 from app.schemas.document import DocumentCorrection, DocumentNoteUpdate
 from app.schemas.calendar_event import (
@@ -554,6 +554,29 @@ def _list_knowledge_documents(
     )
 
 
+def _list_selectable_knowledge_documents(
+    *,
+    db: Session,
+    owner_id: int,
+) -> list[Document]:
+    """Return only documents that can provide RAG context."""
+    return list(
+        db.scalars(
+            select(Document)
+            .join(DocumentIndexJob, DocumentIndexJob.document_id == Document.id)
+            .where(
+                Document.owner_id == owner_id,
+                Document.deleted_at.is_(None),
+                Document.status == DocumentStatus.completed,
+                Document.processing_mode == ProcessingMode.standard,
+                Document.raw_text.is_not(None),
+                DocumentIndexJob.status == DocumentIndexJobStatus.completed,
+            )
+            .order_by(Document.original_filename.asc(), Document.id.asc())
+        ).all()
+    )
+
+
 def _render_knowledge_page(
     *,
     request: Request,
@@ -597,6 +620,7 @@ def _render_knowledge_conversation(
     current_user: User,
     conversation_id: int,
     question_value: str = "",
+    selected_document_id: int | None = None,
     error: str | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> HTMLResponse:
@@ -647,6 +671,11 @@ def _render_knowledge_conversation(
         unread_assistant_message_ids=unread_assistant_message_ids,
         latest_unread_assistant_message_id=latest_unread_assistant_message_id,
         question_value=question_value,
+        selected_document_id=selected_document_id,
+        selectable_documents=_list_selectable_knowledge_documents(
+            db=db,
+            owner_id=current_user.id,
+        ),
         error=error,
         status_code=status_code,
     )
@@ -1146,6 +1175,7 @@ def ask_knowledge_question_submit(
     conversation_id: int,
     request: Request,
     question: str = Form(...),
+    document_id: str = Form(""),
     db: Session = Depends(get_db),
 ) -> Response:
     current_user = _get_web_current_user(request, db)
@@ -1158,22 +1188,48 @@ def ask_knowledge_question_submit(
         )
 
     try:
-        payload = KnowledgeQuestionCreate(question=question)
+        payload = KnowledgeQuestionCreate(
+            question=question,
+            document_id=document_id.strip() or None,
+        )
+        if payload.document_id is not None:
+            selectable_document = db.scalar(
+                select(Document.id)
+                .join(DocumentIndexJob, DocumentIndexJob.document_id == Document.id)
+                .where(
+                    Document.id == payload.document_id,
+                    Document.owner_id == current_user.id,
+                    Document.deleted_at.is_(None),
+                    Document.status == DocumentStatus.completed,
+                    Document.processing_mode == ProcessingMode.standard,
+                    Document.raw_text.is_not(None),
+                    DocumentIndexJob.status == DocumentIndexJobStatus.completed,
+                )
+            )
+            if selectable_document is None:
+                raise ValueError("Choose one of your indexed documents.")
         enforce_knowledge_question_rate_limit(user_id=current_user.id)
         answer_conversation_question(
             db=db,
             owner_id=current_user.id,
             conversation_id=conversation_id,
             question=payload.question,
+            document_id=payload.document_id,
         )
-    except ValidationError as exc:
+    except (ValidationError, ValueError) as exc:
+        error = (
+            exc.errors()[0].get("msg", "Invalid question.")
+            if isinstance(exc, ValidationError)
+            else str(exc)
+        )
         return _render_knowledge_conversation(
             request=request,
             db=db,
             current_user=current_user,
             conversation_id=conversation_id,
             question_value=question,
-            error=exc.errors()[0].get("msg", "Invalid question."),
+            selected_document_id=(int(document_id) if document_id.isdigit() else None),
+            error=error,
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
     except HTTPException as exc:

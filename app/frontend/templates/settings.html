@@ -6,7 +6,8 @@
   <section class="auth-shell">
     <div class="card docsflow-panel">
       <div class="card-body p-4">
-        <p class="workspace-kicker">Timezone</p>
+        <p class="workspace-kicker">General</p>
+        <h2 class="h5" id="email-reminder-title">Timezone</h2>
         <p class="text-secondary mb-4">Choose the timezone used to display dates and times in DocsFlow.</p>
 
         {% if updated %}
@@ -43,7 +44,7 @@
         </section>
         <hr class="my-4">
         <section aria-labelledby="calendar-feed-title">
-          <p class="workspace-kicker">Calendar subscription</p>
+          <p class="workspace-kicker">Calendar</p>
           <h2 class="h5" id="calendar-feed-title">Private calendar feed</h2>
           <p class="text-secondary">Create a private .ics subscription URL for Google Calendar, Apple Calendar, or Outlook. Anyone with this link can read your calendar, so store it like a password.</p>
           {% if request.query_params.get("calendar_feed_revoked") == "1" %}<div class="alert alert-success">Calendar feed link revoked.</div>{% endif %}
