@@ -21,6 +21,7 @@ from app.models.document import (
     ExtractionStatus,
     ProcessingMode,
 )
+from app.models.calendar_event import CalendarEvent
 from app.models.processing_job import (
     ProcessingJob,
     ProcessingJobStatus,
