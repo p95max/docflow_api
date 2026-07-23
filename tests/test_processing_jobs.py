@@ -570,6 +570,12 @@ def test_process_document_task_completes_confidential_document_locally(
     assert document.raw_text is not None
     assert "Invoice number 12345" in document.raw_text
     assert job.status == ProcessingJobStatus.completed
+    assert (
+        db_session.scalar(
+            select(CalendarEvent.id).where(CalendarEvent.document_id == document.id)
+        )
+        is None
+    )
 
 
 def _fake_ai_processing_result() -> StandardAIProcessingResult:

@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Response, status
+from sqlalchemy import update
 
 from app.api.v1.dependencies import CurrentUser, DbSession
+from app.models.calendar_event import CalendarEvent
 from app.models.document import Document
 router = APIRouter()
 
@@ -30,6 +32,18 @@ def delete_document(
         )
 
     document.deleted_at = datetime.now(UTC)
+    # Soft deletion does not activate the database-level SET NULL rule. Keep
+    # calendar history, but remove links that would lead the user to a deleted
+    # document.
+    db.execute(
+        update(CalendarEvent)
+        .where(
+            CalendarEvent.owner_id == current_user.id,
+            CalendarEvent.document_id == document.id,
+            CalendarEvent.deleted_at.is_(None),
+        )
+        .values(document_id=None, detached_from_source=True)
+    )
     db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

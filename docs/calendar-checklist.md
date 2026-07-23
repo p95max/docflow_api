@@ -485,17 +485,23 @@ Architecture contract: [calendar-architecture.md](calendar-architecture.md)
 
 ## 23. Integration Tests
 
-- [ ] An AI-processed document creates a suggested event
-- [ ] A confirmed event links to its document
-- [ ] Reprocessing does not duplicate an event
-- [ ] Manual document correction updates the suggestion
-- [ ] Manual event editing detaches it from the AI source
-- [ ] A deleted document does not expose an inaccessible event
-- [ ] Soft-deleted events are excluded from the calendar
-- [ ] A reminder is delivered once
-- [ ] Recovery backup restores calendar records
-- [ ] User A cannot access User B's events
-- [ ] A confidential document does not create an AI event until AI analysis is explicitly enabled
+- [x] An AI-processed document creates a suggested event
+- [x] A confirmed event links to its document
+- [x] Reprocessing does not duplicate an event
+- [x] Manual document correction updates the suggestion
+- [x] Manual event editing detaches it from the AI source
+- [x] A deleted document does not expose an inaccessible event
+- [x] Soft-deleted events are excluded from the calendar
+- [x] A reminder is delivered once
+- [x] Recovery backup restores calendar records
+- [x] User A cannot access User B's events
+- [x] A confidential document does not create an AI event until AI analysis is explicitly enabled
+
+Coverage is implemented across `test_processing_jobs.py`,
+`test_document_calendar_projection.py`, `test_calendar_api.py`,
+`test_calendar_security.py`, `test_calendar_feed.py`,
+`test_reminder_scheduler.py`, `test_backup_calendar_recovery.py`, and
+`test_knowledge_document_scope_web.py`.
 
 ## 24. UI Tests
 

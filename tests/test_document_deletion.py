@@ -1,10 +1,18 @@
 from pathlib import Path
+from datetime import date
 
 from fastapi import status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.api.v1.routes_document_deletion import delete_document
 from app.models.audit_log import AuditLog
+from app.models.calendar_event import (
+    CalendarEvent,
+    CalendarEventSource,
+    CalendarEventStatus,
+    CalendarEventType,
+)
 from app.models.document import Document, DocumentStatus, ProcessingMode
 from app.models.openai_usage_log import OpenAIUsageLog
 from app.models.processing_job import ProcessingJob
@@ -89,6 +97,38 @@ def test_delete_document_soft_deletes_database_record_and_keeps_file(
     assert db_session.get(OpenAIUsageLog, usage_log.id) is not None
     assert db_session.get(AuditLog, audit_log.id) is not None
     assert file_path.exists()
+
+
+def test_delete_document_preserves_linked_event_without_broken_document_link(
+    db_session: Session,
+    test_user: User,
+) -> None:
+    document, _, *_ = _create_stored_document(db_session, test_user)
+    event = CalendarEvent(
+        owner_id=test_user.id,
+        document_id=document.id,
+        title="Pay invoice",
+        event_type=CalendarEventType.payment_due,
+        source=CalendarEventSource.ai,
+        status=CalendarEventStatus.confirmed,
+        all_day=True,
+        start_date=date(2026, 8, 1),
+        source_evidence={},
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    response = delete_document(
+        document_id=document.id,
+        db=db_session,
+        current_user=test_user,
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    db_session.refresh(event)
+    assert event.deleted_at is None
+    assert event.document_id is None
+    assert event.detached_from_source is True
 
 
 def test_delete_document_hides_other_users_documents(
