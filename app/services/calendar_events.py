@@ -26,6 +26,10 @@ from app.services.reminder_scheduler import (
     cancel_event_reminders,
     reschedule_event_reminders,
 )
+from app.services.calendar_observability import (
+    increment_calendar_counter,
+    log_calendar_event,
+)
 from app.services.rate_limits import enforce_calendar_write_rate_limit
 
 
@@ -126,6 +130,8 @@ def create_user_event(
     )
     db.commit()
     db.refresh(event)
+    increment_calendar_counter("events_created")
+    log_calendar_event("calendar_event_created", owner_id=owner_id, event_id=event.id)
     return event
 
 
@@ -177,6 +183,7 @@ def update_event(
     )
     db.commit()
     db.refresh(event)
+    log_calendar_event("calendar_event_updated", owner_id=owner_id, event_id=event.id)
     return event
 
 
@@ -204,6 +211,7 @@ def delete_event(
         old_value=_event_audit_state(event),
     )
     db.commit()
+    log_calendar_event("calendar_event_deleted", owner_id=owner_id, event_id=event.id)
 
 
 def confirm_event(
@@ -235,6 +243,8 @@ def confirm_event(
     )
     db.commit()
     db.refresh(event)
+    increment_calendar_counter("suggestions_confirmed")
+    log_calendar_event("calendar_suggestion_confirmed", owner_id=owner_id, event_id=event.id)
     return event
 
 
@@ -271,6 +281,7 @@ def complete_event(
     )
     db.commit()
     db.refresh(event)
+    log_calendar_event("calendar_event_completed", owner_id=owner_id, event_id=event.id)
     return event
 
 
@@ -306,6 +317,7 @@ def cancel_event(
     )
     db.commit()
     db.refresh(event)
+    log_calendar_event("calendar_event_cancelled", owner_id=owner_id, event_id=event.id)
     return event
 
 
@@ -354,6 +366,14 @@ def reconcile_ai_event(
         )
         db.commit()
         db.refresh(event)
+        increment_calendar_counter("events_created")
+        increment_calendar_counter("suggestions_created")
+        log_calendar_event(
+            "calendar_suggestion_created",
+            owner_id=owner_id,
+            document_id=document_id,
+            event_id=event.id,
+        )
         return event
 
     if event.detached_from_source or event.status != CalendarEventStatus.suggested:
@@ -391,6 +411,12 @@ def reconcile_ai_event(
         )
         db.commit()
         db.refresh(event)
+        log_calendar_event(
+            "calendar_suggestion_reconciled",
+            owner_id=owner_id,
+            document_id=document_id,
+            event_id=event.id,
+        )
     return event
 
 

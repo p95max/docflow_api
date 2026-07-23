@@ -438,6 +438,12 @@ def test_celery_task_returns_scheduler_metrics(
         "process_due_reminders",
         lambda **_kwargs: ReminderSchedulerMetrics(queued=2, delayed=2),
     )
+    heartbeat_calls: list[bool] = []
+    monkeypatch.setattr(
+        reminder_tasks,
+        "record_beat_heartbeat",
+        lambda: heartbeat_calls.append(True),
+    )
 
     result = reminder_tasks.schedule_due_reminders.apply(throw=True)
 
@@ -448,3 +454,4 @@ def test_celery_task_returns_scheduler_metrics(
         "delayed": 2,
         "cancelled": 0,
     }
+    assert heartbeat_calls == [True]

@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     reminder_max_attempts: int = Field(default=3, ge=1, le=20)
     reminder_retry_base_seconds: int = Field(default=60, ge=1, le=86_400)
     reminder_scheduler_batch_size: int = Field(default=100, ge=1, le=1_000)
+    calendar_beat_health_max_age_seconds: int = Field(default=900, ge=60, le=86_400)
+    reminder_backlog_alert_threshold: int = Field(default=50, ge=1, le=100_000)
 
     # Email reminders are opt-in at deployment level and remain unavailable until
     # all required SMTP settings are present. Values are deliberately kept as

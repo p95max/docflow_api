@@ -527,19 +527,23 @@ markup, browser form submissions, responsive CSS rules, focus styles and ARIA la
 
 ## 25. Logging and Metrics
 
-- [ ] Log projection results
-- [ ] Log skipped events with a reason code
-- [ ] Log reminder delivery
-- [ ] Add counters:
-  - [ ] `events_created`
-  - [ ] `suggestions_created`
-  - [ ] `suggestions_confirmed`
-  - [ ] `reminders_sent`
-  - [ ] `reminders_failed`
-- [ ] Add structured logs with `owner_id`, `document_id`, and `event_id`
-- [ ] Do not log full OCR text
-- [ ] Add a Celery Beat health check
-- [ ] Add an alert for a growing reminder backlog
+- [x] Log projection results
+- [x] Log skipped events with a reason code
+- [x] Log reminder delivery
+- [x] Add counters:
+  - [x] `events_created`
+  - [x] `suggestions_created`
+  - [x] `suggestions_confirmed`
+  - [x] `reminders_sent`
+  - [x] `reminders_failed`
+- [x] Add structured logs with `owner_id`, `document_id`, and `event_id`
+- [x] Do not log full OCR text
+- [x] Add a Celery Beat health check
+- [x] Add an alert for a growing reminder backlog
+
+Calendar counters and the Beat heartbeat use Redis opportunistically and never
+block product workflows if metrics storage is unavailable. Coverage is in
+`tests/test_calendar_observability.py` and `tests/test_reminder_scheduler.py`.
 
 ---
 

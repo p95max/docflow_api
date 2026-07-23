@@ -30,6 +30,10 @@ from app.services.email_reminders import (
     build_email_reminder_message,
     get_email_reminder_deliverer,
 )
+from app.services.calendar_observability import (
+    increment_calendar_counter,
+    log_calendar_event,
+)
 
 
 class ReminderDeliveryUnavailable(RuntimeError):
@@ -455,6 +459,13 @@ def _deliver_claimed_reminder(
         reminder.error_message = "The related calendar event is no longer active."
         metrics.cancelled += 1
         db.commit()
+        log_calendar_event(
+            "calendar_reminder_cancelled",
+            owner_id=event.owner_id,
+            event_id=event.id,
+            reminder_id=reminder.id,
+            reason_code="inactive_event",
+        )
         return
 
     try:
@@ -485,6 +496,14 @@ def _deliver_claimed_reminder(
             },
         )
         metrics.sent += 1
+        increment_calendar_counter("reminders_sent")
+        log_calendar_event(
+            "calendar_reminder_delivered",
+            owner_id=event.owner_id,
+            event_id=event.id,
+            reminder_id=reminder.id,
+            channel=reminder.channel.value,
+        )
     db.commit()
 
 
@@ -501,12 +520,27 @@ def _handle_delivery_failure(
     if reminder.attempts >= max_attempts:
         reminder.status = EventReminderStatus.failed
         metrics.failed += 1
+        increment_calendar_counter("reminders_failed")
+        log_calendar_event(
+            "calendar_reminder_failed",
+            owner_id=reminder.event.owner_id,
+            event_id=reminder.event_id,
+            reminder_id=reminder.id,
+            reason_code="max_attempts_reached",
+        )
         return
 
     retry_delay = retry_base_seconds * (2 ** (reminder.attempts - 1))
     reminder.status = EventReminderStatus.pending
     reminder.scheduled_for = now + timedelta(seconds=retry_delay)
     metrics.delayed += 1
+    log_calendar_event(
+        "calendar_reminder_delayed",
+        owner_id=reminder.event.owner_id,
+        event_id=reminder.event_id,
+        reminder_id=reminder.id,
+        reason_code="delivery_retry",
+    )
 
 
 def _event_is_inactive(event: CalendarEvent) -> bool:

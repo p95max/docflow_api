@@ -1,12 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.routes import router as api_router
 from app.core.config import settings
+from app.services.calendar_observability import calendar_beat_health
 from app.web import FRONTEND_DIR, router as web_router
 from app.web_backups import router as web_backups_router
 from app.web_document_ai import router as web_document_ai_router
@@ -74,6 +75,18 @@ async def add_security_headers(request: Request, call_next):
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/beat", tags=["system"])
+def celery_beat_health_check() -> dict[str, object]:
+    """Read the heartbeat written by the periodic calendar reminder task."""
+    payload = calendar_beat_health()
+    if payload["status"] != "ok":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=payload,
+        )
+    return payload
 
 
 app.include_router(

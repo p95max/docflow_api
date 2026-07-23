@@ -145,6 +145,12 @@ delivery status; the navbar shows the unread count and `/notifications` lets a
 user mark one or all notifications as read. Email delivery and reminder
 settings in the event form are not implemented yet.
 
+Calendar operations emit structured logs with IDs and counts only; full OCR or
+extracted document text is never logged. The scheduler records a Redis-backed
+Beat heartbeat, available at `GET /health/beat`. The endpoint returns `503` if
+the heartbeat is missing, stale, or Redis is unavailable. It also logs a
+warning when the due-reminder backlog reaches `REMINDER_BACKLOG_ALERT_THRESHOLD`.
+
 Calendar events can also be downloaded as standard `.ics` files from their
 detail page. The same format works with Google Calendar, Apple Calendar, and
 Outlook without connecting DocsFlow to any calendar provider. In Settings, a
@@ -856,6 +862,11 @@ file.
 | `CELERY_BROKER_URL` | `redis://redis:6379/0` | Celery broker |
 | `CELERY_RESULT_BACKEND` | `redis://redis:6379/1` | Celery backend |
 | `CELERY_TASK_ALWAYS_EAGER` | `false` | Run tasks synchronously |
+| `REMINDER_MAX_ATTEMPTS` | `3` | Maximum delivery attempts for one reminder |
+| `REMINDER_RETRY_BASE_SECONDS` | `60` | Base delay for exponential reminder retries |
+| `REMINDER_SCHEDULER_BATCH_SIZE` | `100` | Maximum due reminders processed per Beat run |
+| `CALENDAR_BEAT_HEALTH_MAX_AGE_SECONDS` | `900` | Maximum allowed age of the scheduler heartbeat |
+| `REMINDER_BACKLOG_ALERT_THRESHOLD` | `50` | Log a warning when this many due reminders remain queued |
 | `DOCUMENT_PROCESSING_SOFT_TIME_LIMIT_SECONDS` | `60` | Soft task limit |
 | `DOCUMENT_PROCESSING_HARD_TIME_LIMIT_SECONDS` | `90` | Hard task limit |
 | `DOCUMENT_PROCESSING_MAX_RETRIES` | `3` | Max retry attempts |

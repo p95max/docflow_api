@@ -27,6 +27,7 @@ from app.services.calendar_event_validation import (
     TemporalEventsValidationResult,
 )
 from app.services.calendar_events import reconcile_ai_event
+from app.services.calendar_observability import log_calendar_event
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,12 @@ def reconcile_document_calendar_events(
     """
     extraction, validation = _load_projection_inputs(document)
     if extraction is None or validation is None:
+        log_calendar_event(
+            "calendar_projection_skipped",
+            owner_id=document.owner_id,
+            document_id=document.id,
+            reason_code="missing_or_invalid_extraction",
+        )
         return CalendarProjectionResult()
 
     desired_source_keys: set[str] = set()
@@ -59,6 +66,13 @@ def reconcile_document_calendar_events(
     for index, candidate in enumerate(extraction.temporal_events):
         result = validation_by_index.get(index)
         if result is None or result.status not in {TEMPORAL_VALID, TEMPORAL_WARNING}:
+            log_calendar_event(
+                "calendar_projection_skipped",
+                owner_id=document.owner_id,
+                document_id=document.id,
+                event_index=index,
+                reason_code="temporal_validation_not_projectable",
+            )
             continue
 
         candidate, was_manually_corrected = _apply_manual_deadline_correction(
@@ -69,6 +83,13 @@ def reconcile_document_calendar_events(
         if payload is None:
             # A timed candidate without an explicit IANA timezone cannot safely be
             # put on a user's calendar.  It remains in the document result instead.
+            log_calendar_event(
+                "calendar_projection_skipped",
+                owner_id=document.owner_id,
+                document_id=document.id,
+                event_index=index,
+                reason_code="invalid_event_payload",
+            )
             continue
 
         source_key = _source_key(document_id=document.id, candidate=candidate)
@@ -107,7 +128,16 @@ def reconcile_document_calendar_events(
         document=document,
         desired_source_keys=desired_source_keys,
     )
-    return CalendarProjectionResult(created=created, updated=updated, removed=removed)
+    projection = CalendarProjectionResult(created=created, updated=updated, removed=removed)
+    log_calendar_event(
+        "calendar_projection_result",
+        owner_id=document.owner_id,
+        document_id=document.id,
+        created=projection.created,
+        updated=projection.updated,
+        removed=projection.removed,
+    )
+    return projection
 
 
 def _load_projection_inputs(
