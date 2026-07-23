@@ -22,9 +22,16 @@
       <form method="post" action="/calendar/events/{{ event.id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="sequence" value="{{ event.sequence }}"><button class="btn btn-primary" type="submit">Confirm suggestion</button></form>
       <form method="post" action="/calendar/events/{{ event.id }}/dismiss"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="sequence" value="{{ event.sequence }}"><button class="btn btn-outline-danger" type="submit">Dismiss suggestion</button></form>
     </div>
+  {% elif event.status.value == 'confirmed' %}
+    <form method="post" action="/calendar/events/{{ event.id }}/complete" onsubmit="return window.confirm('Mark this calendar event as completed?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="sequence" value="{{ event.sequence }}">
+      <button class="btn btn-success" type="submit">Complete event</button>
+    </form>
   {% endif %}
 </div>
 {% if request.query_params.get("confirmed") == "1" %}<div class="alert alert-success">Event confirmed.</div>{% endif %}
+{% if request.query_params.get("completed") == "1" %}<div class="alert alert-success">Event completed.</div>{% endif %}
 {% if request.query_params.get("created_from_deadline") == "1" %}<div class="alert alert-success">Calendar event created from the document deadline.</div>{% endif %}
 {% if request.query_params.get("created") == "1" %}<div class="alert alert-success">Calendar event created.</div>{% endif %}
 {% if request.query_params.get("saved") == "1" %}<div class="alert alert-success">Event changes saved.</div>{% endif %}

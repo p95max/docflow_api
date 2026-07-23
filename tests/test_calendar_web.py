@@ -74,6 +74,32 @@ def test_calendar_page_renders_month_agenda_filters_and_event_detail_link(
     assert agenda.status_code == status.HTTP_200_OK
     assert "Pay invoice" in agenda.text
 
+    detail = client.get(f"/calendar/events/{event.id}")
+    assert detail.status_code == status.HTTP_200_OK
+    assert "AI suggested" in detail.text
+    assert f'href="/documents/{document.id}"' in detail.text
+
+
+def test_calendar_month_navigation_and_empty_agenda_state(
+    client: TestClient,
+    test_user: User,
+) -> None:
+    _login(client, test_user)
+
+    month = client.get("/calendar?month=2026-08&view=month")
+    assert month.status_code == status.HTTP_200_OK
+    assert "August 2026" in month.text
+    assert 'href="/calendar?month=2026-07&amp;view=month"' in month.text
+    assert 'href="/calendar?month=2026-09&amp;view=month"' in month.text
+
+    next_month = client.get("/calendar?month=2026-09&view=month")
+    assert next_month.status_code == status.HTTP_200_OK
+    assert "September 2026" in next_month.text
+
+    agenda = client.get("/calendar?month=2026-08&view=agenda")
+    assert agenda.status_code == status.HTTP_200_OK
+    assert "No events this month" in agenda.text
+
 
 def test_calendar_month_renders_each_overlapping_day_of_multiday_event(
     client: TestClient,
@@ -143,6 +169,18 @@ def test_calendar_detail_confirms_and_dismisses_suggestion(
     assert confirmed.status_code == status.HTTP_303_SEE_OTHER
     db_session.refresh(event)
     assert event.status == CalendarEventStatus.confirmed
+
+    confirmed_detail = client.get(f"/calendar/events/{event.id}")
+    assert "Complete event" in confirmed_detail.text
+    completed = client.post(
+        f"/calendar/events/{event.id}/complete",
+        data={"sequence": str(event.sequence)},
+        follow_redirects=False,
+    )
+    assert completed.status_code == status.HTTP_303_SEE_OTHER
+    assert completed.headers["location"] == f"/calendar/events/{event.id}?completed=1"
+    db_session.refresh(event)
+    assert event.status == CalendarEventStatus.completed
 
     dismissed = CalendarEvent(
         owner_id=test_user.id,
@@ -427,3 +465,59 @@ def test_editing_ai_event_displays_evidence_and_detaches_from_projection(
     assert event.title == "Pay after review"
     assert event.start_date == date(2026, 8, 11)
     assert event.detached_from_source is True
+
+
+def test_calendar_detail_formats_date_only_and_timed_events_in_user_timezone(
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    test_user.timezone = "Europe/Berlin"
+    date_only = CalendarEvent(
+        owner_id=test_user.id,
+        title="Date-only deadline",
+        event_type=CalendarEventType.action_deadline,
+        start_date=date(2026, 8, 12),
+        source_evidence={},
+    )
+    timed = CalendarEvent(
+        owner_id=test_user.id,
+        title="Berlin meeting",
+        event_type=CalendarEventType.appointment,
+        all_day=False,
+        start_at=datetime(2026, 8, 12, 8, 30, tzinfo=UTC),
+        timezone="Europe/Berlin",
+        source_evidence={},
+    )
+    db_session.add_all([date_only, timed])
+    db_session.commit()
+    _login(client, test_user)
+
+    date_page = client.get(f"/calendar/events/{date_only.id}")
+    assert "2026-08-12" in date_page.text
+    assert "00:00" not in date_page.text
+
+    timed_page = client.get(f"/calendar/events/{timed.id}")
+    assert "10:30 12-08-2026" in timed_page.text
+
+
+def test_calendar_markup_and_css_support_keyboard_and_mobile_layout(
+    client: TestClient,
+    test_user: User,
+) -> None:
+    _login(client, test_user)
+
+    page = client.get("/calendar?month=2026-08&view=month")
+    assert page.status_code == status.HTTP_200_OK
+    assert 'role="grid"' in page.text
+    assert 'role="gridcell"' in page.text
+    assert 'aria-label="Previous month"' in page.text
+    assert 'aria-label="Next month"' in page.text
+    assert 'aria-label="Add event on 2026-08-01"' in page.text
+
+    css = client.get("/assets/css/app.css")
+    assert css.status_code == status.HTTP_200_OK
+    assert ".btn:focus-visible" in css.text
+    assert ".calendar-day-add:hover, .calendar-day-add:focus-visible" in css.text
+    assert "@media (max-width: 576px)" in css.text
+    assert ".calendar-toolbar { align-items: flex-start; flex-direction: column; }" in css.text

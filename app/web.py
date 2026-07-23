@@ -2201,6 +2201,43 @@ def confirm_calendar_event_submit(
 
 
 @router.post(
+    "/calendar/events/{event_id}/complete",
+    response_class=HTMLResponse,
+    response_model=None,
+    dependencies=[Depends(require_csrf)],
+)
+def complete_calendar_event_submit(
+    event_id: int,
+    request: Request,
+    sequence: int = Form(..., ge=0),
+    db: Session = Depends(get_db),
+) -> Response:
+    current_user = _get_web_current_user(request, db)
+    if current_user is None:
+        return _redirect_to_login()
+    try:
+        calendar_events.complete_event(
+            db=db,
+            owner_id=current_user.id,
+            event_id=event_id,
+            expected_sequence=sequence,
+        )
+    except (calendar_events.CalendarEventNotFoundError, calendar_events.CalendarEventConflictError) as exc:
+        return _render_calendar_event_detail(
+            request=request,
+            db=db,
+            current_user=current_user,
+            event_id=event_id,
+            error=str(exc),
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    return RedirectResponse(
+        url=f"/calendar/events/{event_id}?completed=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
     "/calendar/events/{event_id}/dismiss",
     response_class=HTMLResponse,
     response_model=None,

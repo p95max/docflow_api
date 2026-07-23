@@ -505,18 +505,21 @@ Coverage is implemented across `test_processing_jobs.py`,
 
 ## 24. UI Tests
 
-- [ ] Month navigation
-- [ ] Empty state
-- [ ] Suggested event badge
-- [ ] Confirm event
-- [ ] Complete event
-- [ ] Event-to-document link
-- [ ] Document-to-event link
-- [ ] Date-only display
-- [ ] Timezone display
-- [ ] Mobile layout
-- [ ] Keyboard navigation
-- [ ] Accessible labels and focus states
+- [x] Month navigation
+- [x] Empty state
+- [x] Suggested event badge
+- [x] Confirm event
+- [x] Complete event
+- [x] Event-to-document link
+- [x] Document-to-event link
+- [x] Date-only display
+- [x] Timezone display
+- [x] Mobile layout
+- [x] Keyboard navigation
+- [x] Accessible labels and focus states
+
+Coverage is implemented in `tests/test_calendar_web.py`, including rendered
+markup, browser form submissions, responsive CSS rules, focus styles and ARIA labels.
 
 ---
 
