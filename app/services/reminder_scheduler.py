@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime, time, timedelta
-from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field

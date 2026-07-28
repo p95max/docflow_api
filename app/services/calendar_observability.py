@@ -53,8 +53,12 @@ def increment_calendar_counter(name: str, amount: int = 1) -> None:
         client = _redis_client()
         if client is not None:
             client.hincrby(_METRICS_KEY, name, amount)
-    except (RedisError, OSError, ValueError):
-        logger.warning("calendar_observability=metrics_unavailable counter=%s", name)
+    except (RedisError, OSError, ValueError) as exc:
+        logger.warning(
+            "calendar_observability=metrics_unavailable counter=%s error_type=%s",
+            name,
+            type(exc).__name__,
+        )
 
 
 def record_beat_heartbeat(*, now: datetime | None = None) -> None:
@@ -64,8 +68,11 @@ def record_beat_heartbeat(*, now: datetime | None = None) -> None:
         client = _redis_client()
         if client is not None:
             client.set(_BEAT_HEARTBEAT_KEY, timestamp)
-    except (RedisError, OSError, ValueError):
-        logger.warning("calendar_observability=beat_heartbeat_unavailable")
+    except (RedisError, OSError, ValueError) as exc:
+        logger.warning(
+            "calendar_observability=beat_heartbeat_unavailable error_type=%s",
+            type(exc).__name__,
+        )
 
 
 def calendar_beat_health(*, now: datetime | None = None) -> dict[str, Any]:

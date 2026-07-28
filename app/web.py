@@ -1882,7 +1882,7 @@ def create_calendar_event_submit(
     end_time: str = Form(""),
     timezone_name: str = Form(""),
     document_id: str = Form(""),
-    reminder_settings: list[str] = Form(default=[]),
+    reminder_settings: list[str] = Form(default_factory=list),
     email_reminders: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -2067,7 +2067,7 @@ def edit_calendar_event_submit(
     end_time: str = Form(""),
     timezone_name: str = Form(""),
     document_id: str = Form(""),
-    reminder_settings: list[str] = Form(default=[]),
+    reminder_settings: list[str] = Form(default_factory=list),
     email_reminders: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
